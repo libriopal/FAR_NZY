@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
-import type { DisruptionType } from '@match3d/farkle-shared';
+import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 
 const FACE_COLOR: Record<number, string> = {
   1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
@@ -294,67 +294,89 @@ function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void
   );
 }
 
-// ── Disruption Panel (multiplayer send) ───────────────────────────────────────
+// ── Disruption Panel (VS / Heist modes only) ─────────────────────────────────
 
-const DISRUPTION_DEFS: { type: DisruptionType; label: string; emoji: string; cooldownMs: number }[] = [
-  { type: 'ice_send',   label: 'ICE',     emoji: '❄️', cooldownMs: 25_000 },
-  { type: 'lock_send',  label: 'LOCK',    emoji: '🔒', cooldownMs: 35_000 },
-  { type: 'scramble',   label: 'SCRAMBLE',emoji: '🌀', cooldownMs: 20_000 },
+const DISRUPTION_DEFS: { type: DisruptionType; label: string; emoji: string }[] = [
+  { type: 'ice_send',  label: 'ICE',     emoji: '❄️' },
+  { type: 'lock_send', label: 'LOCK',    emoji: '🔒' },
+  { type: 'scramble',  label: 'SCRAMBLE',emoji: '🌀' },
 ];
 
-function DisruptionPanel({ onDisrupt }: { onDisrupt: (type: DisruptionType) => void }) {
-  const [cooldowns, setCooldowns] = useState<Record<DisruptionType, number>>({
-    ice_send: 0, lock_send: 0, scramble: 0,
-  });
-  const intervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+const MODE_LABEL: Partial<Record<GameMode, string>> = {
+  VS_FREE: 'VS', VS_CASINO: 'VS',
+  HEIST_FREE: 'HEIST', HEIST_CASINO: 'HEIST',
+};
 
-  function fireDisrupt(type: DisruptionType, cooldownMs: number) {
-    const ready = (cooldowns[type] ?? 0) <= 0;
-    if (!ready) return;
+function DisruptionPanel({ onDisrupt, gameMode }: { onDisrupt: (type: DisruptionType) => void; gameMode: GameMode }) {
+  const { disruptCharges, disruptChargeProgress, mode } = useFarkleStore(s => ({
+    disruptCharges: s.disruptCharges,
+    disruptChargeProgress: s.disruptChargeProgress,
+    mode: s.mode,
+  }));
+  const spendDisruptCharge = useFarkleStore(s => s.spendDisruptCharge);
+
+  function fireDisrupt(type: DisruptionType) {
+    if (disruptCharges <= 0) return;
+    if (!spendDisruptCharge()) return;
     onDisrupt(type);
-    const until = Date.now() + cooldownMs;
-    setCooldowns(prev => ({ ...prev, [type]: cooldownMs }));
-    const iv = setInterval(() => {
-      const remaining = until - Date.now();
-      if (remaining <= 0) {
-        clearInterval(iv);
-        setCooldowns(prev => ({ ...prev, [type]: 0 }));
-      } else {
-        setCooldowns(prev => ({ ...prev, [type]: remaining }));
-      }
-    }, 250);
-    if (intervalsRef.current[type]) clearInterval(intervalsRef.current[type]);
-    intervalsRef.current[type] = iv;
   }
 
-  useEffect(() => () => {
-    for (const iv of Object.values(intervalsRef.current)) clearInterval(iv);
-  }, []);
+  const hasCharge = disruptCharges > 0;
+  const isFrenzy = mode === 'FRENZY';
 
   return (
     <div style={{
       position: 'absolute', bottom: 80, right: 12,
       display: 'flex', flexDirection: 'column', gap: 5, pointerEvents: 'auto',
+      alignItems: 'flex-end',
     }}>
-      {DISRUPTION_DEFS.map(({ type, label, emoji, cooldownMs }) => {
-        const ms = cooldowns[type] ?? 0;
-        const ready = ms <= 0;
-        const secLeft = Math.ceil(ms / 1000);
-        return (
-          <button key={type} onClick={() => fireDisrupt(type, cooldownMs)} disabled={!ready} style={{
-            background: ready ? 'rgba(124,58,237,0.35)' : 'var(--ba-card-bg)',
-            border: `1px solid ${ready ? 'rgba(167,139,250,0.7)' : 'var(--ba-card-border)'}`,
-            color: ready ? '#e9d5ff' : 'var(--ba-marble-800)',
-            borderRadius: 8, padding: '5px 10px',
-            fontSize: 11, fontWeight: 700, cursor: ready ? 'pointer' : 'default',
-            fontFamily: 'monospace', whiteSpace: 'nowrap',
-            boxShadow: ready ? '0 0 8px rgba(124,58,237,0.4)' : 'none',
-            transition: 'all 0.15s ease',
-          }}>
-            {emoji} {ready ? label : `${secLeft}s`}
-          </button>
-        );
-      })}
+      {/* Mode badge */}
+      <div style={{
+        fontSize: 9, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2,
+        color: 'rgba(167,139,250,0.7)', marginBottom: 2,
+      }}>
+        {MODE_LABEL[gameMode]} MODE
+      </div>
+
+      {/* Charge meter */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: i < disruptCharges
+              ? '#a78bfa'
+              : i === disruptCharges
+                ? `linear-gradient(90deg, #a78bfa ${disruptChargeProgress}%, rgba(124,58,237,0.2) ${disruptChargeProgress}%)`
+                : 'rgba(124,58,237,0.15)',
+            border: '1px solid rgba(124,58,237,0.4)',
+            boxShadow: i < disruptCharges ? '0 0 5px rgba(167,139,250,0.7)' : 'none',
+            transition: 'background 0.1s',
+          }} />
+        ))}
+        <span style={{
+          fontSize: 9, color: isFrenzy ? '#a78bfa' : 'var(--ba-marble-800)',
+          fontFamily: 'monospace',
+        }}>
+          {isFrenzy ? 'CHARGING' : 'FRENZY TO CHARGE'}
+        </span>
+      </div>
+
+      {/* Disruption buttons */}
+      {DISRUPTION_DEFS.map(({ type, label, emoji }) => (
+        <button key={type} onClick={() => fireDisrupt(type)} disabled={!hasCharge} style={{
+          background: hasCharge ? 'rgba(124,58,237,0.35)' : 'var(--ba-card-bg)',
+          border: `1px solid ${hasCharge ? 'rgba(167,139,250,0.7)' : 'var(--ba-card-border)'}`,
+          color: hasCharge ? '#e9d5ff' : 'var(--ba-marble-800)',
+          borderRadius: 8, padding: '5px 10px',
+          fontSize: 11, fontWeight: 700,
+          cursor: hasCharge ? 'pointer' : 'default',
+          fontFamily: 'monospace', whiteSpace: 'nowrap',
+          boxShadow: hasCharge ? '0 0 8px rgba(124,58,237,0.4)' : 'none',
+          transition: 'all 0.15s ease',
+        }}>
+          {emoji} {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -401,13 +423,17 @@ function DisruptionToast() {
 
 // ── Main HUD ──────────────────────────────────────────────────────────────────
 
+const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
+
 interface FarkleHUDProps {
   onBank: () => void;
   onBack: () => void;
   onDisrupt?: (type: DisruptionType) => void;
+  gameMode?: GameMode;
 }
 
-export function FarkleHUD({ onBank, onBack, onDisrupt }: FarkleHUDProps) {
+export function FarkleHUD({ onBank, onBack, onDisrupt, gameMode }: FarkleHUDProps) {
+  const showDisruptions = onDisrupt && gameMode && DISRUPTION_MODES.has(gameMode);
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       <EnergyBar />
@@ -418,7 +444,7 @@ export function FarkleHUD({ onBank, onBack, onDisrupt }: FarkleHUDProps) {
       <ModePulse />
       <ScorePopupLayer />
       <DisruptionToast />
-      {onDisrupt && <DisruptionPanel onDisrupt={onDisrupt} />}
+      {showDisruptions && <DisruptionPanel onDisrupt={onDisrupt} gameMode={gameMode} />}
     </div>
   );
 }

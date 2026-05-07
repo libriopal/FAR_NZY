@@ -10,6 +10,7 @@ import type {
 import { GameSessionManager } from '@match3d/game-core';
 import type { ComplianceProfile } from '@match3d/compliance';
 import type { EconomyBalance } from '@match3d/economy';
+import type { GameMode } from '@match3d/farkle-shared';
 
 export interface AppState {
   // Auth
@@ -43,10 +44,12 @@ export interface AppState {
   showReviveModal: boolean;
   showAdModal: boolean;
   selectedLevelId: string;
+  gameMode: GameMode | null;
 
   // Actions
   setUserId: (id: string) => void;
   setSelectedLevelId: (id: string) => void;
+  setGameMode: (mode: GameMode | null) => void;
   setComplianceApproved: (profile: ComplianceProfile) => void;
   setActiveScreen: (screen: AppState['activeScreen']) => void;
   setSession: (session: GameSessionManager) => void;
@@ -86,6 +89,7 @@ export const useGameStore = create<AppState>()(
     showReviveModal: false,
     showAdModal: false,
     selectedLevelId: 'level_10',
+    gameMode: null,
 
     setUserId: (id) => set({ userId: id, isAuthenticated: true }),
     setComplianceApproved: (profile) => set({ complianceProfile: profile, complianceApproved: true }),
@@ -97,5 +101,6 @@ export const useGameStore = create<AppState>()(
     setShowReviveModal: (show) => set({ showReviveModal: show }),
     setCurrentLevel: (level) => set({ currentLevel: level }),
     setSelectedLevelId: (id) => set({ selectedLevelId: id }),
+    setGameMode: (mode) => set({ gameMode: mode }),
   }))
 );

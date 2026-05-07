@@ -23,8 +23,10 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const [initError, setInitError] = useState<string | null>(null);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const { startChain, extendChain, endChain, tapSphere, bankScore, startGame } = useFarkleGame(physicsRef, levelDef);
+  const gameMode = useGameStore(s => s.gameMode);
   const { state: mpState, sendDisruption } = useMultiplayer();
-  const isMultiplayer = mpState.status === 'playing';
+  const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
+    || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
 
   useEffect(() => {
     // Synchronously clear any stale win/lose phase so routing effect doesn't fire immediately
@@ -142,7 +144,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       <FarkleHUD
         onBank={bankScore}
         onBack={() => setActiveScreen('home')}
-        {...(isMultiplayer ? { onDisrupt: handleDisrupt } : {})}
+        {...(gameMode ? { gameMode } : {})}
+        {...(isDisruptionMode ? { onDisrupt: handleDisrupt } : {})}
       />
     </div>
   );

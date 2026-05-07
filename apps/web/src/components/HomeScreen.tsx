@@ -9,6 +9,7 @@ import type { BioVariant } from '../styles/tokens.js';
 
 export function HomeScreen() {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
+  const setGameMode = useGameStore(s => s.setGameMode);
   const resources = useGameStore(s => s.resources);
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const setSelectedLevelId = useGameStore(s => s.setSelectedLevelId);
@@ -62,7 +63,7 @@ export function HomeScreen() {
       {/* Main actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 360, marginTop: 8 }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setActiveScreen('game')} style={{
+          <button onClick={() => { setGameMode('SOLO_FREE'); setActiveScreen('game'); }} style={{
             flex: 1,
             background: 'var(--ba-accent)', border: '1px solid rgba(255,255,255,0.15)',
             color: '#fff', borderRadius: 12, padding: '16px 24px',

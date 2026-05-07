@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
+import type { GameMode } from '@match3d/farkle-shared';
 
 const S = {
   screen: {
@@ -47,23 +48,32 @@ const S = {
   error: { color: '#ff6060', fontSize: 12, textAlign: 'center' as const },
 };
 
+const MODE_OPTIONS: { value: GameMode; label: string; desc: string }[] = [
+  { value: 'VS_FREE',    label: '⚔ VS',    desc: '1v1 — disrupt your opponent' },
+  { value: 'HEIST_FREE', label: '💀 Heist', desc: 'Score under fire — disruptions enabled' },
+];
+
 export function MultiplayerLobby() {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
+  const setGameMode = useGameStore(s => s.setGameMode);
   const { state, createRoom, joinRoom, leaveRoom } = useMultiplayer();
 
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [tab, setTab] = useState<'create' | 'join'>('create');
+  const [selectedMode, setSelectedMode] = useState<GameMode>('VS_FREE');
 
   const myId = state.playerId;
 
   function handleCreate() {
     if (!playerName.trim()) return;
+    setGameMode(selectedMode);
     createRoom(playerName.trim());
   }
 
   function handleJoin() {
     if (!playerName.trim() || joinCode.length < 4) return;
+    setGameMode(selectedMode);
     joinRoom(joinCode, playerName.trim());
   }
 
@@ -134,6 +144,28 @@ export function MultiplayerLobby() {
               {t === 'create' ? 'Create Room' : 'Join Room'}
             </button>
           ))}
+        </div>
+
+        <div style={S.label}>Game Mode</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {MODE_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setSelectedMode(opt.value)}
+              style={{
+                ...S.btnSecondary, flex: 1, width: 'auto',
+                borderColor: selectedMode === opt.value ? '#a78bfa' : '#1a4060',
+                color: selectedMode === opt.value ? '#e9d5ff' : '#4a8a9a',
+                background: selectedMode === opt.value ? 'rgba(124,58,237,0.15)' : 'transparent',
+                fontSize: 13,
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ color: '#4a6080', fontSize: 11 }}>
+          {MODE_OPTIONS.find(o => o.value === selectedMode)?.desc}
         </div>
 
         <div style={S.label}>Your Name</div>

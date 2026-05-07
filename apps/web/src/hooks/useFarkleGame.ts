@@ -35,12 +35,14 @@ export function useFarkleGame(
   // ── Energy RAF tick ─────────────────────────────────────────────────────────
   useEffect(() => {
     const tick = (now: number) => {
-      const elapsed = (now - lastTickRef.current) / 1000;
+      const deltaMs = now - lastTickRef.current;
+      const elapsed = deltaMs / 1000;
       lastTickRef.current = now;
       const { mode, gamePhase, doublerCells } = store.getState();
       if (gamePhase === 'playing') {
         if (mode === 'PRIME') store.getState().addEnergy(5 * elapsed);
         else if (mode === 'FRENZY') store.getState().addEnergy(-5 * elapsed);
+        store.getState().tickDisruptCharge(deltaMs);
       }
       // Expire stale doubler cells
       if (doublerCells.length > 0) {

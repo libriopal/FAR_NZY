@@ -50,6 +50,8 @@ export interface FarkleGameState {
   disruptions: DisruptionEvent[];
   pendingDisruption: DisruptionEvent | null;
   doublerCells: DoublerCell[];
+  disruptCharges: number;
+  disruptChargeProgress: number;
 
   // Actions
   setGamePhase: (phase: FarkleGameState['gamePhase']) => void;
@@ -66,6 +68,8 @@ export interface FarkleGameState {
   dismissDisruption: () => void;
   spawnDoublerCell: (column: number, durationMs?: number) => void;
   consumeDoublerCell: (column: number) => void;
+  tickDisruptCharge: (deltaMs: number) => void;
+  spendDisruptCharge: () => boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -100,6 +104,8 @@ export const useFarkleStore = create<FarkleGameState>()(
     disruptions: [],
     pendingDisruption: null,
     doublerCells: [],
+    disruptCharges: 0,
+    disruptChargeProgress: 0,
 
     setGamePhase: (phase) => set({ gamePhase: phase }),
     setTurnActive: (active) => set({ turnActive: active }),
@@ -202,6 +208,7 @@ export const useFarkleStore = create<FarkleGameState>()(
         farkleCount: 0, pendingBombScore: 0, bombsOnBoard: 0,
         multiplierOrbActive: false, catalystBoostPct: 0,
         disruptions: [], pendingDisruption: null, doublerCells: [],
+        disruptCharges: 0, disruptChargeProgress: 0,
       }),
 
     addDisruption: (event) =>
@@ -226,5 +233,26 @@ export const useFarkleStore = create<FarkleGameState>()(
       set(s => ({
         doublerCells: s.doublerCells.filter(d => d.column !== column),
       })),
+
+    tickDisruptCharge: (deltaMs) =>
+      set(s => {
+        if (s.mode !== 'FRENZY' || s.gamePhase !== 'playing') return s;
+        // 20 progress/s → 5s per charge
+        let progress = s.disruptChargeProgress + (deltaMs / 1000) * 20;
+        let charges = s.disruptCharges;
+        while (progress >= 100 && charges < 3) {
+          progress -= 100;
+          charges += 1;
+        }
+        if (charges >= 3) progress = Math.min(progress, 99);
+        return { disruptChargeProgress: progress, disruptCharges: charges };
+      }),
+
+    spendDisruptCharge: () => {
+      const charges = get().disruptCharges;
+      if (charges <= 0) return false;
+      set({ disruptCharges: charges - 1 });
+      return true;
+    },
   }))
 );
