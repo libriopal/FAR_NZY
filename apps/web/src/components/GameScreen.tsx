@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
+import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
 import { FarkleHUD } from './FarkleHUD.js';
 import { VoxelPhysicsSystem } from '@match3d/game-core';
 import { LEVELS, DEFAULT_LEVEL } from '../data/levels.js';
+import type { DisruptionType } from '@match3d/farkle-shared';
 
 // Wrapper that re-mounts the inner game when retryKey changes
 export function GameScreen() {
@@ -21,6 +23,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const [initError, setInitError] = useState<string | null>(null);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const { startChain, extendChain, endChain, tapSphere, bankScore, startGame } = useFarkleGame(physicsRef, levelDef);
+  const { state: mpState, sendDisruption } = useMultiplayer();
+  const isMultiplayer = mpState.status === 'playing';
 
   useEffect(() => {
     // Synchronously clear any stale win/lose phase so routing effect doesn't fire immediately
@@ -55,6 +59,14 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       physicsRef.current = null;
     };
   }, []);
+
+  // Apply incoming disruptions from multiplayer to local physics
+  useEffect(() => {
+    const d = mpState.lastDisruption;
+    if (!d) return;
+    physicsRef.current?.sendDisruption(d.targetColumns, d.type as 'ice_send' | 'lock_send' | 'scramble');
+    useFarkleStore.getState().addDisruption(d);
+  }, [mpState.lastDisruption]);
 
   // Only route away on win/lose after the game has actually started
   useEffect(() => {
@@ -114,6 +126,11 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     );
   }
 
+  const handleDisrupt = useCallback((type: DisruptionType) => {
+    // Target opponent's half: cols 0–2 for right-side player, 4–6 for left; send all 7 to let server route
+    sendDisruption(type, [0, 1, 2, 3, 4, 5, 6]);
+  }, [sendDisruption]);
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
       <VoxelPileScene
@@ -125,6 +142,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       <FarkleHUD
         onBank={bankScore}
         onBack={() => setActiveScreen('home')}
+        {...(isMultiplayer ? { onDisrupt: handleDisrupt } : {})}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
+import type { DisruptionType } from '@match3d/farkle-shared';
 
 const FACE_COLOR: Record<number, string> = {
   1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
@@ -293,6 +294,71 @@ function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void
   );
 }
 
+// ── Disruption Panel (multiplayer send) ───────────────────────────────────────
+
+const DISRUPTION_DEFS: { type: DisruptionType; label: string; emoji: string; cooldownMs: number }[] = [
+  { type: 'ice_send',   label: 'ICE',     emoji: '❄️', cooldownMs: 25_000 },
+  { type: 'lock_send',  label: 'LOCK',    emoji: '🔒', cooldownMs: 35_000 },
+  { type: 'scramble',   label: 'SCRAMBLE',emoji: '🌀', cooldownMs: 20_000 },
+];
+
+function DisruptionPanel({ onDisrupt }: { onDisrupt: (type: DisruptionType) => void }) {
+  const [cooldowns, setCooldowns] = useState<Record<DisruptionType, number>>({
+    ice_send: 0, lock_send: 0, scramble: 0,
+  });
+  const intervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  function fireDisrupt(type: DisruptionType, cooldownMs: number) {
+    const ready = (cooldowns[type] ?? 0) <= 0;
+    if (!ready) return;
+    onDisrupt(type);
+    const until = Date.now() + cooldownMs;
+    setCooldowns(prev => ({ ...prev, [type]: cooldownMs }));
+    const iv = setInterval(() => {
+      const remaining = until - Date.now();
+      if (remaining <= 0) {
+        clearInterval(iv);
+        setCooldowns(prev => ({ ...prev, [type]: 0 }));
+      } else {
+        setCooldowns(prev => ({ ...prev, [type]: remaining }));
+      }
+    }, 250);
+    if (intervalsRef.current[type]) clearInterval(intervalsRef.current[type]);
+    intervalsRef.current[type] = iv;
+  }
+
+  useEffect(() => () => {
+    for (const iv of Object.values(intervalsRef.current)) clearInterval(iv);
+  }, []);
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 80, right: 12,
+      display: 'flex', flexDirection: 'column', gap: 5, pointerEvents: 'auto',
+    }}>
+      {DISRUPTION_DEFS.map(({ type, label, emoji, cooldownMs }) => {
+        const ms = cooldowns[type] ?? 0;
+        const ready = ms <= 0;
+        const secLeft = Math.ceil(ms / 1000);
+        return (
+          <button key={type} onClick={() => fireDisrupt(type, cooldownMs)} disabled={!ready} style={{
+            background: ready ? 'rgba(124,58,237,0.35)' : 'var(--ba-card-bg)',
+            border: `1px solid ${ready ? 'rgba(167,139,250,0.7)' : 'var(--ba-card-border)'}`,
+            color: ready ? '#e9d5ff' : 'var(--ba-marble-800)',
+            borderRadius: 8, padding: '5px 10px',
+            fontSize: 11, fontWeight: 700, cursor: ready ? 'pointer' : 'default',
+            fontFamily: 'monospace', whiteSpace: 'nowrap',
+            boxShadow: ready ? '0 0 8px rgba(124,58,237,0.4)' : 'none',
+            transition: 'all 0.15s ease',
+          }}>
+            {emoji} {ready ? label : `${secLeft}s`}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Disruption Toast ──────────────────────────────────────────────────────────
 
 function DisruptionToast() {
@@ -338,9 +404,10 @@ function DisruptionToast() {
 interface FarkleHUDProps {
   onBank: () => void;
   onBack: () => void;
+  onDisrupt?: (type: DisruptionType) => void;
 }
 
-export function FarkleHUD({ onBank, onBack }: FarkleHUDProps) {
+export function FarkleHUD({ onBank, onBack, onDisrupt }: FarkleHUDProps) {
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       <EnergyBar />
@@ -351,6 +418,7 @@ export function FarkleHUD({ onBank, onBack }: FarkleHUDProps) {
       <ModePulse />
       <ScorePopupLayer />
       <DisruptionToast />
+      {onDisrupt && <DisruptionPanel onDisrupt={onDisrupt} />}
     </div>
   );
 }

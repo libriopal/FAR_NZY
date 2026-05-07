@@ -27,6 +27,8 @@ export function useFarkleGame(
   const rafRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(performance.now());
   const deadBoardAttemptsRef = useRef(0);
+  const bankCountRef = useRef(0);
+  const frenzyDoublerSpawnedRef = useRef(false);
   const effectiveWinScore = levelDef?.winScore ?? WIN_SCORE;
   const effectiveEnergyMult = levelDef?.energyMultiplier ?? 1.0;
 
@@ -35,10 +37,17 @@ export function useFarkleGame(
     const tick = (now: number) => {
       const elapsed = (now - lastTickRef.current) / 1000;
       lastTickRef.current = now;
-      const { mode, gamePhase } = store.getState();
+      const { mode, gamePhase, doublerCells } = store.getState();
       if (gamePhase === 'playing') {
         if (mode === 'PRIME') store.getState().addEnergy(5 * elapsed);
         else if (mode === 'FRENZY') store.getState().addEnergy(-5 * elapsed);
+      }
+      // Expire stale doubler cells
+      if (doublerCells.length > 0) {
+        const alive = doublerCells.filter(d => d.expiresAt > now);
+        if (alive.length !== doublerCells.length) {
+          store.setState({ doublerCells: alive });
+        }
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -59,6 +68,20 @@ export function useFarkleGame(
       },
     );
   }, [physicsRef]);
+
+  // ── Doubler cell: spawn 2 random columns on first FRENZY entry ───────────────
+  useEffect(() => {
+    return store.subscribe(
+      s => s.mode,
+      (mode, prev) => {
+        if (mode === 'FRENZY' && prev !== 'FRENZY' && !frenzyDoublerSpawnedRef.current) {
+          frenzyDoublerSpawnedRef.current = true;
+          const cols = _randomColumns(2);
+          for (const col of cols) store.getState().spawnDoublerCell(col, 12_000);
+        }
+      },
+    );
+  }, []);
 
   // ── Chain score sync (resolve wild/mirror faces before lookup) ──────────────
   useEffect(() => {
@@ -298,9 +321,15 @@ export function useFarkleGame(
     const s = store.getState();
     if (s.gamePhase !== 'playing' || s.unbanked === 0) return;
     store.getState().bankScore();
+    // Every 3rd bank: spawn a 30s doubler on a random column
+    bankCountRef.current += 1;
+    if (bankCountRef.current % 3 === 0) {
+      const [col] = _randomColumns(1);
+      if (col !== undefined) store.getState().spawnDoublerCell(col, 30_000);
+    }
     const { banked } = store.getState();
     if (banked >= effectiveWinScore) store.setState({ gamePhase: 'win' });
-  }, []);
+  }, [effectiveWinScore]);
 
   function _checkDeadBoard() {
     const physics = physicsRef.current;
@@ -321,6 +350,8 @@ export function useFarkleGame(
     store.getState().resetGame();
     store.setState({ gamePhase: 'playing', energy: 1 * effectiveEnergyMult, mode: 'PRIME' });
     deadBoardAttemptsRef.current = 0;
+    bankCountRef.current = 0;
+    frenzyDoublerSpawnedRef.current = false;
     const physics = physicsRef.current;
     if (physics) physics.setSpawnWeights(levelDef?.spawnWeights ?? SPAWN_WEIGHTS.PRIME);
   }, [physicsRef, levelDef, effectiveEnergyMult]);
@@ -379,4 +410,13 @@ function _plurality(faces: number[]): number | undefined {
     if (c > bestC) { bestC = c; best = Number(f); }
   }
   return best;
+}
+
+function _randomColumns(count: number): number[] {
+  const all = [0, 1, 2, 3, 4, 5, 6];
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j]!, all[i]!];
+  }
+  return all.slice(0, count);
 }
