@@ -1,0 +1,37 @@
+{
+  "name": "match3d-greenhouse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Living Blueprint: Glass Greenhouse Estate — Physics-based match-3D sweepstakes game",
+  "scripts": {
+    "dev": "pnpm -C apps/web dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm -C apps/web build",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check",
+    "test": "pnpm -r test",
+    "cap:sync": "pnpm build:web && npx cap sync android",
+    "cap:open": "npx cap open android",
+    "android:debug": "pnpm cap:sync && cd android && ./gradlew assembleDebug",
+    "android:release": "pnpm cap:sync && cd android && ./gradlew assembleRelease",
+    "android:bundle": "pnpm cap:sync && cd android && ./gradlew bundleRelease",
+    "supabase:start": "supabase start",
+    "supabase:push": "supabase db push",
+    "supabase:gen-types": "supabase gen types typescript --local > packages/backend-client/src/database.types.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0"
+  }
+}

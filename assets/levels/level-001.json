@@ -1,0 +1,34 @@
+{
+  "id": "level_001",
+  "name": "The First Scaffold",
+  "description": "The greenhouse stands empty. Clear the rubble of early construction materials to lay your first blueprint.",
+  "timerSeconds": 120,
+  "spawnConfig": {
+    "volumeMin": { "x": -3, "y": 0, "z": -3 },
+    "volumeMax": { "x": 3, "y": 4, "z": 3 },
+    "itemCount": 30,
+    "itemPoolWeights": [
+      { "definitionId": "glass_pane",    "weight": 5 },
+      { "definitionId": "marble_block",  "weight": 4 },
+      { "definitionId": "copper_pipe",   "weight": 4 },
+      { "definitionId": "fern_cluster",  "weight": 3 },
+      { "definitionId": "moss_pod",      "weight": 3 },
+      { "definitionId": "vine_coil",     "weight": 2 }
+    ],
+    "modifierConfig": {
+      "frozenProbability": 0,
+      "lockedProbability": 0,
+      "overgrowthProbability": 0
+    }
+  },
+  "objectives": [
+    {
+      "id": "obj_001_matches",
+      "type": "match_count",
+      "target": 5,
+      "label": "Make 5 Matches"
+    }
+  ],
+  "backgroundKey": "bg_greenhouse_dawn",
+  "unlockRequirement": { "type": "level", "value": 0 }
+}

@@ -1,0 +1,865 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FARKLE_FRENZY_PRESERVATION_SPEC.xml
+  Engine-Agnostic Balance, Fairness, Stability and Optimization Reference
+  
+  PURPOSE:
+    This document describes the invariants, formulas, constants, and behavioral
+    rules that define Farkle Frenzy V3's balance and fairness. Any game engine
+    implementing a similar experience must replicate every section marked
+    CRITICAL to maintain the same level of player fairness and game balance.
+    
+    Sections marked RECOMMENDED affect optimization and stability but allow
+    some implementation flexibility. Sections marked OPTIONAL describe
+    enhancements that improve experience but do not affect core fairness.
+
+  VERSION: 1.0 — May 2026
+  SOURCE:  Farkle Frenzy V3 (github.com/libriopal/Match-3)
+-->
+
+<preservation_spec game="Farkle Frenzy V3" version="1.0">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 1: SCORING ENGINE
+       CRITICAL — Any deviation breaks game balance and player trust.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <scoring_engine priority="CRITICAL">
+
+    <description>
+      The Farkle scoring engine evaluates a set of 1–6 die face values (integers
+      1–6) and returns the maximum achievable score by finding the optimal
+      non-overlapping partition of those dice into scoring combinations.
+      This is called the Maximum Partition Rule and is the single most important
+      behavioral invariant in the entire system.
+    </description>
+
+    <single_die_scores>
+      <rule face="1" points="100" note="Scores as a single die — no combination needed"/>
+      <rule face="5" points="50"  note="Scores as a single die — no combination needed"/>
+      <rule face="2" points="0"   note="Must appear in combination to score"/>
+      <rule face="3" points="0"   note="Must appear in combination to score"/>
+      <rule face="4" points="0"   note="Must appear in combination to score"/>
+      <rule face="6" points="0"   note="Must appear in combination to score"/>
+    </single_die_scores>
+
+    <combination_scores>
+      <combo name="Three 1s"           dice_count="3" matching_face="1" points="1000"
+             note="Exception: NOT face × 100. Always exactly 1000."/>
+      <combo name="Three 2s"           dice_count="3" matching_face="2" points="200"  formula="face × 100"/>
+      <combo name="Three 3s"           dice_count="3" matching_face="3" points="300"  formula="face × 100"/>
+      <combo name="Three 4s"           dice_count="3" matching_face="4" points="400"  formula="face × 100"/>
+      <combo name="Three 5s"           dice_count="3" matching_face="5" points="500"  formula="face × 100"/>
+      <combo name="Three 6s"           dice_count="3" matching_face="6" points="600"  formula="face × 100"/>
+      <combo name="Four of a Kind"     dice_count="4" any_face="true"   points="1000"/>
+      <combo name="Five of a Kind"     dice_count="5" any_face="true"   points="2000"/>
+      <combo name="Six of a Kind"      dice_count="6" any_face="true"   points="3000"
+             side_effect="Triggers BOMB_STANDARD spawn at chain center"/>
+      <combo name="Straight (1-2-3-4-5-6)" dice_count="6" faces="1,2,3,4,5,6" points="1500"
+             side_effect="Triggers BOMB_RAINBOW spawn at chain center"/>
+      <combo name="Three Pairs"        dice_count="6" requires="3 distinct pairs"   points="1500"/>
+      <combo name="Two Triplets"       dice_count="6" requires="2 distinct triplets" points="2500"
+             note="Always beats Three-of-a-Kind + Three-of-a-Kind calculation"/>
+      <combo name="Four of a Kind + Pair" dice_count="6" points="1500"/>
+    </combination_scores>
+
+    <maximum_partition_rule>
+      <description>
+        The scorer MUST find the partition of the input dice into non-overlapping
+        scoring combinations that produces the MAXIMUM total score.
+        Every die is used in exactly one combination or contributes zero.
+        No die may be used in more than one combination.
+        The algorithm must use exhaustive recursive search over all valid partitions.
+      </description>
+      <examples>
+        <example input="[1,1,1,5]"       expected="1050" breakdown="Three 1s (1000) + Single 5 (50)"/>
+        <example input="[1,1,1,5,5]"     expected="1100" breakdown="Three 1s (1000) + Single 5 (50) + Single 5 (50)"/>
+        <example input="[1,1,1,2,2,2]"   expected="2500" breakdown="Two Triplets — NOT Three 1s + Three 2s (1200)"/>
+        <example input="[1,1,1,1,2,2]"   expected="1500" breakdown="Four of a Kind + Pair"/>
+      </examples>
+    </maximum_partition_rule>
+
+    <farkle_event>
+      <description>
+        A Farkle occurs when scoreFarkle() returns score === 0.
+        This means no die in the evaluated set participates in any scoring combination.
+      </description>
+      <consequences>
+        <consequence>ALL unbanked points reset to zero (permanent loss)</consequence>
+        <consequence>Multiplier ladder resets to step 0 (×1.0)</consequence>
+        <consequence>Farkle animation triggers (board shake, red flash)</consequence>
+        <consequence>In Rally/Heist: lost points enter the Farkle Pool (recoverable)</consequence>
+        <consequence>Banked points are NEVER affected by a Farkle</consequence>
+      </consequences>
+    </farkle_event>
+
+    <required_test_cases>
+      <!-- Any implementation MUST pass all 16 before shipping -->
+      <test input="[1]"           expected="100"  label="Single 1"/>
+      <test input="[5]"           expected="50"   label="Single 5"/>
+      <test input="[3]"           expected="0"    label="Farkle — single non-scoring"/>
+      <test input="[1,1,1]"       expected="1000" label="Three 1s"/>
+      <test input="[2,2,2]"       expected="200"  label="Three 2s"/>
+      <test input="[6,6,6]"       expected="600"  label="Three 6s"/>
+      <test input="[1,1,1,5]"     expected="1050" label="Three 1s + Single 5 (stacking)"/>
+      <test input="[1,1,1,5,5]"   expected="1100" label="Three 1s + two Single 5s"/>
+      <test input="[1,2,3,4,5,6]" expected="1500" label="Straight"/>
+      <test input="[1,1,1,2,2,2]" expected="2500" label="Two Triplets beats 1200"/>
+      <test input="[1,1,1,1]"     expected="1000" label="Four of a Kind"/>
+      <test input="[5,5,5,5,5]"   expected="2000" label="Five of a Kind"/>
+      <test input="[3,3,3,3,3,3]" expected="3000" label="Six of a Kind"/>
+      <test input="[1,1,2,2,3,3]" expected="1500" label="Three Pairs"/>
+      <test input="[1,1,1,1,2,2]" expected="1500" label="Four of a Kind + Pair"/>
+      <test input="[2,3,4]"       expected="0"    label="Farkle — multi-die non-scoring"/>
+    </required_test_cases>
+
+  </scoring_engine>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 2: MULTIPLIER LADDER
+       CRITICAL — Defines the risk/reward curve of every session.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <multiplier_ladder priority="CRITICAL">
+
+    <description>
+      A 6-step ladder that multiplies the raw chain score before adding to the
+      unbanked total. The ladder creates the core risk/reward tension:
+      higher multipliers mean more to lose on a Farkle.
+    </description>
+
+    <steps>
+      <step index="0" multiplier="1.00" label="Chain 1"/>
+      <step index="1" multiplier="1.25" label="Chain 2"/>
+      <step index="2" multiplier="1.50" label="Chain 3"/>
+      <step index="3" multiplier="2.00" label="Chain 4"/>
+      <step index="4" multiplier="3.00" label="Chain 5"/>
+      <step index="5" multiplier="4.00" label="Chain 6+ (cap — never exceeds ×4.0)"/>
+    </steps>
+
+    <advancement_rules>
+      <rule event="SCORING_CHAIN"  action="Advance one step (capped at index 5)"/>
+      <rule event="FARKLE"         action="Reset to step 0. Unbanked total also lost."/>
+      <rule event="BANK"           action="Reset to step 0. Unbanked transfers to banked."/>
+      <rule event="BOMB_DETONATION" action="No effect — ladder unchanged"/>
+      <rule event="PASS_TO_PLAYER" action="Incoming player inherits current step (Rally/Heist)"/>
+    </advancement_rules>
+
+    <formula>
+      unbanked += rawChainScore × multiplierSteps[currentStep]
+    </formula>
+
+  </multiplier_ladder>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 3: CHAIN CONSTRAINTS
+       CRITICAL — Defines legal player input and game pacing.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <chain_constraints priority="CRITICAL">
+
+    <adjacency>
+      <rule>4-directional only: up, down, left, right</rule>
+      <rule>Diagonal adjacency is NEVER valid under any circumstance</rule>
+      <rule>Validation: |rowA - rowB| + |colA - colB| === 1 (Manhattan distance)</rule>
+    </adjacency>
+
+    <length>
+      <minimum_tiles>1
+        <note>Scorer accepts 1-tile chains. Single face-1 scores 100. Single face-3 Farkles.</note>
+      </minimum_tiles>
+      <minimum_tiles_game_enforced>2
+        <note>useGame enforces 2-tile minimum before evaluating. Scorer itself has no minimum.</note>
+      </minimum_tiles_game_enforced>
+      <maximum_tiles>6
+        <note>Hard cap. Mirrors physical Farkle dice count. At cap, all non-chained adjacent tiles dim and become non-interactive.</note>
+      </maximum_tiles>
+    </length>
+
+    <face_mixing>
+      <rule>Any combination of face values (1–6) is valid in a single chain</rule>
+      <rule>No same-type requirement — chains are evaluated by Farkle scoring, not match-3 logic</rule>
+    </face_mixing>
+
+    <backtracking>
+      <rule>Re-entering the second-to-last tile removes the last tile from the chain</rule>
+      <rule>Only the most recently added tile can be removed this way</rule>
+      <rule>Re-entering any other already-chained tile (not second-to-last) is silently ignored</rule>
+    </backtracking>
+
+    <commitment>
+      <trigger>Pointer up (pointerup event)</trigger>
+      <trigger>Pointer leaves the game board area (pointerleave on grid container)</trigger>
+      <rule>Chain length of 0 at commit: no action taken</rule>
+    </commitment>
+
+    <chainable_tiles>
+      <tile type="DieColor" chainable="true"/>
+      <tile type="LOCK"     chainable="true" note="Must be in a SCORING chain to unlock. Farkle chain does not unlock."/>
+      <tile type="WILD"     chainable="true" note="Auto-resolves to best scoring face via brute-force 6^n search"/>
+      <tile type="STONE"    chainable="false"/>
+      <tile type="ICE"      chainable="false"/>
+      <tile type="BOMB_STANDARD"  chainable="false"/>
+      <tile type="BOMB_RAINBOW"   chainable="false"/>
+    </chainable_tiles>
+
+  </chain_constraints>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 4: SPAWN POOL SYSTEM
+       CRITICAL — Guarantees fair tile distribution across a session.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <spawn_pool_system priority="CRITICAL">
+
+    <description>
+      All tile spawning draws from a pre-shuffled pool with guaranteed equal
+      face distribution. Inspired by the video poker deck model: fairness
+      comes from uniform distribution at pool creation, not from tracking history.
+    </description>
+
+    <pool_size_formula>
+      <formula>poolSize = ceil(gridSize² / 6) × 6</formula>
+      <note>Ensures pool is always a multiple of 6 for perfect equal distribution</note>
+      <examples>
+        <example players="1" grid="7x7"   cells="49"  pool="60"  per_face="10"/>
+        <example players="2" grid="8x8"   cells="64"  pool="66"  per_face="11"/>
+        <example players="3" grid="9x9"   cells="81"  pool="84"  per_face="14"/>
+        <example players="4" grid="10x10" cells="100" pool="102" per_face="17"/>
+      </examples>
+    </pool_size_formula>
+
+    <pool_composition>
+      <die_pool>
+        <rule>poolSize / 6 tiles of each face value (1–6)</rule>
+        <rule>Rock blocker slots occupy die pool entries as value 0</rule>
+      </die_pool>
+      <wild_pool>
+        <rule>Size: ceil(gridSize² / 4)</rule>
+        <distribution>
+          <entry value="0" meaning="Plain die (no overlay)" weight="60%"/>
+          <entry value="1" meaning="Ice Blocker overlay"    weight="15%"/>
+          <entry value="2" meaning="Lock Blocker overlay"   weight="15%"/>
+          <entry value="3" meaning="Wild Blocker overlay"   weight="10%"/>
+        </distribution>
+      </wild_pool>
+    </pool_composition>
+
+    <pool_rules>
+      <rule id="strict_draw_order">
+        Tiles are always drawn in the order the CSPRNG shuffle produced.
+        No skipping, no reordering, no look-ahead.
+      </rule>
+      <rule id="no_manipulation">
+        The pool is NEVER modified to prevent dead boards.
+        Reshuffle is the only intervention — same tiles, new random order.
+        This preserves the uniform distribution guarantee.
+      </rule>
+      <rule id="global_per_session">
+        In multiplayer: all players draw from the same pool.
+        There is no per-player pool.
+      </rule>
+      <rule id="reshuffle_on_depletion">
+        When pool empties: create new pool of same size with equal distribution,
+        shuffle via CSPRNG, continue drawing.
+        This is functionally a new deck, not a continuation.
+      </rule>
+      <rule id="board_gen_order">
+        Board generation MUST follow this strict order:
+        1. Place rock blockers (from blocker pool)
+        2. Fill non-rock cells with dice (from die pool)
+        3. Apply Wild/Ice/Lock overlays (from wild pool, non-rock cells only)
+        4. Normalize (SPAWNING → NORMAL)
+      </rule>
+      <rule id="cascade_refill">
+        Rock blockers NEVER spawn from cascade.
+        Cascade refill uses die pool + wild pool only.
+      </rule>
+    </pool_rules>
+
+  </spawn_pool_system>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 5: RANDOM NUMBER GENERATION
+       CRITICAL — Determines provable fairness for casino contexts.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <random_number_generation priority="CRITICAL">
+
+    <casino_contexts>
+      <algorithm>HMAC-SHA256 CSPRNG</algorithm>
+      <description>
+        Cryptographically secure pseudo-random number generation.
+        Produces values in [0, 1) indistinguishable from true randomness
+        under polynomial-time analysis.
+      </description>
+      <implementation>
+        HMAC-SHA256(key=combinedSeed, data=counter.toString())
+        First 8 hex chars (4 bytes) → uint32 → normalized to [0, 1)
+        Counter increments by 1 per call.
+      </implementation>
+      <usage>
+        ALL game events: tile spawning, pool shuffling, blocker placement,
+        bomb target color (when not overridden by Rainmaker role).
+      </usage>
+    </casino_contexts>
+
+    <non_casino_contexts>
+      <algorithm>LCG (Linear Congruential Generator)</algorithm>
+      <formula>s = (s × 9301 + 49297) % 233280</formula>
+      <usage>Monte Carlo simulation, test suite, non-casino previews ONLY</usage>
+      <warning>LCG internal state can be recovered from outputs. Never use for casino.</warning>
+    </non_casino_contexts>
+
+    <provably_fair_protocol>
+      <step order="1">Server generates 256-bit serverSeed via crypto.getRandomValues()</step>
+      <step order="2">Server computes serverSeedHash = SHA-256(serverSeed). Sends to all players.</step>
+      <step order="3">Each player generates clientSeed (random UUID). Sends to server.</step>
+      <step order="4">combinedSeed = SHA-256(serverSeed + clientSeed1 + clientSeed2 + ...)</step>
+      <step order="5">All random events derived from combinedSeed via HMAC-SHA256 counter sequence</step>
+      <step order="6">After session: server reveals serverSeed</step>
+      <step order="7">Players verify: SHA-256(revealedSeed) must match committed hash</step>
+      <invariant>No single party controls the combined seed</invariant>
+      <invariant>Server cannot manipulate without detection</invariant>
+      <invariant>Players cannot predict server seed before game starts</invariant>
+    </provably_fair_protocol>
+
+    <forbidden>
+      <rule>Math.random() must NEVER be used for any game event</rule>
+      <rule>Math.random() is permitted ONLY for cosmetic/audio effects</rule>
+    </forbidden>
+
+  </random_number_generation>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 6: RTP ENGINE (Casino Modes)
+       CRITICAL — Defines the mathematical relationship between score and payout.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <rtp_engine priority="CRITICAL" applies_to="casino_modes_only">
+
+    <payout_formula>
+      payout = (sessionScore / normalizer) × betAmount
+    </payout_formula>
+
+    <normalizer_derivation>
+      <description>
+        normalizer = E[sessionScore] / targetRTP
+        Where E[sessionScore] is derived from Monte Carlo simulation.
+        Ensures E[payout] / betAmount ≈ targetRTP over many sessions.
+      </description>
+      <monte_carlo_spec>
+        <sessions>4000 simulated sessions minimum</sessions>
+        <seed>Fixed seed for reproducibility</seed>
+        <player_behavior>Random chain decisions (baseline player)</player_behavior>
+        <result>averageScore used as E[sessionScore]</result>
+      </monte_carlo_spec>
+    </normalizer_derivation>
+
+    <rtp_ranges>
+      <range blocker_density="HIGH"   rtp_min="0.82" rtp_max="0.88"
+             note="High blockers = frequent Farkle = lower RTP"/>
+      <range blocker_density="MEDIUM" rtp_min="0.88" rtp_max="0.95"/>
+      <range blocker_density="LOW"    rtp_min="0.95" rtp_max="1.02"
+             note="Expert play on open board approaches 102% skill ceiling"/>
+    </rtp_ranges>
+
+    <drift_correction>
+      <description>
+        Tracks running session RTP and applies small corrections to spawn weights.
+        Maximum correction per session: 5% of drift magnitude.
+        Imperceptible to individual players. Ensures long-run convergence.
+      </description>
+      <overpaying>Reduce face-1 and face-5 spawn weights by up to 5%</overpaying>
+      <underpaying>Increase face-1 and face-5 spawn weights by up to 5%</underpaying>
+      <max_weight_deviation>±10% from equal distribution per face</max_weight_deviation>
+    </drift_correction>
+
+    <house_edge>
+      <versus_casino>8% of total pot (winner receives pot × 0.92)</versus_casino>
+      <rally_casino>8–12% embedded in milestone difficulty (not a direct cut)</rally_casino>
+    </house_edge>
+
+  </rtp_engine>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 7: BOMB MECHANICS
+       CRITICAL — Bomb rewards must not interfere with multiplier balance.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <bomb_mechanics priority="CRITICAL">
+
+    <bomb_standard>
+      <trigger>Six of a Kind chain (6 dice, all same face value)</trigger>
+      <fuse_duration_ms>3000</fuse_duration_ms>
+      <blast_radius>3×3 area centered on bomb position (center ± 1 in each direction)</blast_radius>
+      <gravity>Falls into empty spaces like normal die tile. Fuse counts during fall.</gravity>
+      <scoring>
+        <tile type="normal_die"  points="100" multiplied="false" note="Flat — not affected by multiplier ladder"/>
+        <tile type="STONE"       points="50"  multiplied="false"/>
+        <tile type="ICE"         points="0"   multiplied="false"/>
+        <tile type="LOCK"        action="IMMUNE — not destroyed"/>
+        <tile type="other_bomb"  action="Destroyed — does NOT chain-detonate"/>
+      </scoring>
+      <ladder_effect>NONE — bomb detonation never resets or advances multiplier</ladder_effect>
+    </bomb_standard>
+
+    <bomb_rainbow>
+      <trigger>Straight chain (faces 1-2-3-4-5-6, all six values)</trigger>
+      <fuse_duration_ms>3000</fuse_duration_ms>
+      <effect>Board-wide color clear — all cells of target color destroyed</effect>
+      <target_color_selection>
+        <normal>Randomly determined at detonation via CSPRNG</normal>
+        <rainmaker_role>Rainmaker player chooses target color during countdown</rainmaker_role>
+      </target_color_selection>
+      <scoring>
+        <tile type="face_1_RED"    points_formula="100 × currentMultiplier" multiplied="true"/>
+        <tile type="face_5_BLUE"   points_formula="50 × currentMultiplier"  multiplied="true"/>
+        <tile type="other_colors"  points="0" note="Destroyed but no points"/>
+        <tile type="ICE"           action="Destroyed if color matches. 0 points."/>
+        <tile type="LOCK"          action="IMMUNE — not destroyed"/>
+      </scoring>
+      <ladder_effect>NONE — bomb detonation never resets or advances multiplier</ladder_effect>
+      <note>
+        Rainbow Bomb is the ONLY bomb type whose rewards scale with the multiplier.
+        This creates the highest single-play potential in the game.
+        At ×4.0 with 8 Red tiles: 100 × 4.0 × 8 = 3,200 bonus points.
+      </note>
+    </bomb_rainbow>
+
+  </bomb_mechanics>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 8: BLOCKER RULES
+       CRITICAL — Blocker behavior defines board difficulty tuning.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <blocker_rules priority="CRITICAL">
+
+    <stone_blocker>
+      <health>2 hits to destroy. Health 1 = cracked (visual change only).</health>
+      <movement>Completely immovable. Gravity never applies.</movement>
+      <damage_sources>
+        <source>Adjacent chain clear (any of 4 neighboring cells): 1 damage</source>
+        <source>Standard Bomb explosion within 3×3 radius: destroys regardless of health</source>
+      </damage_sources>
+      <on_destroy points="50" multiplied="false"/>
+      <role_modifier name="HEADHUNTER">Destroys in 1 hit instead of 2. 50pts still awarded.</role_modifier>
+    </stone_blocker>
+
+    <ice_blocker>
+      <movement>Completely immovable.</movement>
+      <chainable>false</chainable>
+      <damage_sources>
+        <source>Standard Bomb explosion within 3×3 radius: destroys</source>
+        <source>Rainbow Bomb if ice cell color matches target: destroys</source>
+        <source>Adjacent chain clear: NO EFFECT on Ice</source>
+      </damage_sources>
+      <on_destroy points="0"/>
+      <strategic_note>Freezes a die face in place. Cannot score until bomb-thawed.</strategic_note>
+    </ice_blocker>
+
+    <lock_blocker>
+      <movement>Immovable while locked. Subject to gravity once unlocked.</movement>
+      <chainable>true — ONLY way to unlock is being included in a scoring chain</chainable>
+      <unlock_condition>Chain must score greater than 0. Farkle chain does NOT unlock.</unlock_condition>
+      <on_unlock>Tile becomes normal die tile of same face value. No bonus points for unlocking.</on_unlock>
+      <scoring_contribution>Face value contributes normally to the unlocking chain score.</scoring_contribution>
+      <immunity>Immune to ALL bombs. Cannot be destroyed by any means.</immunity>
+    </lock_blocker>
+
+    <density_tiers>
+      <tier name="LOW"    blockers_7x7="3-4"  percentage="6-8%"/>
+      <tier name="MEDIUM" blockers_7x7="5-7"  percentage="10-14%" default="true"/>
+      <tier name="HIGH"   blockers_7x7="8-12" percentage="16-24%"/>
+      <distribution approximate_ratio="Stone:Ice:Lock = 50%:25%:25%"/>
+      <scaling>Blocker count scales proportionally to grid size for multiplayer modes.</scaling>
+    </density_tiers>
+
+  </blocker_rules>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 9: DEAD BOARD PREVENTION
+       CRITICAL — Without this, games can freeze indefinitely.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <dead_board_prevention priority="CRITICAL">
+
+    <detection>
+      <trigger>After every tile cascade completes</trigger>
+      <algorithm>
+        BFS from every non-blocker cell.
+        Try all valid chain extensions (4-directional, non-visited, up to 6 tiles).
+        Evaluate each candidate chain via scoreFarkle().
+        Terminate immediately when first chain scoring greater than 0 is found.
+        If BFS exhausts all candidates with no scoring chain: board is DEAD.
+      </algorithm>
+    </detection>
+
+    <recovery_sequence>
+      <stage order="1" name="Pool Reshuffle">
+        <action>Reshuffle remaining pool with CSPRNG. Redraw all non-blocker tiles.</action>
+        <bias>
+          face_1 spawn weight: 25% (normal: 16.7%)
+          face_5 spawn weight: 20% (normal: 16.7%)
+          Others share remaining ~55%
+        </bias>
+        <then>Run dead board detection again.</then>
+      </stage>
+      <stage order="2" name="Full Spatial Shuffle">
+        <action>Randomly redistribute existing non-blocker tiles across all non-blocker cells.</action>
+        <then>Run dead board detection again.</then>
+      </stage>
+      <stage order="3" name="Guaranteed Recovery">
+        <action>Set ALL non-blocker tiles to face-1 (Red). Every single tile scores 100.</action>
+        <note>Mathematical fallback. Should essentially never occur on boards with 6+ tiles.</note>
+      </stage>
+    </recovery_sequence>
+
+  </dead_board_prevention>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 10: ROUND FLOW AND BANKING
+       CRITICAL — Defines when players keep or lose points.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <round_flow priority="CRITICAL">
+
+    <score_pools>
+      <pool name="BANKED"   description="Permanent. Never affected by Farkle. Transfers out on session end."/>
+      <pool name="UNBANKED" description="At risk. Lost entirely on Farkle. Must be banked to become permanent."/>
+    </score_pools>
+
+    <round_end_conditions>
+      <condition trigger="Chain length 6"      outcome="CONTINUE — multiplier advances, unbanked grows"/>
+      <condition trigger="Chain length 2-5"    outcome="AUTO-BANK — unbanked transfers to banked, multiplier resets, ROUND_END"/>
+      <condition trigger="Farkle (score=0)"    outcome="ROUND_END — unbanked lost, NO bank"/>
+      <condition trigger="Energy reaches 0"    outcome="AUTO-BANK — unbanked transfers to banked, ROUND_END"/>
+    </round_end_conditions>
+
+    <banking_decision>
+      <description>
+        Voluntary bank: player secures all unbanked points.
+        Unbanked transfers to banked. Multiplier resets to ×1.0. Turn ends.
+        This is the primary skill expression of the game.
+      </description>
+      <key_factors>
+        Current unbanked total, current multiplier step,
+        board state (safe chains visible), die distribution, session objective.
+      </key_factors>
+    </banking_decision>
+
+    <farkle_pool>
+      <description>Rally and Heist modes only. Lost unbanked points enter this shared buffer.</description>
+      <recovery>Archivist role recovers 15% of pool balance per scoring chain automatically.</recovery>
+      <purpose>Prevents a single Farkle from ending team momentum. Creates recovery arc.</purpose>
+    </farkle_pool>
+
+  </round_flow>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 11: ENERGY SYSTEM
+       CRITICAL — Governs turn structure and PRIME/FRENZY mode switching.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <energy_system priority="CRITICAL">
+
+    <range min="0" max="300"/>
+    <threshold name="FRENZY_THRESHOLD" value="150"/>
+
+    <modes>
+      <mode name="PRIME" range="0-150" type="turn-based"/>
+      <mode name="FRENZY" range="151-300" type="simultaneous_all_players"/>
+    </modes>
+
+    <global_mode_rule>
+      Any single player exceeding FRENZY_THRESHOLD switches ALL players to FRENZY.
+    </global_mode_rule>
+
+    <prime_energy_rules>
+      <gain  trigger="passive"              amount="+5 per second"/>
+      <cost  trigger="chain_length_2_to_5"  amount="-10"/>
+      <gain  trigger="chain_length_6"       amount="+10"/>
+      <gain  trigger="chain_length_6_plus_wild" amount="+20"/>
+    </prime_energy_rules>
+
+    <frenzy_energy_rules>
+      <drain trigger="passive_normal"       amount="-5 per second"/>
+      <drain trigger="passive_catchup"      amount="-3 per second (when energy less than 75)"/>
+      <gain  trigger="any_chain"            amount="+10"/>
+      <gain  trigger="chain_with_wild"      amount="+20"/>
+      <bonus trigger="catchup_active"       amount="+2 additional per chain"/>
+    </frenzy_energy_rules>
+
+    <frenzy_end_condition>
+      ALL players must drop below FRENZY_THRESHOLD for FRENZY to end.
+      If anchor player drops below threshold: 2-second instability warning before end.
+    </frenzy_end_condition>
+
+    <implementation_requirement>
+      Energy tick MUST use requestAnimationFrame (client) or 1000ms setInterval (server).
+      Never use setInterval on the client for energy — causes stale closure issues.
+    </implementation_requirement>
+
+  </energy_system>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 12: GRID SIZES
+       CRITICAL — Scales with player count. Changing breaks pool math.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <grid_sizes priority="CRITICAL">
+
+    <formula>gridDimension = 6 + playerCount (for multiplayer)</formula>
+    <formula>gridDimension = 7 (for singleplayer — always)</formula>
+
+    <sizes>
+      <size mode="SOLO"   players="1" grid="7x7"   cells="49"/>
+      <size mode="VS/RALLY/HEIST" players="2" grid="8x8"   cells="64"/>
+      <size mode="VS/RALLY/HEIST" players="3" grid="9x9"   cells="81"/>
+      <size mode="VS/RALLY/HEIST" players="4" grid="10x10" cells="100"/>
+    </sizes>
+
+    <constraint>
+      Grid size determines pool size (Section 4).
+      Grid size determines blocker count (Section 8).
+      Never hardcode grid dimensions — always derive from player count.
+    </constraint>
+
+  </grid_sizes>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 13: HEIST MODE CONSTANTS
+       CRITICAL — These values define the vault/betrayal balance.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <heist_constants priority="CRITICAL">
+
+    <constant name="VAULT_SPLIT"          value="0.70"
+              meaning="70% of all scored points go to shared vault. 30% to personal score."/>
+    <constant name="VAULT_THRESHOLD"      value="5000"
+              meaning="Vault must reach this value before heist becomes available."/>
+    <constant name="HEIST_ENERGY_COST"    value="50"
+              meaning="Player must have at least 50 energy to initiate heist."/>
+    <constant name="HEIST_WINDOW_MS"      value="5000"
+              meaning="5-second window for other players to block after heist initiated."/>
+
+    <role_modifiers>
+      <modifier role="ARCHIVIST"  effect="Shields 20% of vault from any single heist"/>
+      <modifier role="CONDUCTOR"  effect="+10% vault contribution rate while active"/>
+      <modifier role="RAINMAKER"  effect="Heist window extended +2000ms"/>
+      <modifier role="HEADHUNTER" effect="Successfully blocking heist recovers 15% of vault to personal score"/>
+    </role_modifiers>
+
+  </heist_constants>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 14: CASCADE SYSTEM
+       RECOMMENDED — Implementation method affects visual feel but not fairness.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <cascade_system priority="RECOMMENDED">
+
+    <description>
+      After tiles are removed (chain commit, bomb detonation, blocker destruction):
+      1. stepGravity() — move tiles down into empty spaces (one row per step)
+      2. spawnTiles() — fill top-row empties from pool
+      3. normalizeTiles() — convert SPAWNING state to NORMAL
+      4. Repeat until stable (no empty spaces below filled tiles)
+    </description>
+
+    <timing>
+      <constant name="CASCADE_MS" value="80" recommended_physics_value="160"
+                note="Milliseconds between cascade steps. Increase if physics gravity animations are used."/>
+    </timing>
+
+    <implementation_requirement>
+      Use setTimeout recursion or synchronous applyCascadeSync().
+      Never use setInterval — causes stale closure issues in React.
+    </implementation_requirement>
+
+    <gravity_rule>
+      Bombs (BOMB_STANDARD, BOMB_RAINBOW) fall exactly like normal die tiles.
+      Fuse continues counting during fall. Does not pause.
+      Stone, Ice, Lock blockers are completely immovable. Never apply gravity.
+    </gravity_rule>
+
+  </cascade_system>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 15: WILD BLOCKER (WILD TILE)
+       RECOMMENDED — Advanced mechanic. Scoring behavior is critical if implemented.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <wild_blocker priority="RECOMMENDED">
+
+    <description>
+      A die tile in WILD state. Has an underlying face value but resolves to
+      whichever face value maximizes the chain score.
+    </description>
+
+    <scoring_resolution>
+      <algorithm>
+        Brute-force all 6^n face combinations where n = wild count in chain.
+        Maximum n = 6 (all tiles wild) → 46,656 combinations maximum.
+        Return the combination producing the highest scoreFarkle() result.
+        Performance: negligible at 6^6 maximum.
+      </algorithm>
+      <examples>
+        <example chain="[1,1,WILD]"        resolves_as="1" result="Three 1s = 1000"/>
+        <example chain="[1,WILD,3,4,5,6]"  resolves_as="2" result="Straight = 1500"/>
+        <example chain="[WILD,WILD,WILD]"  resolves_as="1,1,1" result="Three 1s = 1000"/>
+      </examples>
+    </scoring_resolution>
+
+    <scatter_trigger>
+      <condition>3 or more Wild tiles simultaneously present on board</condition>
+      <effects>
+        <effect order="1">Force all player energies to FRENZY_THRESHOLD + 1</effect>
+        <effect order="2">Destroy all cells matching any wild tile's underlying face</effect>
+        <effect order="3">Score: face-1 destroyed = +100, face-5 destroyed = +50, others = 0</effect>
+        <effect order="4">Wild tiles themselves destroyed</effect>
+        <effect order="5">Normal cascade runs after scatter</effect>
+      </effects>
+    </scatter_trigger>
+
+  </wild_blocker>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 16: RALLY MODE SPECIAL RULES
+       RECOMMENDED — Required if Rally mode is implemented.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <rally_mode priority="RECOMMENDED">
+
+    <three_way_decision>
+      <option name="CONTINUE">Build another chain. Multiplier stays. Unbanked stays at risk.</option>
+      <option name="BANK">Secure unbanked. Transfers to banked. Multiplier resets. Turn ends.</option>
+      <option name="PASS">
+        Hand board to next player. Incoming player inherits: exact board state,
+        full unbanked total (from ALL previous players this streak), current multiplier step.
+        If incoming player Farkles: ENTIRE accumulated unbanked is lost.
+      </option>
+    </three_way_decision>
+
+    <reaction_window_ms>3000</reaction_window_ms>
+
+    <role_abilities>
+      <role name="RAINMAKER">
+        Straight chain → color selector appears during countdown instead of random color.
+        Player chooses Rainbow Bomb target color.
+      </role>
+      <role name="HEADHUNTER">
+        Stone Blockers destroyed in 1 hit instead of 2.
+        50-point reward applies immediately.
+      </role>
+      <role name="ARCHIVIST">
+        After each scoring chain: 15% of Farkle Pool balance auto-recovered to unbanked.
+        Recovery visible before Continue/Bank/Pass decision.
+      </role>
+      <role name="CONDUCTOR">
+        When Conductor chooses PASS (not Continue or Bank):
+        Multiplier advances one additional step before incoming player begins.
+        Conductor passing at ×2.0 → incoming player receives board at ×3.0.
+        Bonus applies ONLY on Pass. Banking forfeits the boost.
+      </role>
+    </role_abilities>
+
+    <milestone_payouts applies_to="RALLY_CASINO">
+      <milestone tier="1" score="10000"  payout_multiplier="0.5"  meaning="0.5× total pot returned"/>
+      <milestone tier="2" score="25000"  payout_multiplier="1.0"/>
+      <milestone tier="3" score="50000"  payout_multiplier="2.0"/>
+      <milestone tier="4" score="100000" payout_multiplier="5.0"/>
+    </milestone_payouts>
+
+  </rally_mode>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 17: ARCHITECTURAL INVARIANTS
+       These must never change without full system impact analysis.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <architectural_invariants priority="CRITICAL">
+
+    <invariant name="bomb_fuse_ms"         value="3000" unit="milliseconds"/>
+    <invariant name="bomb_radius"          value="1"    meaning="3×3 area (center ± 1)"/>
+    <invariant name="chain_max"            value="6"    unit="tiles"/>
+    <invariant name="chain_min_scorer"     value="1"    meaning="Scorer has no minimum"/>
+    <invariant name="chain_min_game"       value="2"    meaning="Game enforces 2-tile minimum"/>
+    <invariant name="multiplier_steps"     value="6"    meaning="Steps 0–5, capped at index 5"/>
+    <invariant name="multiplier_cap"       value="4.0"  meaning="Never exceeds ×4.0"/>
+    <invariant name="energy_max"           value="300"/>
+    <invariant name="frenzy_threshold"     value="150"/>
+    <invariant name="vault_split"          value="0.70" applies_to="HEIST"/>
+    <invariant name="heist_window_ms"      value="5000" applies_to="HEIST"/>
+    <invariant name="pool_divisor"         value="6"    meaning="Pool always multiple of 6"/>
+    <invariant name="rtp_skill_ceiling"    value="1.02" meaning="102% for expert solo low-density play"/>
+    <invariant name="house_edge_versus"    value="0.08" meaning="8% of pot"/>
+    <invariant name="monte_carlo_sessions" value="4000" meaning="Minimum for normalizer calibration"/>
+
+  </architectural_invariants>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SECTION 18: IMPLEMENTATION WARNINGS
+       Common mistakes that break balance or fairness silently.
+       ═══════════════════════════════════════════════════════════════════ -->
+  <implementation_warnings>
+
+    <warning id="W1" severity="CRITICAL">
+      Do not use Math.random() for tile spawning, pool shuffling, or any game event.
+      Using Math.random() breaks provably fair guarantees and makes sessions unverifiable.
+    </warning>
+
+    <warning id="W2" severity="CRITICAL">
+      Do not apply the multiplier ladder to Standard Bomb tile rewards.
+      Standard Bomb pays flat 100pts/die and 50pts/Stone regardless of multiplier.
+      Only Rainbow Bomb rewards (Red and Blue tiles) scale with the multiplier.
+    </warning>
+
+    <warning id="W3" severity="CRITICAL">
+      Do not allow bomb detonation to reset or advance the multiplier ladder.
+      Bombs are interruptions to the chain streak — they must not interact with ladder state.
+    </warning>
+
+    <warning id="W4" severity="CRITICAL">
+      Do not allow Lock Blockers to be destroyed by bombs.
+      Lock Blockers are immune to ALL bombs. This is intentional — they can only be
+      unlocked by inclusion in a scoring chain.
+    </warning>
+
+    <warning id="W5" severity="CRITICAL">
+      Do not use the Three-of-a-Kind formula (face × 100) for Three 1s.
+      Three 1s = 1000, always. 1 × 100 = 100 is wrong. This is the most common error.
+    </warning>
+
+    <warning id="W6" severity="CRITICAL">
+      The maximum partition rule requires exhaustive search.
+      Greedy approaches (take the first/largest combination found) will produce wrong scores.
+      Example: [1,1,1,2,2,2] greedy might score 1200. Correct answer is 2500 (Two Triplets).
+    </warning>
+
+    <warning id="W7" severity="RECOMMENDED">
+      Do not use setInterval for cascade steps — use setTimeout recursion.
+      setInterval with React state creates stale closure bugs where the interval
+      references outdated state from the closure it was created in.
+    </warning>
+
+    <warning id="W8" severity="RECOMMENDED">
+      Do not use setInterval for energy tick on the client.
+      Use requestAnimationFrame for smooth, frame-accurate energy updates.
+    </warning>
+
+    <warning id="W9" severity="RECOMMENDED">
+      Adjacent chain clears do NOT damage Ice Blockers.
+      Only bombs destroy Ice. This is often incorrectly implemented to mirror Stone behavior.
+    </warning>
+
+    <warning id="W10" severity="RECOMMENDED">
+      The normalizer must be recalibrated via Monte Carlo if blocker density changes.
+      The same normalizer cannot be used across HIGH/MEDIUM/LOW density settings —
+      average session scores differ significantly across density tiers.
+    </warning>
+
+  </implementation_warnings>
+
+</preservation_spec>

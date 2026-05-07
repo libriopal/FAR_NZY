@@ -1,0 +1,42 @@
+{
+  "id": "level_005",
+  "name": "Overgrowth Rising",
+  "description": "Vines have begun spreading through the east wing. Clear hybrid and organic debris before the overgrowth consumes the scaffold.",
+  "timerSeconds": 90,
+  "spawnConfig": {
+    "volumeMin": { "x": -4, "y": 0, "z": -4 },
+    "volumeMax": { "x": 4, "y": 6, "z": 4 },
+    "itemCount": 51,
+    "itemPoolWeights": [
+      { "definitionId": "glass_pane",           "weight": 3 },
+      { "definitionId": "steel_beam",           "weight": 3 },
+      { "definitionId": "fern_cluster",         "weight": 4 },
+      { "definitionId": "vine_coil",            "weight": 4 },
+      { "definitionId": "bioluminescent_bloom", "weight": 2 },
+      { "definitionId": "bio_steel_node",       "weight": 2 },
+      { "definitionId": "glass_seed_capsule",   "weight": 2 }
+    ],
+    "modifierConfig": {
+      "frozenProbability": 0.05,
+      "lockedProbability": 0.05,
+      "overgrowthProbability": 0.10
+    }
+  },
+  "objectives": [
+    {
+      "id": "obj_005_organic",
+      "type": "match_category",
+      "target": 8,
+      "category": "organic",
+      "label": "Match 8 Organic Items"
+    },
+    {
+      "id": "obj_005_score",
+      "type": "score_target",
+      "target": 3000,
+      "label": "Reach 3,000 Score"
+    }
+  ],
+  "backgroundKey": "bg_greenhouse_vines",
+  "unlockRequirement": { "type": "level", "value": 4 }
+}

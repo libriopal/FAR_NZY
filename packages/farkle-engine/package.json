@@ -1,0 +1,26 @@
+{
+  "name": "@match3d/farkle-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx/esm --test src/farkleScorer.test.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./csprng": "./src/csprng.ts",
+    "./chainIndex": "./src/chainIndex.ts",
+    "./gridUtils": "./src/gridUtils.ts",
+    "./farkleScorer": "./src/farkleScorer.ts",
+    "./floodFill": "./src/floodFill.ts",
+    "./rtpConfig": "./src/rtpConfig.ts",
+    "./monteCarlo": "./src/monteCarlo.ts"
+  },
+  "dependencies": {
+    "@match3d/farkle-shared": "workspace:*",
+    "nanoid": "^5.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

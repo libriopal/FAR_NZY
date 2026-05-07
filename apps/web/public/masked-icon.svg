@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0a1628"/>
+  <rect x="60" y="60" width="392" height="392" rx="40" fill="none" stroke="#1a4060" stroke-width="4"/>
+  <!-- Greenhouse frame -->
+  <polygon points="256,80 440,200 440,440 72,440 72,200" fill="none" stroke="#7ecfff" stroke-width="6"/>
+  <!-- Vine accent -->
+  <path d="M180,440 Q200,380 256,340 Q312,380 332,440" fill="none" stroke="#5de58a" stroke-width="5"/>
+  <circle cx="256" cy="330" r="14" fill="#5de58a"/>
+</svg>

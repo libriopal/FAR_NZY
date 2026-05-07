@@ -1,0 +1,47 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@assets/*": ["../../assets/*"],
+      "@match3d/game-core": ["../../packages/game-core/src/index.ts"],
+      "@match3d/compliance": ["../../packages/compliance/src/index.ts"],
+      "@match3d/economy": ["../../packages/economy/src/index.ts"],
+      "@match3d/blockchain": ["../../packages/blockchain/src/index.ts"],
+      "@match3d/ai-quests": ["../../packages/ai-quests/src/index.ts"],
+      "@match3d/ads": ["../../packages/ads/src/index.ts"],
+      "@match3d/analytics": ["../../packages/analytics/src/index.ts"],
+      "@match3d/backend-client": ["../../packages/backend-client/src/index.ts"],
+      "@match3d/farkle-shared": ["../../packages/farkle-shared/src/index.ts"],
+      "@match3d/farkle-engine": ["../../packages/farkle-engine/src/web.ts"],
+      "@match3d/farkle-engine/csprng": ["../../packages/farkle-engine/src/csprng.ts"],
+      "@match3d/farkle-engine/chainIndex": ["../../packages/farkle-engine/src/chainIndex.ts"],
+      "@match3d/farkle-engine/gridUtils": ["../../packages/farkle-engine/src/gridUtils.ts"],
+      "@match3d/farkle-engine/farkleScorer": ["../../packages/farkle-engine/src/farkleScorer.ts"],
+      "@match3d/farkle-engine/floodFill": ["../../packages/farkle-engine/src/floodFill.ts"],
+      "@match3d/farkle-engine/rtpConfig": ["../../packages/farkle-engine/src/rtpConfig.ts"],
+      "@match3d/farkle-engine/monteCarlo": ["../../packages/farkle-engine/src/monteCarlo.ts"]
+    },
+    "types": ["vite/client"],
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": [
+    "src",
+    "../../packages/ads/src",
+    "../../packages/ai-quests/src",
+    "../../packages/analytics/src",
+    "../../packages/backend-client/src",
+    "../../packages/blockchain/src",
+    "../../packages/compliance/src",
+    "../../packages/economy/src",
+    "../../packages/game-core/src"
+  ]
+}

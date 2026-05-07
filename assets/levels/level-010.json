@@ -1,0 +1,51 @@
+{
+  "id": "level_010",
+  "name": "The Frozen Spire",
+  "description": "A cryogenic containment breach has locked half the materials in ice. Work around frozen nodes and clear the Bio-Steel synthesis pile.",
+  "timerSeconds": 75,
+  "spawnConfig": {
+    "volumeMin": { "x": -4.5, "y": 0, "z": -4.5 },
+    "volumeMax": { "x": 4.5, "y": 8, "z": 4.5 },
+    "itemCount": 60,
+    "itemPoolWeights": [
+      { "definitionId": "marble_block",       "weight": 3 },
+      { "definitionId": "steel_beam",         "weight": 3 },
+      { "definitionId": "glass_pane",         "weight": 2 },
+      { "definitionId": "bio_steel_node",     "weight": 3 },
+      { "definitionId": "marble_root_ball",   "weight": 2 },
+      { "definitionId": "glass_seed_capsule", "weight": 2 },
+      { "definitionId": "bioluminescent_bloom","weight": 2 },
+      { "definitionId": "moss_pod",           "weight": 2 },
+      { "definitionId": "fern_cluster",       "weight": 1 }
+    ],
+    "modifierConfig": {
+      "frozenProbability": 0.20,
+      "lockedProbability": 0.10,
+      "overgrowthProbability": 0.05
+    }
+  },
+  "objectives": [
+    {
+      "id": "obj_010_hybrid",
+      "type": "match_category",
+      "target": 6,
+      "category": "hybrid",
+      "label": "Match 6 Hybrid Items"
+    },
+    {
+      "id": "obj_010_specific",
+      "type": "match_specific",
+      "target": 3,
+      "definitionId": "bio_steel_node",
+      "label": "Match 3 Bio-Steel Nodes"
+    },
+    {
+      "id": "obj_010_score",
+      "type": "score_target",
+      "target": 8000,
+      "label": "Reach 8,000 Score"
+    }
+  ],
+  "backgroundKey": "bg_greenhouse_ice",
+  "unlockRequirement": { "type": "resource", "value": "bioSteel_50" }
+}

@@ -1,0 +1,744 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  beautiful-update.xml — v2
+  Gothic Bio-Architecture: Libra Sanctuary + Scorpio Grid
+  Full H-Block / F-Block / G-Block Visual Takeover Prompt
+
+  HOW TO USE:
+    Copy the content inside <prompt_text> and paste into a fresh Claude session.
+    Claude will ask Phase 0 questions before touching anything.
+    Answer them. Approve each phase. Then watch the game become beautiful.
+
+  VISION:
+    The interface is a LIVING ORGANISM.
+    The Libra Lobby is the Ivory Exoskeleton — structural, elegant, breathing.
+    The Scorpio Grid is the Neural Core — obsidian, vascular, predatory.
+    Every interaction is biological. Every visual is earned.
+-->
+
+<beautiful_update version="2.0" theme="Gothic Bio-Architecture">
+
+  <!-- ═══════════════════════════════════════════
+       DESIGN SYSTEM REFERENCE (for Claude's use)
+       ═══════════════════════════════════════════ -->
+
+  <libra_palette name="Ivory Sanctuary — Lobby/Menus">
+    <token name="--bg-shell"         value="#E8EAE6" note="Warm matte alabaster — the bone foundation"/>
+    <token name="--bg-inner-panel"   value="#F5F7F4" note="Translucent white membrane"/>
+    <token name="--shadow-organic"   value="inset 0 10px 20px rgba(0,0,0,0.05), 0 5px 15px rgba(0,0,0,0.1)"/>
+    <token name="--fluid-gold"       value="#D4AF37" note="Liquid gold circulatory lines"/>
+    <token name="--silver-filigree"  value="#C0C8D0" note="Thin metallic blueprint accents"/>
+    <token name="--vein-mint"        value="#98B4A6" note="Sage veins — secondary text"/>
+    <token name="--btn-glass"        value="rgba(255,255,255,0.4)"/>
+    <token name="--border-organic"   value="40px 10px 40px 10px" note="Asymmetric organic curves"/>
+  </libra_palette>
+
+  <scorpio_palette name="Obsidian Nerve Center — Game Grid">
+    <token name="--bg-void"          value="#05070A" note="Deepest obsidian black"/>
+    <token name="--bg-grid-plate"    value="#0F1218" note="Dark hematite — the chitinous grid floor"/>
+    <token name="--neural-cyan"      value="#00F5FF" note="Electric nerve color — primary glow"/>
+    <token name="--arterial-crimson" value="#8B0000" note="Deep blood glow — high stakes signal"/>
+    <token name="--neon-ichor"       value="#FF003F" note="Crimson lock pulse, Farkle flash"/>
+    <token name="--toxic-violet"     value="#4B0082" note="×4.0 multiplier, Face 6 Obsidian"/>
+    <token name="--die-surface"      value="#1A1C22" note="Matte black die face"/>
+    <token name="--die-pip-glow"     value="#00F5FF" note="Pips that look like glowing eyes"/>
+    <token name="--iron-wrought"     value="#2D2D2D" note="Lock portcullis bar color"/>
+    <token name="--pulse-shadow"     value="0 0 20px rgba(0,245,255,0.2)"/>
+  </scorpio_palette>
+
+  <gem_palette name="Die Face Colors — same in both themes, intensity varies">
+    <gem face="1" name="GOLD ICHOR"    surface="#fde68a" mid="#f59e0b" dark="#78350f" glow="#fbbf24"
+         note="Scores alone. Highest contrast. Premium signal. Libra=polished marble. Scorpio=molten gold."/>
+    <gem face="2" name="CORAL HEMATITE" surface="#fca5a5" mid="#ef4444" dark="#7f1d1d" glow="#f87171"
+         note="Needs triplets. Cold iron texture until chained."/>
+    <gem face="3" name="JADE MOSS"     surface="#86efac" mid="#22c55e" dark="#14532d" glow="#4ade80"
+         note="Organic. Moss veins sprout when Stone neighbor damaged."/>
+    <gem face="4" name="VIOLET CHITIN" surface="#c4b5fd" mid="#7c3aed" dark="#2e1065" glow="#a78bfa"
+         note="Carbon fiber texture. Heavy."/>
+    <gem face="5" name="STEEL CRYSTAL" surface="#bae6fd" mid="#0ea5e9" dark="#0c4a6e" glow="#38bdf8"
+         note="Scores alone. Crystalline silver. Second premium."/>
+    <gem face="6" name="OBSIDIAN VOID" surface="#ddd6fe" mid="#4c1d95" dark="#1a0533" glow="#8b5cf6"
+         note="×4.0 echo. Pulses arterial crimson when on board during high multiplier."/>
+  </gem_palette>
+
+  <multiplier_color_echo note="Ladder colors must echo gem palette — players learn value through color">
+    <step index="0" mult="1.00" color="#94a3b8" name="Slate — neutral, unearned"/>
+    <step index="1" mult="1.25" color="#4ade80" name="Jade echo — Face 3"/>
+    <step index="2" mult="1.50" color="#38bdf8" name="Steel echo — Face 5 (first scoring single milestone)"/>
+    <step index="3" mult="2.00" color="#fbbf24" name="Gold echo — Face 1 (premium die milestone)"/>
+    <step index="4" mult="3.00" color="#fb923c" name="Amber heat — danger zone, no gem echo (warning)"/>
+    <step index="5" mult="4.00" color="#a78bfa" name="Obsidian echo — Face 6 (maximum power territory)"/>
+  </multiplier_color_echo>
+
+
+  <!-- ═══════════════════════════════════════════
+       THE PROMPT — PASTE THIS INTO CLAUDE
+       ═══════════════════════════════════════════ -->
+
+  <prompt_text>
+You are taking over as Lead Visual Architect and Gothic Bio-Engineer
+for a Farkle-based match-3 puzzle game.
+
+Your creative mandate is to build TWO living worlds:
+  THE LIBRA SANCTUARY — the Ivory Lobby. Bone, glass, liquid gold.
+                         A futuristic cathedral where you prepare.
+  THE SCORPIO GRID    — the Obsidian Neural Core. Chitinous, bioluminescent,
+                         predatory. Where the game actually happens.
+
+The interface is not a screen. It is a SYNTHETIC ORGANISM.
+Every color, particle, and sound must reinforce this.
+
+Before touching a single file, complete Phase 0.
+Do not skip questions. Do not assume. Ask everything.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 0 — MANDATORY QUESTIONS
+
+Ask every question below. Wait for all answers before proceeding.
+
+Q1. FRAMEWORK + RENDERER
+What frontend framework? (React, Vue, vanilla JS, other?)
+How are the 3D dice currently rendered?
+(CSS 3D transforms, Three.js, a 2D canvas library, or other?)
+This determines how die states and overlays are applied.
+
+Q2. CHAIN BUG — EXACT SYMPTOMS
+Describe what happens when you drag to chain tiles.
+Which part breaks: tile selection, adjacency checking,
+chain commit on release, or something else?
+Does the chain register any tiles at all?
+
+Q3. SCORING ENGINE CRITICAL CHECK
+Show me the current scoring function.
+Specifically: how does it handle [1,1,1,2,2,2]?
+The correct answer is 2500 (Two Triplets).
+If it returns 1200 (Three 1s + Three 2s), the scorer is broken
+and must be replaced before any visual work is meaningful.
+IMPORTANT: The document showing this code is NOT the correct implementation:
+  totalScore += (counts[1] || 0) * 100;  ← This scores [1,1,1] as 300. Wrong. Should be 1000.
+The correct scorer uses maximum partition — exhaustive recursive search.
+Confirm which scorer is running.
+
+Q4. FILE NAMES
+What are the names of:
+- Die/tile rendering component
+- Grid/board component
+- Game state (the useGame equivalent)
+- Audio hook (the useAudio equivalent)
+- Main CSS file or design token file
+
+Q5. CURRENT VISUAL STATE
+What do the dice look like right now?
+(3D CSS, flat colored squares, SVG, canvas-drawn, or other?)
+Do any blocker visuals exist yet?
+Is there any particle system at all?
+
+Q6. CASCADE TIMING
+What is the delay between gravity steps in milliseconds?
+Is it a named constant? What is it called?
+I need approval to change it from its current value to 160ms
+for physics gravity animation. Confirm: approved or not?
+
+Q7. MOTION/REACT
+Is motion/react (formerly Framer Motion) installed?
+Run: npm list motion
+If not: do you want it added for physics layout animation? (~30KB)
+
+Q8. AUDIO STATE
+What sounds exist right now?
+Are they synthesized (Web Audio API) or loaded from files?
+Have the ambient music stems been sourced yet?
+(ambient.mp3 / strings.mp3 / choir.mp3 / electronic.mp3 — all same duration)
+
+Q9. WILD BLOCKER
+Does a Wild tile type exist in the engine?
+If yes: does the scorer expose the resolved face value to the UI
+during chain building (so the UI can show which face Wild resolves to)?
+
+Q10. THEME DIRECTION CONFIRMATION
+Confirm you want the dual-theme Gothic Bio-Architecture:
+  Libra (Lobby): Ivory Sanctuary — alabaster, gold circulatory lines,
+                 organic curved borders, translucent glass membranes
+  Scorpio (Grid): Obsidian Neural Core — deep black, bioluminescent cyan,
+                  arterial crimson, chitinous textures, pulsing nerve glows
+Is this the vision? Or any adjustments?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 1 — SCORING ENGINE VERIFICATION
+
+This runs before any visual work.
+A beautiful game built on a broken scorer is worthless.
+
+Run all 16 test cases against the current scorer:
+
+[1]           → 100
+[5]           → 50
+[3]           → 0    (Farkle)
+[1,1,1]       → 1000 (NOT 300)
+[2,2,2]       → 200
+[6,6,6]       → 600
+[1,1,1,5]     → 1050
+[1,1,1,5,5]   → 1100
+[1,2,3,4,5,6] → 1500
+[1,1,1,2,2,2] → 2500 (NOT 1200 — Two Triplets beats separate triples)
+[1,1,1,1]     → 1000
+[5,5,5,5,5]   → 2000
+[3,3,3,3,3,3] → 3000
+[1,1,2,2,3,3] → 1500
+[1,1,1,1,2,2] → 1500
+[2,3,4]       → 0    (Farkle)
+
+If any test fails: fix the scorer first. Do not proceed until all 16 pass.
+The scorer must use maximum-partition exhaustive search — not greedy selection.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 2 — CHAIN LOGIC DEBUG
+
+Read the chain selection code. Identify which issues are present:
+
+POINTER CAPTURE BUG (most common post-engine-swap issue):
+In the onPointerDown handler on each tile, add:
+  e.currentTarget.releasePointerCapture(e.pointerId)
+Without this, the browser routes all drag events to the first tile touched.
+Neighbor tiles never fire onPointerEnter.
+
+ADJACENCY CHECK:
+Must use Manhattan distance: Math.abs(rowA-rowB) + Math.abs(colA-colB) === 1
+Diagonal (1,1) returns false. Distance (2,0) returns false.
+
+BACKTRACK:
+Re-entering the second-to-last tile removes the last tile.
+Re-entering any other existing tile is silently ignored.
+
+COMMIT:
+Chain must commit on pointerup AND on pointer leaving the grid container.
+If only pointerup: dragging off-grid leaves a ghost chain active.
+
+SYNAPTIC NERVE LINK VISUAL:
+When tiles are chained, draw an SVG path between their center points.
+This is the "Bio-Link" — a glowing neural connection between chained dice.
+Implementation: a single SVG overlay over the grid (absolute positioned,
+pointer-events none). For each consecutive pair in the chain, draw:
+  <path d="M {x1},{y1} L {x2},{y2}"
+        stroke={gemGlowColor}
+        strokeWidth="2"
+        opacity="0.7"
+        filter="url(#nerve-glow)" />
+SVG filter for nerve-glow:
+  <filter id="nerve-glow">
+    <feGaussianBlur stdDeviation="3" result="blur"/>
+    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+  </filter>
+The nerve color matches the gem glow of the most common face in the chain.
+If chain is mixed: use --neural-cyan (#00F5FF).
+
+Produce CHAIN_DEBUG.md listing issues found and proposed fixes.
+Get approval before applying.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 3 — DESIGN TOKEN INJECTION
+
+Create or update the CSS token file with both theme systems:
+
+/* ═══════════════════════════════════════
+   LIBRA SANCTUARY — Ivory Lobby Theme
+═══════════════════════════════════════ */
+:root, [data-theme="libra"] {
+  --bg-shell:         #E8EAE6;
+  --bg-inner-panel:   #F5F7F4;
+  --shadow-organic:   inset 0 10px 20px rgba(0,0,0,0.05), 0 5px 15px rgba(0,0,0,0.1);
+  --fluid-gold:       #D4AF37;
+  --silver-filigree:  #C0C8D0;
+  --vein-mint:        #98B4A6;
+  --btn-glass:        rgba(255,255,255,0.4);
+  --border-organic:   40px 10px 40px 10px;
+  --surface-active:   rgba(212,175,55,0.15);
+}
+
+/* ═══════════════════════════════════════
+   SCORPIO GRID — Obsidian Neural Theme
+═══════════════════════════════════════ */
+[data-theme="scorpio"] {
+  --bg-void:          #05070A;
+  --bg-grid-plate:    #0F1218;
+  --neural-cyan:      #00F5FF;
+  --arterial-crimson: #8B0000;
+  --neon-ichor:       #FF003F;
+  --toxic-violet:     #4B0082;
+  --die-surface:      #1A1C22;
+  --die-pip-glow:     #00F5FF;
+  --iron-wrought:     #2D2D2D;
+  --pulse-shadow:     0 0 20px rgba(0,245,255,0.2);
+  --grid-animation:   pulse 4s infinite ease-in-out;
+}
+
+/* ═══════════════════════════════════════
+   GEM FACES — used in both themes
+═══════════════════════════════════════ */
+:root {
+  --gem-1-top: #fde68a; --gem-1-mid: #f59e0b; --gem-1-dark: #78350f; --gem-1-glow: #fbbf24;
+  --gem-2-top: #fca5a5; --gem-2-mid: #ef4444; --gem-2-dark: #7f1d1d; --gem-2-glow: #f87171;
+  --gem-3-top: #86efac; --gem-3-mid: #22c55e; --gem-3-dark: #14532d; --gem-3-glow: #4ade80;
+  --gem-4-top: #c4b5fd; --gem-4-mid: #7c3aed; --gem-4-dark: #2e1065; --gem-4-glow: #a78bfa;
+  --gem-5-top: #bae6fd; --gem-5-mid: #0ea5e9; --gem-5-dark: #0c4a6e; --gem-5-glow: #38bdf8;
+  --gem-6-top: #ddd6fe; --gem-6-mid: #4c1d95; --gem-6-dark: #1a0533; --gem-6-glow: #8b5cf6;
+}
+
+Apply data-theme="libra" to the lobby root element.
+Apply data-theme="scorpio" to the game grid root element.
+The THEME TRANSITION (lobby → game) is a CSS class change + animation (Phase 9).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 4 — ISOMETRIC GEM CUBE (H1)
+
+Each die face is a 3-polygon isometric cube SVG. ViewBox 0 0 48 48.
+
+THREE FACE POLYGONS:
+  Top face:   M 24,3  L 45,13.5 L 24,24 L 3,13.5  Z  (light — --gem-N-top)
+  Left face:  M 3,13.5 L 24,24  L 24,45 L 3,34.5  Z  (mid — --gem-N-mid)
+  Right face: M 24,24 L 45,13.5 L 45,34.5 L 24,45 Z  (dark — --gem-N-dark)
+
+LIBRA VERSION (polished marble):
+  Top face: gradient from rgba(255,255,255,0.4) → --gem-N-top
+  Left face: --gem-N-mid with subtle marble grain (CSS noise texture)
+  Right face: --gem-N-dark with gold-leaf edge: 0.5px --fluid-gold stroke
+  Number: centered, font-black, color #1c1917 (dark on light)
+  HIDDEN by default. Reveals on hover + chain selection.
+
+SCORPIO VERSION (carbon fiber / dark gemstone):
+  Top face: gradient from rgba(255,255,255,0.15) → --gem-N-top at 60% opacity
+  Left face: --gem-N-mid darkened 20%, matte finish
+  Right face: --bg-void with --gem-N-glow bleed at 30%
+  Pips / number: --die-pip-glow (#00F5FF) — glowing eyes in the dark
+  Number: hidden by default. Reveals on hover + chain.
+
+FACE 1 and FACE 5 PREMIUM SIGNAL:
+  These two faces score alone. They must LOOK premium.
+  In both themes: apply a subtle external glow ring (not just color difference).
+  Face 1: ring glow in --fluid-gold (Libra) or --gem-1-glow (Scorpio)
+  Face 5: ring glow in --silver-filigree (Libra) or --gem-5-glow (Scorpio)
+  This teaches players which dice are valuable without reading rules.
+
+FACE 6 SCORPIO PULSE:
+  When multiplier is at ×3.0 or ×4.0, Face 6 dice on the Scorpio grid
+  pulsate with --arterial-crimson shadow (box-shadow: 0 0 16px #8B0000).
+  This signals: "you are in the danger/power zone and this die matters."
+  Animation: 1.5s ease-in-out infinite alternate on shadow opacity.
+
+NUMBER REVEAL BEHAVIOR:
+  Default state:       opacity 0
+  Hover:               opacity 1, translateY(-4px), shadow grows (lift effect)
+  Chain selected:      opacity 1, float oscillation (translateY -4px to -8px, 1.4s loop)
+  Glow ring on chain:  --gem-N-glow color, breathes at 0.8s
+  At-cap (not chained): opacity 0.35, no interaction
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 5 — DIE STATE VISUALS (H2 Block)
+
+H2-A: STONE — "Calcification / Cathedral Floor"
+  The die loses its gem luster and fuses to the grid.
+  CSS class: .state-stone
+    filter: grayscale(0.8) contrast(1.2)
+    background-image: CSS noise texture simulating cracked marble
+    transition: filter 0.5s cubic-bezier(0.4, 0, 0.2, 1)
+    animation: none  ← bio-pulse STOPS. The organism is dead here.
+  Health = 1 (cracked):
+    Add SVG crack overlay paths on top of the cube.
+    Main crack: diagonal path across left+right faces, white stroke, opacity 0.7
+    Branch crack: shorter fork from main crack midpoint
+    Moss detail: tiny --vein-mint (#98B4A6) tendril lines sprouting from cracks.
+    These represent the grid organism "reclaiming" the dead stone.
+  Not chainable. Pointer-events: none.
+
+H2-B: ICE — "Cryo-Stasis / Stained Glass Cathedral"
+  The die is preserved in geometric frost — dark cathedral stained glass.
+  CSS class: .state-ice
+    backdrop-filter: blur(4px)
+    background: rgba(173,216,230,0.2)
+    border: 1px solid rgba(255,255,255,0.5)
+    box-shadow: inset 0 0 15px var(--neural-cyan)
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)
+  Display: ❄️ emoji centered on die face replacing any number.
+    Font size: 60% of cell size. Centered absolutely.
+    CSS filter: drop-shadow(0 0 6px var(--neural-cyan))
+  NOT chainable. Pointer-events: none.
+  Only destroyed by bomb detonation.
+
+H2-C: LOCK — "The Portcullis Binding"
+  The die is held by wrought iron. It CAN be chained (to unlock).
+  CSS class: .state-lock
+    Underlying gem colors still show (face value visible, important for strategy).
+  SVG portcullis overlay (absolutely positioned, full coverage):
+    Three horizontal bars across the cube face, spaced evenly.
+    Two vertical bars. All in --iron-wrought (#2D2D2D).
+    StrokeWidth: 1.5px. The bars cast a shadow over the gem below.
+  Display: 🔒 emoji instead of face number.
+    Apply CSS animation: .neural-pulse
+    @keyframes neural-pulse { 0%,100% { opacity:0.4; transform:scale(1); }
+                               50%      { opacity:1;   transform:scale(1.2); } }
+    Pulse color: --neon-ichor (#FF003F)  ← arterial crimson "bound" signal.
+  Amber outer glow ring: box-shadow 0 0 12px rgba(245,158,11,0.5)
+  On unlock: 🔒 fades out over 300ms. Face number fades in. Bars dissolve.
+
+H2-D: WILD — "Neural Flux / Bioluminescence"
+  The die is a live synapse that hasn't fired.
+  It cycles through the gem palette, waiting to be clamped.
+  CSS class: .state-wild
+  Display: "W" symbol instead of face number.
+    Font-black, white, fills 60% of face area.
+    CSS: font-weight: 900; letter-spacing: -0.05em;
+  RAINBOW GLOW ANIMATION:
+    The outer border/ring cycles through gem glow colors:
+    #fbbf24 → #f87171 → #4ade80 → #a78bfa → #38bdf8 → #8b5cf6
+    @keyframes wild-hue { from { filter: hue-rotate(0deg); }
+                           to   { filter: hue-rotate(360deg); } }
+    animation: wild-hue 2s linear infinite (on the glow ring only)
+  The die SURFACE stays its underlying face color (critical — keep readable).
+  IS chainable. Pointer-events: normal.
+  When chained: W brightens (opacity 0.6 → 1.0), glow doubles in intensity.
+    Show floating indicator above tile: "→ [resolved face]" in gem glow color.
+    This tells the player what face value Wild resolved to in the current chain.
+  WILD SCATTER WARNING (3+ Wilds on board simultaneously):
+    All Wilds pulse faster: hue-rotate 0.5s instead of 2s.
+    Board shimmer: CSS radial-gradient sweep across entire grid, 800ms,
+    rainbow colors at opacity 0.3. Visual warning: scatter imminent.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 6 — BOMB SPHERE VISUALS (H-Block extension)
+
+STANDARD BOMB — RED SPHERE OF DESTRUCTION
+  Shape: Perfect sphere with 3D radial gradient.
+    radial-gradient(circle at 35% 30%, #fca5a5, #ef4444 40%, #7f1d1d 75%, #1a0000)
+  Pulsing crimson outer glow:
+    animation: bomb-heartbeat 1.2s ease-in-out infinite
+    @keyframes bomb-heartbeat {
+      0%,100% { box-shadow: 0 0 15px rgba(239,68,68,0.5); }
+      50%      { box-shadow: 0 0 30px rgba(239,68,68,0.9); }
+    }
+  Fuse: Amber arc at top. Animated spark flickers at tip.
+  Countdown ring: SVG circle stroke-dashoffset draining clockwise.
+    Color: #ef4444 → #fbbf24 when fuseMs < 1000. Pulses double speed at < 1000.
+  Timer text: monospace, white, below sphere.
+
+RAINBOW BOMB — PRISM ORB / NEURAL OVOID
+  Same sphere shape. Surface color cycles through gem glow colors at 300ms each.
+  Outer ring cycles via hue-rotate animation.
+  Feels like the Wild Blocker's sibling — players connect them instinctively.
+
+EXPLOSION EFFECT — BOTH TYPES
+  Phase 1 (0–100ms):   Sphere scales up (1 → 2.5x), opacity 1 → 0.
+  Phase 2 (0–300ms):   Shockwave ring expands outward from blast center.
+                        Standard: deep crimson ring. Rainbow: cycling color ring.
+                        Ring opacity 1 → 0 as it expands to blast radius × 2.
+  Phase 3 (100–400ms): Affected tiles dissolve in gem-color sparks (see G2 particles).
+  Phase 4 (200–600ms): Particle burst from center (see G2 particle events).
+  All explosion visuals are CLIENT SIDE ONLY.
+  Game logic (which tiles destroyed) is handled by the engine. Visuals just play.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 7 — PHYSICS GRAVITY ANIMATION (G1)
+
+REQUIRES: CASCADE_MS approval (current value → 160ms).
+Ask developer for explicit approval before changing.
+If denied: implement animation anyway, it will be slightly choppy.
+
+IMPLEMENTATION:
+  Wrap each die tile component in motion.div with layout + layoutId props.
+  layoutId = cell.id (the stable unique tile ID — must not change during play).
+
+  motion.div props:
+    layout
+    layoutId={cell.id}
+    transition={{ type: "spring", stiffness: 280, damping: 22, mass: 0.6 }}
+
+  When stepGravity moves a tile to a new grid row, motion/react detects
+  the position change and spring-animates between old and new positions.
+  Result: tiles fall with natural acceleration and a small landing bounce.
+  The spring config gives obsidian/iron "weight" feel — not bouncy plastic.
+
+STONE/ICE/LOCK blockers: DO NOT wrap in layout motion.div.
+They are immovable. Gravity never applies.
+
+BOMBS: DO wrap in layout motion.div. They fall like die tiles.
+Fuse counts during fall — do not pause.
+
+FACE 6 "HEAVY IMPACT" SHAKE:
+  When a Face 6 (Obsidian) tile lands on the grid after falling:
+  Apply a subtle translateY shake to the grid container:
+    keyframe: 0% 0px, 15% -3px, 30% 2px, 45% -2px, 60% 1px, 100% 0px
+    duration: 200ms. Scorpio theme only — too heavy for Libra theme.
+  This simulates the weight of an obsidian relic hitting stone.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 8 — CANVAS PARTICLE SYSTEM (G2 — Gothic Bio Style)
+
+Custom canvas hook. Zero new dependencies. 60–90 lines of TypeScript.
+Canvas: absolute positioned over grid, full coverage, transparent,
+pointer-events: none, redraws on requestAnimationFrame.
+
+SIX PARTICLE EVENTS — GOTHIC BIO NAMES:
+
+1. SOLAR DUST (chain commit — scoring)
+   Trigger: chain scores > 0 and commits
+   Particles: 8–12 per tile, in that tile's gem glow color
+   Scorpio theme: motes drift upward "toward the cathedral ceiling"
+   Gold tiles (Face 1): extra brightness, slightly larger particles
+   Behavior: upward arc, gentle sideways drift, slow fade
+
+2. VOID SMOKE (chain commit — Face 6 specific)
+   Trigger: chain includes Face 6 tiles
+   Particles: 6–10 dark violet tendrils from Face 6 tile positions
+   Behavior: downward drift along grid floor, "cling to the crypt"
+   Color: #4c1d95 → #1a0533. Semi-transparent. Low opacity (0.6 max).
+
+3. ARTERIAL BURST (Farkle)
+   Trigger: chain scores 0
+   Particles: 25–35 crimson particles exploding from chain center
+   Color: #ef4444 and #8B0000 (neon-ichor for largest fragments)
+   Extra: Full-screen desaturation flash — CSS filter: saturate(0)
+          applied to grid for 300ms then eases back to saturate(1)
+   Fragments: 3–5 large (10–18px) tumbling pieces
+   Behavior: fast radial burst, heavy gravity pull-down, fast decay
+
+4. ETHEREAL MISTS (bank success)
+   Trigger: player banks points
+   Particles: 30–45 upward-flowing particles from BankBar
+   Color: #C0C8D0 (silver-filigree) and #D4AF37 (fluid-gold) alternating
+   Behavior: slow upward flow, gentle sway, dissolves as it rises
+   Feels: "Gold ichor flows back up to the Sanctuary"
+   Shape: Mix of small circles and near-invisible rectangles (mist feel)
+
+5. VOID COLLAPSE (Six-of-a-Kind trigger)
+   Trigger: Six-of-a-Kind chain commits (before bomb spawns)
+   Particles: 18–24 gold particles arcing upward like altar offerings
+   Color: #fbbf24 (gold ichor) and #f59e0b (mid gold)
+   Behavior: high arc, slow at peak, gravity pulls back down
+   Size: 8–14px (heavy coin feel)
+   Extra: Brief radial flash at chain center in --fluid-gold
+
+6. RAINBOW PURGE (Straight trigger — before rainbow bomb spawns)
+   Trigger: 1-2-3-4-5-6 Straight chain commits
+   Particles: 6 streams fanning outward, one per gem glow color
+   Each stream: 10–14 particles at 60° intervals from chain center
+   Behavior: fast initial burst, then scatter and fade
+   Feels: all 6 gem energies releasing simultaneously
+
+HOOK INTERFACE:
+  emit(type: ParticleEventType, gridX: number, gridY: number, faceColor?: string)
+  ParticleEventType: 'solar_dust'|'void_smoke'|'arterial_burst'|
+                     'ethereal_mists'|'void_collapse'|'rainbow_purge'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 9 — HYBRID AUDIO (G3 — Gothic Bio / Abyssal Echo)
+
+SYNTHESIS SOUNDS (Web Audio API — all gameplay events):
+  Tile select:    Crystal tap — high sine 1200Hz, 40ms decay, bone-dry
+  Chain build:    Harmonic ping rises per tile (+80Hz each addition)
+                  In Scorpio: slightly lower base frequency (800Hz) for darker tone
+  Chain commit:   Glass cascade — descending crystal pops, 30ms stagger
+  Farkle:         Heavy stone doors slamming — sawtooth 220Hz → 60Hz, 500ms
+                  Plus sub-bass thud at impact moment (80Hz, 100ms)
+  Bank:           Cathedral chime chord — C major arpeggio, rising, pure tone
+  Bomb tick:      Mechanical portcullis click — metallic, precise
+  Bomb detonate:  Deep stone impact + debris scatter (multi-frequency burst)
+  Wild activate:  Low-frequency thrum — gets louder as color cycle nears gold
+  Lock place:     Heavy metallic thunk — "portcullis falling" (120Hz, fast decay)
+  Stone damage:   Rock crack — white noise burst with low-frequency impact
+
+HOWLER.JS MUSIC (ambient + adaptive intensity):
+  useMusic hook wraps Howler.js for the following stem system.
+  All stems must be IDENTICAL DURATION for synchronized playback.
+
+  LIBRA STATE (lobby/menus):
+    Active stems: ambient only (volume 0.4)
+    Character: choral ambient hum, silver-toned, airy cathedral feel
+
+  PRIME LOW (×1.0–×1.25):
+    Active: ambient + strings (volumes 0.5, 0.2)
+    Character: sparse orchestral beneath the drone
+
+  PRIME HIGH (×1.5–×2.0):
+    Active: ambient + strings + choir (0.4, 0.4, 0.2)
+    Character: tension building, the cathedral is watching
+
+  FRENZY ACTIVE (energy > 150):
+    Active: all four stems (0.3, 0.5, 0.4, 0.5)
+    Character: full Gothic Bio symphony — the organism is alive
+
+  BOMB COUNTDOWN (fuseMs < 1500):
+    Reduce ambient/strings to 0.2, raise choir to 0.6, electronic to 0.7
+    Add bomb-tick stinger loop on top
+    Character: the crypt is about to collapse
+
+  CROSSFADE: 1500ms between all state transitions. Never cut abruptly.
+
+  REQUIRED FILES (developer sources these):
+    public/music/ambient.mp3      — dark drone, vine/gothic texture, looped
+    public/music/strings.mp3      — sparse dark orchestral, same duration
+    public/music/choir.mp3        — gothic choir tension layer, same duration
+    public/music/electronic.mp3   — bioluminescent pulse, same duration
+    public/stingers/farkle.mp3    — 2–3s stone slamming, descending
+    public/stingers/bank.mp3      — 3s cathedral chime resolve, ascending
+    public/stingers/bomb.mp3      — 1s portcullis tick, loopable
+    public/stingers/heist.mp3     — dissonant gothic tension, loopable
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 10 — MULTIPLIER LADDER (F-Block Visual)
+
+The ladder is the Celestial Vault. It lives in the Libra Lobby
+and bleeds into the Scorpio Grid as the player climbs.
+
+LADDER STEP VISUAL DESIGN:
+  Each step is a floating platform — asymmetric organic border-radius.
+  Inactive steps: --silver-filigree border, dark fill, subdued label
+  Active step: gem-echo glow (see color map below), elevated z-index
+
+  Step 0 (×1.0):  #94a3b8  — slate. Neutral. "You have earned nothing yet."
+  Step 1 (×1.25): #4ade80  — jade. "First growth."
+  Step 2 (×1.5):  #38bdf8  — steel crystal. "The silver prize tier."
+  Step 3 (×2.0):  #fbbf24  — gold ichor. Matches Face 1 — premium die milestone.
+                             box-shadow: 0 0 15px rgba(212,175,55,0.6)
+  Step 4 (×3.0):  #fb923c  — amber heat. No gem echo — this is the WARNING zone.
+                             Pulse animation: border flickers red → amber.
+  Step 5 (×4.0):  #a78bfa  — obsidian echo. Matches Face 6.
+                             Deep pulse: 0 0 20px rgba(139,92,246,0.8)
+                             In Scorpio theme: this step's glow bleeds into bg.
+
+LADDER TRANSITIONS:
+  Advancing: step lights up with a brief upward particle burst (Solar Dust).
+  Farkle reset: all steps flash --neon-ichor red, then extinguish cascade top→bottom.
+  Bank reset: steps extinguish cascade bottom→top (reverse — "banking back down").
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 11 — Z-PROTOCOL: THE THEME TRANSITION
+
+This is the emotional peak of the visual design.
+The transition from Libra Sanctuary → Scorpio Grid is a narrative beat.
+
+ENTERING THE GRID ("The Descent"):
+  Duration: 800ms total.
+  Frame 0–200ms:   Screen develops hairline cracks (CSS pseudo-element overlay,
+                   SVG crack paths animated stroke-dashoffset to "draw" the cracks).
+  Frame 200–500ms: Cracks glow --neon-ichor (#FF003F) — like the crypt bleeding through.
+  Frame 500–800ms: The screen "shatters" — each crack panel fades to Scorpio dark.
+                   Libra alabaster drains away. Obsidian floods in.
+                   data-theme switches from "libra" to "scorpio".
+  Frame 600–800ms: Scorpio grid elements animate in from below (translateY: 20px → 0).
+  Audio: crack SFX + low-frequency thud as obsidian locks in.
+
+RETURNING TO LOBBY ("The Ascension" — after Bank):
+  Duration: 600ms.
+  Frame 0–300ms:   Gold particles (Ethereal Mists) rise from BankBar,
+                   spreading across the screen.
+  Frame 300–600ms: Gold mists solidify into Libra alabaster.
+                   data-theme switches from "scorpio" to "libra".
+  Audio: cathedral chime resolve (bank.mp3 stinger).
+
+FARKLE COLLAPSE ("The Ruin"):
+  Duration: 1000ms.
+  Frame 0–300ms:   Arterial Burst particles. Grid shakes. Screen desaturates.
+  Frame 300–600ms: Everything dims to near-black except a single glowing red
+                   "Scorpio eye" at screen center.
+                   Implement as SVG circle with --neon-ichor glow, pulsing.
+  Frame 600–1000ms: Eye fades. Transition to Libra lobby — but darker, slower
+                    than a normal ascension. "You return to nothing."
+  Audio: stone slamming SFX + heavy silence before choral drone resumes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEAUTY MANDATE — applies to all phases without exception
+
+LIGHT SOURCE:    Top-left on all 3D surfaces. Shadow bottom-right. Always.
+DEPTH:           Nothing is flat. Every surface has a visible third dimension.
+MOTION:          Primary events = large visible impact. Background = subtle, breathing.
+BREATHING:       The Scorpio grid pulses at 4s ease-in-out. The player feels it alive.
+COLOR SIGNAL:    Players learn which dice are valuable from color — not from reading.
+                 Gold and Steel must look premium vs. the neutral groupers.
+PERFORMANCE:     60fps on low-end Android. Max 80 simultaneous particles.
+                 Limit backdrop-filter to 3 simultaneous elements.
+                 CSS over JS for all repeating animations.
+TYPOGRAPHY:      Numbers/scores: JetBrains Mono, font-weight 900.
+                 Labels: Inter or system-ui, uppercase, letter-spacing 0.08em.
+                 Die face numbers: monospace, embedded in die face.
+                 Blocker emoji: system emoji font, large, centered.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+APPROVAL GATES — never skip, never assume
+
+CASCADE_MS change:    explicit approval required
+New npm dependencies: explicit approval required
+Scorer changes:       explicit approval required (run 16 tests first)
+Cell/tile interface:  explicit approval required
+Database schema:      explicit approval required
+Z-Protocol timing:    show animation timing to developer before implementing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXECUTION ORDER
+
+Phase 0:  Questions       ← Start here. All 10 questions. No exceptions.
+Phase 1:  Scorer verify   ← 16 test cases. Fix if broken.
+Phase 2:  Chain debug     ← Pointer capture + adjacency + nerve links.
+Phase 3:  Design tokens   ← Inject both theme CSS systems.
+Phase 4:  Gem cubes (H1)  ← Isometric die in Libra and Scorpio styles.
+Phase 5:  Die states (H2) ← Stone/Ice/Lock/Wild with emoji and glows.
+Phase 6:  Bomb spheres    ← Red sphere + rainbow orb + explosion.
+Phase 7:  Physics (G1)    ← layout animation + CASCADE_MS (with approval).
+Phase 8:  Particles (G2)  ← Canvas hook, 6 Gothic Bio event types.
+Phase 9:  Audio (G3)      ← Synthesis sounds + useMusic Howler stems.
+Phase 10: Ladder (F-block)← Celestial Vault visual with gem color echoes.
+Phase 11: Z-Protocol      ← The Descent, The Ascension, The Ruin transitions.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+START NOW.
+
+Ask all 10 Phase 0 questions.
+Wait for every answer.
+Then produce AUDIT.md before touching any source file.
+Make this game beautiful.
+  </prompt_text>
+
+
+  <!-- Reference data outside the prompt -->
+  <phase_index>
+    <phase id="0"  name="Mandatory Questions"         blocks="true"/>
+    <phase id="1"  name="Scorer Verification"         source="16 test cases"/>
+    <phase id="2"  name="Chain Logic Debug + Nerves"  source="pointer capture + synaptic SVG links"/>
+    <phase id="3"  name="Design Token Injection"      source="Libra + Scorpio CSS systems"/>
+    <phase id="4"  name="Gem Cube Isometric (H1)"     source="H-block"/>
+    <phase id="5"  name="Die States (H2)"             source="Stone/Ice/Lock/Wild — emoji + glows"/>
+    <phase id="6"  name="Bomb Spheres"                source="Red sphere + rainbow orb + explosion"/>
+    <phase id="7"  name="Physics Gravity (G1)"        source="motion/react layout spring"/>
+    <phase id="8"  name="Particles (G2)"              source="Gothic Bio 6 event types"/>
+    <phase id="9"  name="Hybrid Audio (G3)"           source="Synthesis + Howler stems"/>
+    <phase id="10" name="Multiplier Ladder (F-block)" source="Celestial Vault gem-echo colors"/>
+    <phase id="11" name="Z-Protocol Transitions"      source="Descent/Ascension/Ruin theme switches"/>
+  </phase_index>
+
+  <open_decisions>
+    <decision id="CASCADE_MS"    status="NEEDS_APPROVAL"
+              current="unknown"  target="160ms"
+              note="Required for physics gravity spring to be visible"/>
+    <decision id="AUDIO_STEMS"   status="NEEDS_SOURCING"
+              note="4 same-duration music stems required for useMusic to function"/>
+    <decision id="WILD_RESOLVER" status="NEEDS_CONFIRMATION"
+              note="UI needs resolved wild face value exposed during chain preview"/>
+    <decision id="SCORER_INTEGRITY" status="VERIFY_FIRST"
+              note="Must confirm max-partition scorer is running — naive scorer breaks [1,1,1,2,2,2]"/>
+  </open_decisions>
+
+</beautiful_update>

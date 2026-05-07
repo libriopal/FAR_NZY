@@ -1,0 +1,86 @@
+import type { LevelDef } from '@match3d/farkle-shared';
+
+export const LEVELS: LevelDef[] = [
+  {
+    id: 'level_01',
+    name: 'Seedling Plot',
+    spawnWeights: { die:70, sphere:28, ice:0, lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:1, stone:0, multiplier_orb:1, ghost:0, catalyst:0 },
+    winScore: 25_000,
+    timeLimitSec: null,
+    energyMultiplier: 1.0,
+  },
+  {
+    id: 'level_02',
+    name: 'Glass Frame',
+    spawnWeights: { die:66, sphere:25, ice:2, lock:0, wild:1, bomb:0, rainbow_bomb:0, mirror:3, stone:1, multiplier_orb:2, ghost:0, catalyst:0 },
+    winScore: 40_000,
+    timeLimitSec: null,
+    energyMultiplier: 1.0,
+  },
+  {
+    id: 'level_03',
+    name: 'Vine Trellis',
+    spawnWeights: { die:62, sphere:22, ice:3, lock:1, wild:2, bomb:1, rainbow_bomb:0, mirror:4, stone:2, multiplier_orb:2, ghost:1, catalyst:0 },
+    winScore: 55_000,
+    timeLimitSec: null,
+    energyMultiplier: 1.0,
+  },
+  {
+    id: 'level_04',
+    name: 'Bioluminescent Bay',
+    spawnWeights: { die:58, sphere:20, ice:4, lock:2, wild:3, bomb:2, rainbow_bomb:0, mirror:5, stone:2, multiplier_orb:3, ghost:1, catalyst:0 },
+    winScore: 65_000,
+    timeLimitSec: 300,
+    energyMultiplier: 1.1,
+  },
+  {
+    id: 'level_05',
+    name: 'Aero Scaffold',
+    spawnWeights: { die:55, sphere:18, ice:5, lock:2, wild:4, bomb:2, rainbow_bomb:1, mirror:5, stone:3, multiplier_orb:3, ghost:1, catalyst:1 },
+    winScore: 75_000,
+    timeLimitSec: 270,
+    energyMultiplier: 1.1,
+  },
+  {
+    id: 'level_06',
+    name: 'Steel Canopy',
+    spawnWeights: { die:52, sphere:16, ice:6, lock:3, wild:5, bomb:3, rainbow_bomb:1, mirror:6, stone:3, multiplier_orb:3, ghost:1, catalyst:1 },
+    winScore: 80_000,
+    timeLimitSec: 240,
+    energyMultiplier: 1.2,
+  },
+  {
+    id: 'level_07',
+    name: 'Hydro Core',
+    spawnWeights: { die:48, sphere:14, ice:7, lock:4, wild:6, bomb:4, rainbow_bomb:1, mirror:6, stone:4, multiplier_orb:4, ghost:1, catalyst:1 },
+    winScore: 85_000,
+    timeLimitSec: 210,
+    energyMultiplier: 1.2,
+  },
+  {
+    id: 'level_08',
+    name: 'Overgrowth Dome',
+    spawnWeights: { die:44, sphere:13, ice:7, lock:4, wild:7, bomb:5, rainbow_bomb:2, mirror:7, stone:4, multiplier_orb:4, ghost:2, catalyst:1 },
+    winScore: 90_000,
+    timeLimitSec: 180,
+    energyMultiplier: 1.3,
+  },
+  {
+    id: 'level_09',
+    name: 'Root Network',
+    spawnWeights: { die:41, sphere:12, ice:7, lock:5, wild:8, bomb:6, rainbow_bomb:2, mirror:7, stone:5, multiplier_orb:4, ghost:2, catalyst:1 },
+    winScore: 95_000,
+    timeLimitSec: 180,
+    energyMultiplier: 1.3,
+  },
+  {
+    id: 'level_10',
+    name: 'Grand Blueprint',
+    spawnWeights: { die:38, sphere:12, ice:6, lock:4, wild:9, bomb:7, rainbow_bomb:2, mirror:7, stone:5, multiplier_orb:5, ghost:3, catalyst:2 },
+    winScore: 100_000,
+    timeLimitSec: null,
+    energyMultiplier: 1.5,
+  },
+];
+
+export const DEFAULT_LEVEL = LEVELS[9]!;
