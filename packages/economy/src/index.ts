@@ -19,14 +19,15 @@ export interface TransactionRequest {
 }
 
 export type TransactionType =
-  | 'purchase'       // real money -> gold coins (IAP)
-  | 'reward_ad'      // rewarded ad completion
-  | 'level_complete' // gameplay reward
+  | 'purchase'            // real money -> gold coins (IAP)
+  | 'reward_ad'           // rewarded ad completion
+  | 'level_complete'      // gameplay reward
   | 'daily_bonus'
   | 'gift_received'
   | 'booster_spend'
-  | 'sweeps_award'   // promotional SC grant
-  | 'refund';
+  | 'sweeps_award'        // promotional SC grant
+  | 'refund'
+  | 'battle_pass_reward'; // battle pass tier claim
 
 export interface TransactionRecord {
   id: string;
@@ -123,3 +124,25 @@ export const AD_REWARD_AMOUNTS: Record<string, { goldCoins: number; sweepsCoins:
   booster: { goldCoins: 300, sweepsCoins: 0 },
   daily_free: { goldCoins: 200, sweepsCoins: 5 },
 };
+
+export interface BattlePassTier {
+  tier: number;
+  goldCost: number;
+  goldReward: number;
+  scReward: number;
+  label: string;
+  isMilestone: boolean;
+}
+
+export const BATTLE_PASS_TIERS: BattlePassTier[] = [
+  { tier: 1,  goldCost: 500, goldReward: 600,   scReward: 0,  label: 'Seedling',     isMilestone: false },
+  { tier: 2,  goldCost: 500, goldReward: 650,   scReward: 0,  label: 'Sprout',       isMilestone: false },
+  { tier: 3,  goldCost: 500, goldReward: 700,   scReward: 0,  label: 'Vine',         isMilestone: false },
+  { tier: 4,  goldCost: 500, goldReward: 750,   scReward: 0,  label: 'Tendril',      isMilestone: false },
+  { tier: 5,  goldCost: 500, goldReward: 800,   scReward: 25, label: 'Glass Panel',  isMilestone: true  },
+  { tier: 6,  goldCost: 500, goldReward: 900,   scReward: 0,  label: 'Biolume',      isMilestone: false },
+  { tier: 7,  goldCost: 500, goldReward: 1000,  scReward: 0,  label: 'Aero Layer',   isMilestone: false },
+  { tier: 8,  goldCost: 500, goldReward: 1100,  scReward: 0,  label: 'Hydro Node',   isMilestone: false },
+  { tier: 9,  goldCost: 500, goldReward: 1200,  scReward: 0,  label: 'Blueprint',    isMilestone: false },
+  { tier: 10, goldCost: 500, goldReward: 1500,  scReward: 100, label: 'Grand Dome',  isMilestone: true  },
+];

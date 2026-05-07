@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { DisruptionType, DisruptionEvent } from '@match3d/farkle-shared';
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:3001';
 
@@ -19,6 +20,7 @@ export interface MultiplayerState {
   banked: number;
   unbanked: number;
   lastMessage: { type: string; [k: string]: unknown } | null;
+  lastDisruption: DisruptionEvent | null;
   error: string | null;
 }
 
@@ -31,6 +33,7 @@ const INITIAL: MultiplayerState = {
   banked: 0,
   unbanked: 0,
   lastMessage: null,
+  lastDisruption: null,
   error: null,
 };
 
@@ -76,6 +79,8 @@ export function useMultiplayer() {
             return { ...next, banked: (msg.banked as number) ?? prev.banked, unbanked: (msg.unbanked as number) ?? prev.unbanked };
           case 'TURN_CHANGE':
             return { ...next, activePlayerId: msg.activePlayerId as string };
+          case 'DISRUPTION_INCOMING':
+            return { ...next, lastDisruption: msg.disruption as DisruptionEvent };
           case 'ERROR':
             return { ...next, error: msg.message as string };
           default:
@@ -108,6 +113,10 @@ export function useMultiplayer() {
 
   const bank = useCallback(() => _send({ type: 'BANK' }), [_send]);
 
+  const sendDisruption = useCallback((disruptType: DisruptionType, targetColumns: number[]) => {
+    _send({ type: 'DISRUPT', disruptType, targetColumns });
+  }, [_send]);
+
   const leaveRoom = useCallback(() => {
     _send({ type: 'LEAVE_ROOM' });
     wsRef.current?.close();
@@ -116,5 +125,5 @@ export function useMultiplayer() {
 
   useEffect(() => () => wsRef.current?.close(), []);
 
-  return { state, createRoom, joinRoom, submitChain, bank, leaveRoom };
+  return { state, createRoom, joinRoom, submitChain, bank, sendDisruption, leaveRoom };
 }

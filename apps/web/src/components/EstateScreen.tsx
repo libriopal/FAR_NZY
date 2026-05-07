@@ -93,33 +93,34 @@ export function EstateScreen() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0a1f0a 0%, #0a1628 100%)',
-      color: '#5de58a', fontFamily: 'monospace', overflowY: 'auto',
+      background: 'var(--ba-surface-bg)',
+      color: 'var(--ba-marble-200)', fontFamily: 'monospace', overflowY: 'auto',
     }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '16px 20px', borderBottom: '1px solid #1a3a1a',
-        background: 'rgba(0,0,0,0.4)',
+        padding: '16px 20px', borderBottom: '1px solid var(--ba-glass-border)',
+        background: 'var(--ba-glass-bg)',
+        backdropFilter: 'var(--ba-glass-blur)', WebkitBackdropFilter: 'var(--ba-glass-blur)',
       }}>
         <button onClick={() => setActiveScreen('home')} style={backBtnStyle}>←</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Glass Greenhouse Estate</div>
-          <div style={{ color: '#1a4a1a', fontSize: 11 }}>Expand your living blueprint</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ba-glow-green)' }}>Glass Greenhouse Estate</div>
+          <div style={{ color: 'var(--ba-marble-500)', fontSize: 11 }}>Expand your living blueprint</div>
         </div>
       </div>
 
       {/* Resource bar */}
-      <div style={{
+      <div className="ba-glass" style={{
         display: 'flex', gap: 20, padding: '12px 20px',
-        background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid #1a3a1a',
+        borderBottom: '1px solid var(--ba-glass-border)', borderRadius: 0,
       }}>
-        <ResBadge icon="⚙️" label="Bio-Steel" value={resources.bioSteel} color="#7ecfff" />
-        <ResBadge icon="🌱" label="Aero-Seeds" value={resources.aeroSeeds} color="#5de58a" />
+        <ResBadge icon="⚙️" label="Bio-Steel" value={resources.bioSteel} tokenColor="var(--ba-blueprint)" />
+        <ResBadge icon="🌱" label="Aero-Seeds" value={resources.aeroSeeds} tokenColor="var(--ba-glow-green)" />
       </div>
 
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ color: '#1a4a1a', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+        <div style={{ color: 'var(--ba-marble-500)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
           Upgrade Tree
         </div>
 
@@ -130,47 +131,42 @@ export function EstateScreen() {
           const available = prereqOk && !isPurchased;
 
           return (
-            <div key={upgrade.id} style={{
-              background: isPurchased
-                ? 'rgba(93,229,138,0.08)'
-                : available && affordable
-                  ? 'rgba(13,42,20,0.8)'
-                  : 'rgba(10,26,10,0.4)',
-              border: `1px solid ${isPurchased ? '#2a6a3a' : available ? '#1a4a2a' : '#0a2a0a'}`,
+            <div key={upgrade.id} className="ba-glass" style={{
+              border: `1px solid ${isPurchased ? 'var(--ba-glow-green)' : available ? 'var(--ba-card-border)' : 'var(--ba-glass-border)'}`,
               borderRadius: 12, padding: 16,
               opacity: !prereqOk && !isPurchased ? 0.45 : 1,
             }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>{upgrade.name}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--ba-marble-200)' }}>{upgrade.name}</span>
                     <span style={{
-                      fontSize: 10, color: '#1a4a1a',
-                      background: '#0a1f0a', borderRadius: 4, padding: '2px 6px',
+                      fontSize: 10, color: 'var(--ba-marble-500)',
+                      background: 'var(--ba-card-bg)', borderRadius: 4, padding: '2px 6px',
                     }}>
                       Tier {upgrade.tier}
                     </span>
                     {isPurchased && (
-                      <span style={{ fontSize: 10, color: '#5de58a' }}>✓ Built</span>
+                      <span style={{ fontSize: 10, color: 'var(--ba-glow-green)' }}>✓ Built</span>
                     )}
                   </div>
-                  <div style={{ color: '#2a6a3a', fontSize: 12, marginTop: 4 }}>
+                  <div style={{ color: 'var(--ba-marble-500)', fontSize: 12, marginTop: 4 }}>
                     {upgrade.description}
                   </div>
                   {!isPurchased && (
                     <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                       {(upgrade.cost.bioSteel ?? 0) > 0 && (
-                        <CostBadge icon="⚙️" amount={upgrade.cost.bioSteel!} color="#7ecfff"
+                        <CostBadge icon="⚙️" amount={upgrade.cost.bioSteel!} tokenColor="var(--ba-blueprint)"
                           insufficient={resources.bioSteel < upgrade.cost.bioSteel!} />
                       )}
                       {(upgrade.cost.aeroSeeds ?? 0) > 0 && (
-                        <CostBadge icon="🌱" amount={upgrade.cost.aeroSeeds!} color="#5de58a"
+                        <CostBadge icon="🌱" amount={upgrade.cost.aeroSeeds!} tokenColor="var(--ba-glow-green)"
                           insufficient={resources.aeroSeeds < upgrade.cost.aeroSeeds!} />
                       )}
                     </div>
                   )}
                   {!prereqOk && !isPurchased && (
-                    <div style={{ color: '#1a3a1a', fontSize: 11, marginTop: 6 }}>
+                    <div style={{ color: 'var(--ba-marble-800)', fontSize: 11, marginTop: 6 }}>
                       Requires: {upgrade.prerequisiteIds.map(id =>
                         ESTATE_UPGRADES.find(u => u.id === id)?.name ?? id
                       ).join(', ')}
@@ -179,11 +175,12 @@ export function EstateScreen() {
                 </div>
                 {available && (
                   <button onClick={() => handlePurchase(upgrade)} style={{
-                    background: affordable ? '#1a6fd4' : '#1a1a2a',
-                    border: 'none', color: affordable ? '#fff' : '#2a2a4a',
+                    background: affordable ? 'var(--ba-accent)' : 'var(--ba-card-bg)',
+                    border: 'none', color: affordable ? '#fff' : 'var(--ba-marble-800)',
                     borderRadius: 8, padding: '10px 18px',
                     fontSize: 13, fontWeight: 700, cursor: affordable ? 'pointer' : 'not-allowed',
                     fontFamily: 'monospace', whiteSpace: 'nowrap',
+                    boxShadow: affordable ? '0 0 10px var(--ba-accent-glow)' : 'none',
                   }}>
                     {affordable ? 'Build' : 'Need more'}
                   </button>
@@ -194,16 +191,16 @@ export function EstateScreen() {
         })}
       </div>
 
-      <div style={{ padding: '0 20px 32px', color: '#0a2a0a', fontSize: 11, textAlign: 'center' }}>
+      <div style={{ padding: '0 20px 32px', color: 'var(--ba-marble-800)', fontSize: 11, textAlign: 'center' }}>
         Earn Bio-Steel and Aero-Seeds by matching items in gameplay.
       </div>
 
       {toast && (
         <div style={{
           position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: '#1a6fd4', color: '#fff', padding: '10px 24px',
+          background: 'var(--ba-accent)', color: '#fff', padding: '10px 24px',
           borderRadius: 24, fontFamily: 'monospace', fontSize: 14,
-          boxShadow: '0 4px 20px rgba(26,111,212,0.5)', zIndex: 999,
+          boxShadow: '0 4px 20px var(--ba-accent-glow)', zIndex: 999,
         }}>
           {toast}
         </div>
@@ -212,25 +209,25 @@ export function EstateScreen() {
   );
 }
 
-function ResBadge({ icon, label, value, color }: { icon: string; label: string; value: number; color: string }) {
+function ResBadge({ icon, label, value, tokenColor }: { icon: string; label: string; value: number; tokenColor: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ fontSize: 16 }}>{icon}</span>
       <div>
-        <div style={{ color, fontSize: 15, fontWeight: 700 }}>{value.toLocaleString()}</div>
-        <div style={{ color: '#1a3a1a', fontSize: 10 }}>{label}</div>
+        <div style={{ color: tokenColor, fontSize: 15, fontWeight: 700 }}>{value.toLocaleString()}</div>
+        <div style={{ color: 'var(--ba-marble-500)', fontSize: 10 }}>{label}</div>
       </div>
     </div>
   );
 }
 
-function CostBadge({ icon, amount, color, insufficient }: {
-  icon: string; amount: number; color: string; insufficient: boolean;
+function CostBadge({ icon, amount, tokenColor, insufficient }: {
+  icon: string; amount: number; tokenColor: string; insufficient: boolean;
 }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 12, color: insufficient ? '#ff6060' : color,
+      fontSize: 12, color: insufficient ? 'var(--ba-danger)' : tokenColor,
     }}>
       {icon} {amount.toLocaleString()}
     </span>
@@ -238,6 +235,6 @@ function CostBadge({ icon, amount, color, insufficient }: {
 }
 
 const backBtnStyle: React.CSSProperties = {
-  background: 'transparent', border: '1px solid #1a3a1a', color: '#5de58a',
+  background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-accent)',
   borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 16,
 };

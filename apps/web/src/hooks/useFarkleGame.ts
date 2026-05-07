@@ -164,6 +164,26 @@ export function useFarkleGame(
       });
     }
 
+    // Apply doubler cell ×2 bonus — if any chain body touches an active doubler column
+    if (result === 'ok') {
+      const now = Date.now();
+      const doublerCells = store.getState().doublerCells.filter(d => d.active && d.expiresAt > now);
+      const chainColumns = new Set(chainBodies.map(b => b?.column).filter((c): c is number => c !== undefined));
+      for (const dc of doublerCells) {
+        if (chainColumns.has(dc.column)) {
+          const after = store.getState();
+          const bankDelta = after.banked - s.banked;
+          const unbankedDelta = after.unbanked - s.unbanked;
+          store.setState(prev => ({
+            banked: prev.banked + Math.max(0, bankDelta),
+            unbanked: prev.unbanked + Math.max(0, unbankedDelta),
+          }));
+          store.getState().consumeDoublerCell(dc.column);
+          break;
+        }
+      }
+    }
+
     // Remove committed bodies from physics
     for (const id of chainIds) physics?.removeBody(id);
 

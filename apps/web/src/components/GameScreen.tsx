@@ -66,22 +66,22 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100dvh', background: '#0a1628', color: '#ff6060', fontFamily: 'monospace',
+        height: '100dvh', background: 'var(--ba-surface-bg)', color: 'var(--ba-danger)', fontFamily: 'monospace',
         padding: 24, gap: 16, textAlign: 'center',
       }}>
         <div style={{ fontSize: 20, fontWeight: 700 }}>Physics Init Failed</div>
-        <div style={{ fontSize: 11, color: '#803030', maxWidth: 300, wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 11, color: 'var(--ba-marble-800)', maxWidth: 300, wordBreak: 'break-all' }}>
           {initError}
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onRetry} style={{
-            background: '#1a6fd4', border: 'none', color: '#fff',
+            background: 'var(--ba-accent)', border: 'none', color: '#fff',
             borderRadius: 8, padding: '10px 20px', fontFamily: 'monospace', cursor: 'pointer',
           }}>
             ↺ Retry
           </button>
           <button onClick={() => setActiveScreen('home')} style={{
-            background: 'transparent', border: '1px solid #3a1a1a', color: '#6a4a4a',
+            background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
             borderRadius: 8, padding: '10px 20px', fontFamily: 'monospace', cursor: 'pointer',
           }}>
             ← Back
@@ -95,16 +95,16 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100dvh', background: '#0a1628', color: '#7ecfff', fontFamily: 'monospace', gap: 16,
+        height: '100dvh', background: 'var(--ba-surface-bg)', color: 'var(--ba-accent)', fontFamily: 'monospace', gap: 16,
       }}>
         <div style={{
-          width: 40, height: 40, border: '3px solid #1a4060', borderTopColor: '#3af',
+          width: 40, height: 40, border: '3px solid var(--ba-card-border)', borderTopColor: 'var(--ba-accent)',
           borderRadius: '50%', animation: 'spin 0.8s linear infinite',
         }} />
         <div style={{ fontSize: 14 }}>Loading physics...</div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <button onClick={() => setActiveScreen('home')} style={{
-          background: 'transparent', border: '1px solid #1a4060', color: '#4a6080',
+          background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
           borderRadius: 8, padding: '8px 20px', fontFamily: 'monospace', cursor: 'pointer',
           fontSize: 12, marginTop: 8,
         }}>

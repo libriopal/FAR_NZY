@@ -67,6 +67,22 @@ export type DieColor = 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'PURPLE'
 
 export type BlockerType = 'STONE' | 'ICE' | 'LOCK';
 
+export type DisruptionType = 'ice_send' | 'lock_send' | 'scramble';
+
+export interface DisruptionEvent {
+  id: string;
+  type: DisruptionType;
+  fromPlayerId: string;
+  targetColumns: number[];
+  receivedAt: number;
+}
+
+export interface DoublerCell {
+  column: number;
+  active: boolean;
+  expiresAt: number;
+}
+
 export type CellState = 'NORMAL' | 'EMPTY' | 'SPAWNING' | 'FROZEN' | 'LOCKED' | 'WILD';
 
 export type GamePhase =

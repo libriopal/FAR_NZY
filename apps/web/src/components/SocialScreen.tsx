@@ -100,27 +100,28 @@ export function SocialScreen() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', minHeight: '100vh',
-      background: 'linear-gradient(180deg, #0f0a1f 0%, #0a1628 100%)',
-      color: '#d4a0ff', fontFamily: 'monospace', overflowY: 'auto',
+      background: 'var(--ba-surface-bg)',
+      color: 'var(--ba-marble-200)', fontFamily: 'monospace', overflowY: 'auto',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '16px 20px', borderBottom: '1px solid #1a1040',
-        background: 'rgba(0,0,0,0.4)',
+        padding: '16px 20px', borderBottom: '1px solid var(--ba-glass-border)',
+        background: 'var(--ba-glass-bg)',
+        backdropFilter: 'var(--ba-glass-blur)', WebkitBackdropFilter: 'var(--ba-glass-blur)',
       }}>
         <button onClick={() => setActiveScreen('home')} style={backBtnStyle}>←</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Greenhouse Community</div>
-          <div style={{ color: '#1a1040', fontSize: 11 }}>Leaderboards · Gifts · Guild</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ba-accent)' }}>Greenhouse Community</div>
+          <div style={{ color: 'var(--ba-marble-500)', fontSize: 11 }}>Leaderboards · Gifts · Guild</div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', borderBottom: '1px solid #1a1040' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--ba-glass-border)' }}>
         {(['leaderboard', 'gifts', 'guild'] as SocialTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, background: 'transparent', border: 'none',
-            borderBottom: tab === t ? '2px solid #d4a0ff' : '2px solid transparent',
-            color: tab === t ? '#d4a0ff' : '#2a1a4a', padding: '12px 0',
+            borderBottom: tab === t ? '2px solid var(--ba-accent)' : '2px solid transparent',
+            color: tab === t ? 'var(--ba-accent)' : 'var(--ba-marble-500)', padding: '12px 0',
             fontFamily: 'monospace', fontSize: 13, cursor: 'pointer',
             textTransform: 'capitalize',
           }}>
@@ -138,9 +139,9 @@ export function SocialScreen() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: '#6a3ab2', color: '#fff', padding: '10px 24px',
+          background: 'var(--ba-accent)', color: '#fff', padding: '10px 24px',
           borderRadius: 24, fontFamily: 'monospace', fontSize: 14,
-          boxShadow: '0 4px 20px rgba(106,58,178,0.6)', zIndex: 999,
+          boxShadow: '0 4px 20px var(--ba-accent-glow)', zIndex: 999,
         }}>
           {toast}
         </div>
@@ -151,35 +152,35 @@ export function SocialScreen() {
 
 function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
   if (entries.length === 0) {
-    return <div style={{ color: '#1a1040', textAlign: 'center', padding: 48 }}>Loading rankings...</div>;
+    return <div style={{ color: 'var(--ba-marble-800)', textAlign: 'center', padding: 48 }}>Loading rankings...</div>;
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ color: '#2a1a4a', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+      <div style={{ color: 'var(--ba-marble-500)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
         Weekly Rankings
       </div>
       {entries.map(e => (
-        <div key={e.rank} style={{
+        <div key={e.rank} className="ba-glass" style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          background: e.isMe ? 'rgba(106,58,178,0.2)' : 'rgba(15,10,31,0.6)',
-          border: `1px solid ${e.isMe ? '#4a1a8a' : '#1a1040'}`,
+          border: `1px solid ${e.isMe ? 'var(--ba-accent)' : 'var(--ba-card-border)'}`,
           borderRadius: 10, padding: '12px 16px',
+          boxShadow: e.isMe ? '0 0 8px var(--ba-accent-glow)' : 'none',
         }}>
           <div style={{
             width: 28, textAlign: 'center', fontWeight: 700,
-            color: e.rank === 1 ? '#ffd700' : e.rank === 2 ? '#c0c0c0' : e.rank === 3 ? '#cd7f32' : '#2a1a4a',
+            color: e.rank === 1 ? 'var(--ba-glow-amber)' : e.rank === 2 ? '#c0c0c0' : e.rank === 3 ? '#cd7f32' : 'var(--ba-marble-500)',
           }}>
             {e.rank <= 3 ? ['🥇', '🥈', '🥉'][e.rank - 1] : `#${e.rank}`}
           </div>
-          <div style={{ flex: 1, fontWeight: e.isMe ? 700 : 400 }}>
+          <div style={{ flex: 1, fontWeight: e.isMe ? 700 : 400, color: 'var(--ba-marble-200)' }}>
             {e.displayName}{e.isMe ? ' (you)' : ''}
           </div>
-          <div style={{ color: '#d4a0ff', fontSize: 14, fontWeight: 700 }}>
+          <div style={{ color: 'var(--ba-accent)', fontSize: 14, fontWeight: 700 }}>
             {e.score.toLocaleString()}
           </div>
         </div>
       ))}
-      <p style={{ color: '#1a1040', fontSize: 10, marginTop: 8, textAlign: 'center' }}>
+      <p style={{ color: 'var(--ba-marble-800)', fontSize: 10, marginTop: 8, textAlign: 'center' }}>
         Rankings reset weekly. Play to improve your position.
       </p>
     </div>
@@ -189,35 +190,34 @@ function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
 function GiftsPanel({ gifts, onClaim }: { gifts: GiftItem[]; onClaim: (id: string) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ color: '#2a1a4a', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+      <div style={{ color: 'var(--ba-marble-500)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
         Inbox ({gifts.filter(g => !g.claimedAt).length} unclaimed)
       </div>
       {gifts.length === 0 && (
-        <div style={{ color: '#1a1040', textAlign: 'center', padding: 32 }}>No gifts yet.</div>
+        <div style={{ color: 'var(--ba-marble-800)', textAlign: 'center', padding: 32 }}>No gifts yet.</div>
       )}
       {gifts.map(g => (
-        <div key={g.id} style={{
+        <div key={g.id} className="ba-glass" style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          background: g.claimedAt ? 'rgba(10,10,20,0.4)' : 'rgba(15,10,31,0.8)',
-          border: `1px solid ${g.claimedAt ? '#0a0a14' : '#2a1a4a'}`,
+          border: `1px solid ${g.claimedAt ? 'var(--ba-glass-border)' : 'var(--ba-card-border)'}`,
           borderRadius: 10, padding: '12px 16px',
           opacity: g.claimedAt ? 0.5 : 1,
         }}>
           <div style={{ fontSize: 20 }}>🎁</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{g.fromName}</div>
-            <div style={{ color: '#d4a0ff', fontSize: 12 }}>+{g.amount} {g.type}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ba-marble-200)' }}>{g.fromName}</div>
+            <div style={{ color: 'var(--ba-accent)', fontSize: 12 }}>+{g.amount} {g.type}</div>
           </div>
           {!g.claimedAt ? (
             <button onClick={() => onClaim(g.id)} style={{
-              background: '#6a3ab2', border: 'none', color: '#fff',
+              background: 'var(--ba-accent)', border: 'none', color: '#fff',
               borderRadius: 8, padding: '8px 16px', fontSize: 13,
               cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
             }}>
               Claim
             </button>
           ) : (
-            <span style={{ color: '#1a1040', fontSize: 11 }}>✓ Claimed</span>
+            <span style={{ color: 'var(--ba-marble-800)', fontSize: 11 }}>✓ Claimed</span>
           )}
         </div>
       ))}
@@ -313,8 +313,8 @@ function GuildPanel() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => setView('main')} style={guildBtnStyle('#1a1040')}>← Back</button>
-          <span style={{ color: '#d4a0ff', fontWeight: 700 }}>Create Guild</span>
+          <button onClick={() => setView('main')} style={guildBackBtnStyle}>← Back</button>
+          <span style={{ color: 'var(--ba-accent)', fontWeight: 700 }}>Create Guild</span>
         </div>
         <input
           value={createName} onChange={e => setCreateName(e.target.value)}
@@ -328,8 +328,8 @@ function GuildPanel() {
           style={{ ...inputStyle, width: '100%' }}
           maxLength={4}
         />
-        {err && <div style={{ color: '#ff6060', fontSize: 12 }}>{err}</div>}
-        <button onClick={handleCreate} disabled={busy || !createName.trim() || !createTag.trim()} style={guildBtnStyle('#6a3ab2')}>
+        {err && <div style={{ color: 'var(--ba-danger)', fontSize: 12 }}>{err}</div>}
+        <button onClick={handleCreate} disabled={busy || !createName.trim() || !createTag.trim()} style={guildActionBtnStyle}>
           {busy ? 'Creating...' : 'Create Guild'}
         </button>
       </div>
@@ -341,32 +341,32 @@ function GuildPanel() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => setView('browse')} style={guildBtnStyle('#1a1040')}>← Back</button>
-          <span style={{ color: '#d4a0ff', fontWeight: 700 }}>[{selectedGuild.tag}] {selectedGuild.name}</span>
+          <button onClick={() => setView('browse')} style={guildBackBtnStyle}>← Back</button>
+          <span style={{ color: 'var(--ba-accent)', fontWeight: 700 }}>[{selectedGuild.tag}] {selectedGuild.name}</span>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ color: '#4a2a7a', fontSize: 12 }}>{selectedGuild.member_count} members</span>
-          <span style={{ color: '#d4a0ff', fontSize: 12 }}>Weekly: {selectedGuild.weekly_score.toLocaleString()}</span>
+          <span style={{ color: 'var(--ba-marble-500)', fontSize: 12 }}>{selectedGuild.member_count} members</span>
+          <span style={{ color: 'var(--ba-accent)', fontSize: 12 }}>Weekly: {selectedGuild.weekly_score.toLocaleString()}</span>
         </div>
         {guildMembers.map((m, i) => (
-          <div key={m.user_id} style={{
+          <div key={m.user_id} className="ba-glass" style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            background: 'rgba(15,10,31,0.6)', border: '1px solid #1a1040',
+            border: '1px solid var(--ba-card-border)',
             borderRadius: 8, padding: '10px 14px',
           }}>
-            <span style={{ color: '#d4a0ff', width: 22, fontSize: 12 }}>#{i + 1}</span>
-            <span style={{ flex: 1, color: '#e0d0ff', fontSize: 13 }}>{m.profiles?.display_name ?? m.user_id.slice(0, 8)}</span>
-            <span style={{ color: '#ffd700', fontSize: 12 }}>{m.weekly_contribution.toLocaleString()}</span>
+            <span style={{ color: 'var(--ba-accent)', width: 22, fontSize: 12 }}>#{i + 1}</span>
+            <span style={{ flex: 1, color: 'var(--ba-marble-200)', fontSize: 13 }}>{m.profiles?.display_name ?? m.user_id.slice(0, 8)}</span>
+            <span style={{ color: 'var(--ba-glow-amber)', fontSize: 12 }}>{m.weekly_contribution.toLocaleString()}</span>
           </div>
         ))}
-        {guildMembers.length === 0 && <div style={{ color: '#2a1a4a', fontSize: 12 }}>No member data yet.</div>}
+        {guildMembers.length === 0 && <div style={{ color: 'var(--ba-marble-800)', fontSize: 12 }}>No member data yet.</div>}
         {!myGuild && (
-          <button onClick={() => handleJoin(selectedGuild)} disabled={busy} style={guildBtnStyle('#6a3ab2')}>
+          <button onClick={() => handleJoin(selectedGuild)} disabled={busy} style={guildActionBtnStyle}>
             {busy ? '...' : 'Join Guild'}
           </button>
         )}
         {myGuild && (
-          <button onClick={handleLeave} disabled={busy} style={guildBtnStyle('#3a0a0a')}>
+          <button onClick={handleLeave} disabled={busy} style={{ ...guildActionBtnStyle, background: 'rgba(239,68,68,0.2)', border: '1px solid var(--ba-danger)' }}>
             {busy ? '...' : 'Leave Guild'}
           </button>
         )}
@@ -378,21 +378,21 @@ function GuildPanel() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <button onClick={() => setView('main')} style={guildBtnStyle('#1a1040')}>← Back</button>
-          <span style={{ color: '#d4a0ff', fontWeight: 700 }}>Top Guilds</span>
+          <button onClick={() => setView('main')} style={guildBackBtnStyle}>← Back</button>
+          <span style={{ color: 'var(--ba-accent)', fontWeight: 700 }}>Top Guilds</span>
         </div>
         {topGuilds.map((g, i) => (
-          <div key={g.id} onClick={() => openDetail(g)} style={{
+          <div key={g.id} onClick={() => openDetail(g)} className="ba-glass" style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            background: 'rgba(15,10,31,0.6)', border: '1px solid #1a1040',
+            border: '1px solid var(--ba-card-border)',
             borderRadius: 10, padding: '12px 16px', cursor: 'pointer',
           }}>
-            <div style={{ color: '#d4a0ff', fontWeight: 700, width: 24 }}>#{i + 1}</div>
+            <div style={{ color: 'var(--ba-accent)', fontWeight: 700, width: 24 }}>#{i + 1}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, color: '#e0d0ff' }}>[{g.tag}] {g.name}</div>
-              <div style={{ color: '#2a1a4a', fontSize: 12 }}>{g.member_count} members</div>
+              <div style={{ fontWeight: 700, color: 'var(--ba-marble-200)' }}>[{g.tag}] {g.name}</div>
+              <div style={{ color: 'var(--ba-marble-500)', fontSize: 12 }}>{g.member_count} members</div>
             </div>
-            <div style={{ color: '#d4a0ff', fontSize: 13 }}>{g.weekly_score.toLocaleString()}</div>
+            <div style={{ color: 'var(--ba-accent)', fontSize: 13 }}>{g.weekly_score.toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -403,36 +403,37 @@ function GuildPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {myGuildId ? (
-        <div style={{
-          background: 'rgba(15,10,31,0.6)', border: '1px solid #6a3ab2',
+        <div className="ba-glass" style={{
+          border: '1px solid var(--ba-accent)',
           borderRadius: 12, padding: 16,
+          boxShadow: '0 0 12px var(--ba-accent-glow)',
         }}>
-          <div style={{ color: '#d4a0ff', fontWeight: 700, marginBottom: 6 }}>Your Guild</div>
-          <div style={{ color: '#2a1a4a', fontSize: 12, marginBottom: 10 }}>
+          <div style={{ color: 'var(--ba-accent)', fontWeight: 700, marginBottom: 6 }}>Your Guild</div>
+          <div style={{ color: 'var(--ba-marble-500)', fontSize: 12, marginBottom: 10 }}>
             Guild ID: {myGuildId.slice(0, 8)}...
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => { setSelectedGuild(topGuilds.find(g => g.id === myGuildId) ?? null); setView('detail'); }} style={guildBtnStyle('#1a1040')}>
+            <button onClick={() => { setSelectedGuild(topGuilds.find(g => g.id === myGuildId) ?? null); setView('detail'); }} style={guildBackBtnStyle}>
               View Details
             </button>
-            <button onClick={handleLeave} disabled={busy} style={guildBtnStyle('#3a0a0a')}>
+            <button onClick={handleLeave} disabled={busy} style={{ ...guildActionBtnStyle, background: 'rgba(239,68,68,0.2)', border: '1px solid var(--ba-danger)' }}>
               {busy ? '...' : 'Leave'}
             </button>
           </div>
         </div>
       ) : (
-        <div style={{
-          background: 'rgba(15,10,31,0.6)', border: '1px solid #1a1040',
+        <div className="ba-glass" style={{
+          border: '1px solid var(--ba-card-border)',
           borderRadius: 12, padding: 20, textAlign: 'center',
         }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#d4a0ff', marginBottom: 4 }}>Not in a guild</div>
-          <div style={{ color: '#2a1a4a', fontSize: 13, marginBottom: 20 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ba-accent)', marginBottom: 4 }}>Not in a guild</div>
+          <div style={{ color: 'var(--ba-marble-500)', fontSize: 13, marginBottom: 20 }}>
             Join a guild to earn bonus SC and compete in weekly events.
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => setView('create')} style={guildBtnStyle('#6a3ab2')}>Create Guild</button>
-            <button onClick={() => setView('browse')} style={guildBtnStyle('#1a1040')}>Browse Guilds</button>
+            <button onClick={() => setView('create')} style={guildActionBtnStyle}>Create Guild</button>
+            <button onClick={() => setView('browse')} style={guildBackBtnStyle}>Browse Guilds</button>
           </div>
         </div>
       )}
@@ -441,20 +442,25 @@ function GuildPanel() {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(15,10,31,0.8)', border: '1px solid #1a1040',
-  color: '#d4a0ff', borderRadius: 8, padding: '10px 14px',
+  background: 'var(--ba-card-bg)', border: '1px solid var(--ba-card-border)',
+  color: 'var(--ba-marble-200)', borderRadius: 8, padding: '10px 14px',
   fontSize: 13, fontFamily: 'monospace', outline: 'none',
 };
 
-function guildBtnStyle(bg: string): React.CSSProperties {
-  return {
-    background: bg, border: 'none', color: '#fff',
-    borderRadius: 8, padding: '10px 20px',
-    fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
-  };
-}
+const guildActionBtnStyle: React.CSSProperties = {
+  background: 'var(--ba-accent)', border: 'none', color: '#fff',
+  borderRadius: 8, padding: '10px 20px',
+  fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
+  boxShadow: '0 0 8px var(--ba-accent-glow)',
+};
+
+const guildBackBtnStyle: React.CSSProperties = {
+  background: 'var(--ba-card-bg)', border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-200)',
+  borderRadius: 8, padding: '10px 20px',
+  fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
+};
 
 const backBtnStyle: React.CSSProperties = {
-  background: 'transparent', border: '1px solid #1a1040', color: '#d4a0ff',
+  background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-accent)',
   borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 16,
 };

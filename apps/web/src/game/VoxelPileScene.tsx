@@ -70,6 +70,34 @@ function ColumnGrid() {
   );
 }
 
+// ── Doubler Cell Floor Panels ─────────────────────────────────────────────────
+
+function DoublerCellPanels() {
+  const doublerCells = useFarkleStore(s => s.doublerCells);
+  const now = Date.now();
+  const active = doublerCells.filter(d => d.active && d.expiresAt > now);
+  if (active.length === 0) return null;
+  return (
+    <group>
+      {active.map(d => {
+        const x = COLUMN_X[d.column] ?? 0;
+        return (
+          <mesh key={d.column} position={[x, 0.06, 0]}>
+            <boxGeometry args={[0.85, 0.05, 1.0]} />
+            <meshStandardMaterial
+              color="#22d3ee"
+              emissive="#22d3ee"
+              emissiveIntensity={0.8}
+              opacity={0.55}
+              transparent
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 // ── Chain line ────────────────────────────────────────────────────────────────
 
 function ChainLine() {
@@ -385,6 +413,7 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap }: 
       <pointLight position={[0, 8, 4]} intensity={0.5} color="#3af" />
       <pointLight position={[-4, 2, 2]} intensity={0.3} color="#7c3aed" />
       <ColumnGrid />
+      <DoublerCellPanels />
       <ChainLine />
       {bodies.map(body => (
         <EntityMesh

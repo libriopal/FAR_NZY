@@ -425,6 +425,24 @@ export class VoxelPhysicsSystem {
   getEntityType(id: string): EntityType | null { return this.bodies.get(id)?.entityType ?? null; }
   getHealth(id: string): number { return this.bodies.get(id)?.health ?? 0; }
 
+  sendDisruption(targetColumns: number[], type: 'ice_send' | 'lock_send' | 'scramble'): void {
+    for (const col of targetColumns) {
+      if (col < 0 || col > 6) continue;
+      if (type === 'ice_send') {
+        this.spawnBody(col, 'ice');
+      } else if (type === 'lock_send') {
+        this.spawnBody(col, 'lock');
+      } else if (type === 'scramble') {
+        // Re-roll faces of all settled dice in this column
+        for (const [, data] of this.bodies) {
+          if (data.column === col && data.entityType === 'die') {
+            data.face = this._rollFace();
+          }
+        }
+      }
+    }
+  }
+
   // ── Simulation ────────────────────────────────────────────────────────────
 
   startSimulation(

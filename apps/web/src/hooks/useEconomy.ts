@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { EconomyClient } from '@match3d/economy';
-import type { TransactionRequest, TransactionRecord } from '@match3d/economy';
+import type { TransactionRequest, TransactionRecord, BattlePassTier } from '@match3d/economy';
 import { useGameStore } from '../store/gameStore.js';
 import { processTransaction } from '@match3d/backend-client';
 import { blockchainQueue } from '@match3d/blockchain';
@@ -111,5 +111,22 @@ export function useEconomy() {
     updateEconomyBalance({ goldCoins, sweepsCoins, lastUpdated: Date.now() });
   }, [updateEconomyBalance]);
 
-  return { creditReward, syncBalance, economyClient: _economyClient };
+  const claimBattlePassTier = useCallback(async (tierDef: BattlePassTier): Promise<boolean> => {
+    if (economyBalance.goldCoins < tierDef.goldCost) return false;
+    // Optimistic update: deduct cost, credit gold+SC rewards
+    updateEconomyBalance({
+      ...economyBalance,
+      goldCoins: economyBalance.goldCoins - tierDef.goldCost + tierDef.goldReward,
+      sweepsCoins: economyBalance.sweepsCoins + tierDef.scReward,
+      lastUpdated: Date.now(),
+    });
+    // Log via creditReward for blockchain queue (net gold, SC separately if applicable)
+    await creditReward('battle_pass_reward', 'goldCoins', tierDef.goldReward - tierDef.goldCost, { tier: tierDef.tier });
+    if (tierDef.scReward > 0) {
+      await creditReward('battle_pass_reward', 'sweepsCoins', tierDef.scReward, { tier: tierDef.tier });
+    }
+    return true;
+  }, [userId, economyBalance, updateEconomyBalance, creditReward]);
+
+  return { creditReward, syncBalance, claimBattlePassTier, economyClient: _economyClient };
 }

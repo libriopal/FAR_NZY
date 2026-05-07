@@ -162,6 +162,12 @@ export class GameRoom {
       case 'PASS':
         this.nextTurn();
         break;
+      case 'DISRUPT': {
+        const disruptType = msg.disruptType as string;
+        const targetColumns = msg.targetColumns as number[];
+        this.handleDisrupt(playerId, disruptType, targetColumns);
+        break;
+      }
       case 'LEAVE_ROOM':
         this.removePlayer(playerId);
         break;
@@ -195,6 +201,24 @@ export class GameRoom {
     this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
     this.startTurnTimer();
+  }
+
+  private handleDisrupt(fromPlayerId: string, disruptType: string, targetColumns: number[]) {
+    const VALID_TYPES = new Set(['ice_send', 'lock_send', 'scramble']);
+    if (!VALID_TYPES.has(disruptType)) return;
+    const disruption = {
+      id: `${Date.now()}-${fromPlayerId}`,
+      type: disruptType,
+      fromPlayerId,
+      targetColumns: (targetColumns ?? []).filter((c: number) => c >= 0 && c <= 6),
+      receivedAt: Date.now(),
+    };
+    // Route disruption to all opponents
+    for (const [pid, player] of this.players) {
+      if (pid !== fromPlayerId) {
+        this.send(player.ws, { type: 'DISRUPTION_INCOMING', disruption });
+      }
+    }
   }
 
   private handleBank(playerId: string) {

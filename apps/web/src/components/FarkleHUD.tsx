@@ -22,7 +22,7 @@ function ScorePopupLayer() {
         const delta = next - prev;
         if (delta > 0) {
           const id = ++counterRef.current;
-          setPopups(p => [...p, { id, text: `+${delta.toLocaleString()}`, color: '#ffd700' }]);
+          setPopups(p => [...p, { id, text: `+${delta.toLocaleString()}`, color: 'var(--ba-glow-amber)' }]);
           setTimeout(() => setPopups(p => p.filter(x => x.id !== id)), 1200);
         }
       }
@@ -80,8 +80,8 @@ function FarkleFlash() {
     }}>
       <div style={{
         position: 'absolute', top: '42%', left: '50%', transform: 'translateX(-50%)',
-        color: '#ff4040', fontSize: 32, fontWeight: 900, fontFamily: 'monospace',
-        textShadow: '0 0 16px #ff0000', letterSpacing: 4,
+        color: 'var(--ba-danger)', fontSize: 32, fontWeight: 900, fontFamily: 'monospace',
+        textShadow: '0 0 16px var(--ba-danger)', letterSpacing: 4,
       }}>
         FARKLE!
       </div>
@@ -102,9 +102,9 @@ function ModePulse() {
   useEffect(() => {
     if (mode !== prevMode.current) {
       prevMode.current = mode;
-      if (mode === 'FRENZY') setPulse({ color: '#ff6040', label: 'FRENZY!' });
-      else if (mode === 'PRIME') setPulse({ color: '#3af', label: 'PRIME' });
-      else setPulse({ color: '#4a6080', label: 'NORMAL' });
+      if (mode === 'FRENZY') setPulse({ color: 'var(--ba-frenzy)', label: 'FRENZY!' });
+      else if (mode === 'PRIME') setPulse({ color: 'var(--ba-blueprint)', label: 'PRIME' });
+      else setPulse({ color: 'var(--ba-marble-500)', label: 'NORMAL' });
       setTimeout(() => setPulse(null), 800);
     }
   }, [mode]);
@@ -140,32 +140,46 @@ function ModePulse() {
 function EnergyBar() {
   const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
   const pct = (energy / MAX_ENERGY) * 100;
-  const barColor = mode === 'FRENZY' ? '#ff6040' : mode === 'PRIME' ? '#3af' : '#335';
+
+  const barBg =
+    mode === 'FRENZY' ? 'linear-gradient(90deg, var(--ba-vine-mid), var(--ba-glow-teal))' :
+    mode === 'PRIME'  ? 'linear-gradient(90deg, var(--ba-vine-dark), var(--ba-glow-green))' :
+    'var(--ba-marble-800)';
+
   const label = mode === 'FRENZY' ? 'FRENZY' : mode === 'PRIME' ? 'PRIME' : 'NORMAL';
-  const labelColor = mode === 'FRENZY' ? '#ff6040' : mode === 'PRIME' ? '#7ecfff' : '#4a6080';
+  const labelColor =
+    mode === 'FRENZY' ? 'var(--ba-frenzy)' :
+    mode === 'PRIME'  ? 'var(--ba-blueprint)' :
+    'var(--ba-marble-500)';
 
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0,
-      height: 32, background: '#0d2040',
-      display: 'flex', alignItems: 'center', paddingLeft: 8, paddingRight: 8, gap: 8,
+      height: 44,
+      background: 'var(--ba-glass-bg)',
+      backdropFilter: 'var(--ba-glass-blur)',
+      WebkitBackdropFilter: 'var(--ba-glass-blur)',
+      borderBottom: '1px solid var(--ba-glass-border)',
+      display: 'flex', alignItems: 'center', paddingLeft: 10, paddingRight: 10, gap: 8,
     }}>
       <span style={{ color: labelColor, fontSize: 11, fontFamily: 'monospace', fontWeight: 700, minWidth: 52 }}>
         {label}
       </span>
-      <div style={{ flex: 1, height: 8, background: '#0a1628', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, height: 8, background: 'var(--ba-marble-950)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
         <div style={{
           position: 'absolute', left: `${(FRENZY_THRESHOLD / MAX_ENERGY) * 100}%`,
-          top: 0, bottom: 0, width: 1, background: '#ff604060',
+          top: 0, bottom: 0, width: 1, background: 'rgba(34,211,238,0.4)',
         }} />
         <div style={{
           height: '100%', width: `${pct}%`,
-          background: barColor,
+          background: barBg,
           transition: 'width 0.1s linear',
-          boxShadow: `0 0 4px ${barColor}`,
+          borderRadius: 4,
+          ...(mode === 'FRENZY' ? { boxShadow: '0 0 8px var(--ba-glow-teal)' } :
+             mode === 'PRIME'  ? { boxShadow: '0 0 6px var(--ba-glow-green)' } : {}),
         }} />
       </div>
-      <span style={{ color: '#4a6080', fontSize: 10, fontFamily: 'monospace', minWidth: 32, textAlign: 'right' }}>
+      <span style={{ color: 'var(--ba-marble-500)', fontSize: 10, fontFamily: 'monospace', minWidth: 32, textAlign: 'right' }}>
         {Math.floor(energy)}/{MAX_ENERGY}
       </span>
     </div>
@@ -185,24 +199,24 @@ function ScoreDisplay() {
 
   return (
     <div style={{
-      position: 'absolute', top: 38, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
       textAlign: 'center', pointerEvents: 'none',
     }}>
-      <div style={{ color: '#7ecfff', fontSize: 22, fontWeight: 700, fontFamily: 'monospace', textShadow: '0 0 8px #3af' }}>
+      <div style={{ color: 'var(--ba-accent)', fontSize: 22, fontWeight: 700, fontFamily: 'monospace', textShadow: '0 0 8px var(--ba-accent-glow)' }}>
         {total.toLocaleString()}
       </div>
-      <div style={{ width: 120, height: 3, background: '#0a2040', borderRadius: 2, margin: '3px auto 0' }}>
+      <div style={{ width: 120, height: 3, background: 'var(--ba-marble-950)', borderRadius: 2, margin: '3px auto 0' }}>
         <div style={{
           height: '100%', width: `${progressPct}%`,
-          background: '#ffd700', borderRadius: 2,
+          background: 'var(--ba-glow-amber)', borderRadius: 2,
           transition: 'width 0.3s ease',
         }} />
       </div>
-      <div style={{ color: '#4a6080', fontSize: 9, fontFamily: 'monospace' }}>
+      <div style={{ color: 'var(--ba-marble-500)', fontSize: 9, fontFamily: 'monospace' }}>
         {total.toLocaleString()} / {WIN_SCORE.toLocaleString()}
       </div>
       {mult > 1 && (
-        <div style={{ color: '#d4a0ff', fontSize: 12, fontFamily: 'monospace' }}>×{mult} multiplier</div>
+        <div style={{ color: 'var(--ba-blueprint)', fontSize: 12, fontFamily: 'monospace' }}>×{mult} multiplier</div>
       )}
     </div>
   );
@@ -231,17 +245,17 @@ function ChainPreview() {
         {chainFaces.map((face, i) => (
           <div key={i} style={{
             width: 32, height: 32, borderRadius: 6,
-            background: FACE_COLOR[face] ?? '#7ecfff',
+            background: FACE_COLOR[face] ?? 'var(--ba-blueprint)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
-            boxShadow: `0 0 8px ${FACE_COLOR[face] ?? '#7ecfff'}`,
+            boxShadow: `0 0 8px ${FACE_COLOR[face] ?? 'var(--ba-blueprint-glow)'}`,
           }}>
             {face}
           </div>
         ))}
       </div>
       <div style={{
-        color: isFarkle ? '#ff6060' : '#ffd700',
+        color: isFarkle ? 'var(--ba-danger)' : 'var(--ba-glow-amber)',
         fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
       }}>
         {isFarkle ? 'FARKLE' : `+${preview.toLocaleString()}`}
@@ -256,23 +270,65 @@ function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void
   const unbanked = useFarkleStore(s => s.unbanked);
 
   return (
-    <div style={{ position: 'absolute', top: 38, right: 12, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
+    <div style={{ position: 'absolute', top: 50, right: 12, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
       {unbanked > 0 && (
         <button onClick={onBank} style={{
-          background: '#1a6fd4', border: 'none', color: '#fff',
+          background: 'var(--ba-accent)', border: 'none', color: '#fff',
           borderRadius: 8, padding: '6px 12px',
           fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
+          boxShadow: '0 0 12px var(--ba-accent-glow)',
         }}>
           BANK {unbanked.toLocaleString()}
         </button>
       )}
       <button onClick={onBack} style={{
-        background: 'transparent', border: '1px solid #1a4060', color: '#4a8a9a',
+        background: 'var(--ba-card-bg)', border: '1px solid var(--ba-card-border)',
+        color: 'var(--ba-marble-500)',
         borderRadius: 8, padding: '4px 10px',
         fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
       }}>
         ← Exit
       </button>
+    </div>
+  );
+}
+
+// ── Disruption Toast ──────────────────────────────────────────────────────────
+
+function DisruptionToast() {
+  const pendingDisruption = useFarkleStore(s => s.pendingDisruption);
+  const dismissDisruption = useFarkleStore(s => s.dismissDisruption);
+
+  if (!pendingDisruption) return null;
+
+  const labels: Record<string, string> = {
+    ice_send: '❄️ ICE incoming!',
+    lock_send: '🔒 LOCK incoming!',
+    scramble: '🌀 Scramble incoming!',
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', top: 52, left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(30,0,60,0.92)', border: '1px solid rgba(200,50,255,0.6)',
+      borderRadius: 10, padding: '8px 20px',
+      color: '#e879f9', fontSize: 14, fontFamily: 'monospace', fontWeight: 700,
+      boxShadow: '0 0 16px rgba(200,50,255,0.4)',
+      animation: 'disruptIn 0.3s ease-out',
+      pointerEvents: 'auto', zIndex: 10,
+      display: 'flex', gap: 12, alignItems: 'center',
+    }}>
+      {labels[pendingDisruption.type] ?? 'Disruption incoming!'}
+      <button onClick={dismissDisruption} style={{
+        background: 'transparent', border: 'none', color: 'rgba(200,50,255,0.7)',
+        cursor: 'pointer', fontFamily: 'monospace', fontSize: 12,
+      }}>✕</button>
+      <style>{`
+        @keyframes disruptIn {
+          0% { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -294,6 +350,7 @@ export function FarkleHUD({ onBank, onBack }: FarkleHUDProps) {
       <FarkleFlash />
       <ModePulse />
       <ScorePopupLayer />
+      <DisruptionToast />
     </div>
   );
 }

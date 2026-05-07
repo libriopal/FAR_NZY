@@ -56,37 +56,38 @@ export function WinScreen() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', background: 'radial-gradient(ellipse at center, #0d2a14 0%, #0a1628 70%)',
-      color: '#5de58a', fontFamily: 'monospace', padding: 24, textAlign: 'center',
+      minHeight: '100vh', background: 'var(--ba-surface-bg)',
+      color: 'var(--ba-glow-green)', fontFamily: 'monospace', padding: 24, textAlign: 'center',
     }}>
-      <div style={{ fontSize: 64, marginBottom: 8 }}>🌿</div>
+      <div style={{ fontSize: 64, marginBottom: 8, animation: 'ba-glow-in 0.6s var(--ba-ease-spring)' }}>🌿</div>
       <h2 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px',
-        textShadow: '0 0 20px #5de58a80' }}>Blueprint Complete</h2>
-      <p style={{ color: '#4a9a6a', fontSize: 14, marginBottom: 24 }}>
+        color: 'var(--ba-glow-green)', textShadow: '0 0 20px rgba(74,222,128,0.5)' }}>Blueprint Complete</h2>
+      <p style={{ color: 'var(--ba-marble-500)', fontSize: 14, marginBottom: 24 }}>
         The greenhouse grows stronger.
       </p>
 
       {/* Score card */}
-      <div style={{
-        background: 'rgba(13,32,64,0.8)', borderRadius: 12, border: '1px solid #1a4060',
+      <div className="ba-glass ba-dissolve" style={{
+        borderRadius: 12, border: '1px solid var(--ba-card-border)',
         padding: '20px 40px', marginBottom: 20,
+        animationPlayState: 'paused',
       }}>
-        <div style={{ fontSize: 36, fontWeight: 700, color: '#7ecfff' }}>
+        <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--ba-accent)' }}>
           {score.toLocaleString()}
         </div>
-        <div style={{ color: '#4a8a9a', fontSize: 14 }}>Score</div>
+        <div style={{ color: 'var(--ba-marble-500)', fontSize: 14 }}>Score</div>
       </div>
 
       {/* Reward card */}
-      <div style={{
-        background: 'rgba(10,42,20,0.6)', borderRadius: 12, border: '1px solid #1a4a2a',
+      <div className="ba-glass" style={{
+        borderRadius: 12, border: '1px solid var(--ba-card-border)',
         padding: '16px 32px', marginBottom: 28,
       }}>
-        <div style={{ color: '#2a9a5a', fontSize: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ color: 'var(--ba-marble-500)', fontSize: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
           Rewards
           {scoreMult > 1.0 && (
             <span style={{
-              background: scoreMult >= 2.0 ? '#7c3aed' : '#1a6fd4',
+              background: scoreMult >= 2.0 ? 'var(--ba-blueprint)' : 'var(--ba-accent)',
               color: '#fff', fontSize: 10, borderRadius: 6, padding: '2px 6px', fontWeight: 700,
             }}>
               {scoreMult >= 2.0 ? '2× BONUS' : '1.5× BONUS'}
@@ -95,13 +96,13 @@ export function WinScreen() {
         </div>
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
           <div>
-            <div style={{ color: '#ffd700', fontWeight: 700, fontSize: 18 }}>+{goldReward}</div>
-            <div style={{ color: '#4a8a4a', fontSize: 11 }}>Gold Coins</div>
+            <div style={{ color: 'var(--ba-glow-amber)', fontWeight: 700, fontSize: 18 }}>+{goldReward}</div>
+            <div style={{ color: 'var(--ba-marble-500)', fontSize: 11 }}>Gold Coins</div>
           </div>
           {scReward > 0 && (
             <div>
-              <div style={{ color: '#00e5ff', fontWeight: 700, fontSize: 18 }}>+{scReward}</div>
-              <div style={{ color: '#4a8a4a', fontSize: 11 }}>Sweeps Coins</div>
+              <div style={{ color: 'var(--ba-glow-teal)', fontWeight: 700, fontSize: 18 }}>+{scReward}</div>
+              <div style={{ color: 'var(--ba-marble-500)', fontSize: 11 }}>Sweeps Coins</div>
             </div>
           )}
         </div>
@@ -110,23 +111,23 @@ export function WinScreen() {
       <div style={{ display: 'flex', gap: 12, flexDirection: 'column', width: '100%', maxWidth: 300 }}>
         {!claimed ? (
           <button onClick={claimReward} style={{
-            background: '#1a6fd4', border: 'none', color: '#fff', borderRadius: 10,
+            background: 'var(--ba-accent)', border: 'none', color: '#fff', borderRadius: 10,
             padding: '14px 48px', fontSize: 16, cursor: 'pointer', fontFamily: 'monospace',
-            fontWeight: 700, boxShadow: '0 0 20px rgba(26,111,212,0.5)',
+            fontWeight: 700, boxShadow: '0 0 20px var(--ba-accent-glow)',
           }}>
             Claim & Continue
           </button>
         ) : (
           <button onClick={() => setActiveScreen('home')} style={{
-            background: '#1a6fd4', border: 'none', color: '#fff', borderRadius: 10,
+            background: 'var(--ba-accent)', border: 'none', color: '#fff', borderRadius: 10,
             padding: '14px 48px', fontSize: 16, cursor: 'pointer', fontFamily: 'monospace',
             fontWeight: 700,
           }}>
             Continue →
           </button>
         )}
-        <button onClick={() => setActiveScreen('game')} style={{
-          background: 'transparent', border: '1px solid #1a4060', color: '#4a8a9a',
+        <button onClick={() => setActiveScreen('game')} className="ba-glass" style={{
+          border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
           borderRadius: 10, padding: '12px 48px', fontSize: 14, cursor: 'pointer', fontFamily: 'monospace',
         }}>
           Play Again
@@ -163,35 +164,38 @@ export function LoseScreen() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', background: 'radial-gradient(ellipse at center, #200a0a 0%, #0a1628 70%)',
-      color: '#ff6060', fontFamily: 'monospace', padding: 24, textAlign: 'center',
+      minHeight: '100vh', background: 'var(--ba-surface-bg)',
+      color: 'var(--ba-danger)', fontFamily: 'monospace', padding: 24, textAlign: 'center',
     }}>
       <div style={{ fontSize: 64, marginBottom: 8 }}>💀</div>
-      <h2 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px' }}>Scaffold Collapsed</h2>
-      <p style={{ color: '#6a2a2a', fontSize: 14, marginBottom: 32 }}>
+      <h2 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px',
+        textShadow: '0 0 16px rgba(239,68,68,0.5)' }}>Scaffold Collapsed</h2>
+      <p style={{ color: 'var(--ba-marble-500)', fontSize: 14, marginBottom: 32 }}>
         The overgrowth has won this round.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 300 }}>
         {!reviveUsed && (
-          <button onClick={handleRevive} disabled={reviving} style={{
-            background: reviving ? '#1a1a1a' : '#7a2aaa',
-            border: 'none', color: '#fff', borderRadius: 10,
+          <button onClick={handleRevive} disabled={reviving} className="ba-glass" style={{
+            background: reviving ? 'var(--ba-card-bg)' : 'rgba(124,58,237,0.3)',
+            border: '1px solid rgba(124,58,237,0.6)',
+            color: '#fff', borderRadius: 10,
             padding: '14px 24px', fontSize: 15, cursor: reviving ? 'default' : 'pointer',
             fontFamily: 'monospace', fontWeight: 700,
-            boxShadow: reviving ? 'none' : '0 0 20px rgba(122,42,170,0.5)',
+            boxShadow: reviving ? 'none' : '0 0 20px rgba(124,58,237,0.4)',
           }}>
             {reviving ? 'Loading Ad...' : '▶ Watch Ad → Revive'}
           </button>
         )}
         <button onClick={() => setActiveScreen('game')} style={{
-          background: '#1a6fd4', border: 'none', color: '#fff', borderRadius: 10,
+          background: 'var(--ba-accent)', border: 'none', color: '#fff', borderRadius: 10,
           padding: '14px 24px', fontSize: 15, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
+          boxShadow: '0 0 16px var(--ba-accent-glow)',
         }}>
           ↺ Try Again
         </button>
-        <button onClick={() => setActiveScreen('home')} style={{
-          background: 'transparent', border: '1px solid #3a1a1a', color: '#6a2a2a',
+        <button onClick={() => setActiveScreen('home')} className="ba-glass" style={{
+          border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
           borderRadius: 10, padding: '14px 24px', fontSize: 15, cursor: 'pointer', fontFamily: 'monospace',
         }}>
           Home

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { EntityType } from '@match3d/farkle-shared';
+import type { EntityType, DisruptionEvent, DoublerCell } from '@match3d/farkle-shared';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,9 @@ export interface FarkleGameState {
   bombsOnBoard: number;           // count of bomb/rainbow_bomb on board (HUD indicator)
   multiplierOrbActive: boolean;   // next commit gets ×1.5 bonus
   catalystBoostPct: number;       // cumulative wild spawn % boost this session (0–10)
+  disruptions: DisruptionEvent[];
+  pendingDisruption: DisruptionEvent | null;
+  doublerCells: DoublerCell[];
 
   // Actions
   setGamePhase: (phase: FarkleGameState['gamePhase']) => void;
@@ -59,6 +62,10 @@ export interface FarkleGameState {
   bankScore: () => void;
   updateBodies: (bodies: FarkleBody[]) => void;
   resetGame: () => void;
+  addDisruption: (event: DisruptionEvent) => void;
+  dismissDisruption: () => void;
+  spawnDoublerCell: (column: number, durationMs?: number) => void;
+  consumeDoublerCell: (column: number) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +97,9 @@ export const useFarkleStore = create<FarkleGameState>()(
     bombsOnBoard: 0,
     multiplierOrbActive: false,
     catalystBoostPct: 0,
+    disruptions: [],
+    pendingDisruption: null,
+    doublerCells: [],
 
     setGamePhase: (phase) => set({ gamePhase: phase }),
     setTurnActive: (active) => set({ turnActive: active }),
@@ -191,6 +201,30 @@ export const useFarkleStore = create<FarkleGameState>()(
         bodies: [], gamePhase: 'idle', turnActive: true,
         farkleCount: 0, pendingBombScore: 0, bombsOnBoard: 0,
         multiplierOrbActive: false, catalystBoostPct: 0,
+        disruptions: [], pendingDisruption: null, doublerCells: [],
       }),
+
+    addDisruption: (event) =>
+      set(s => ({
+        disruptions: [...s.disruptions, event],
+        pendingDisruption: s.pendingDisruption ?? event,
+      })),
+
+    dismissDisruption: () =>
+      set(s => {
+        const remaining = s.disruptions.filter(d => d.id !== s.pendingDisruption?.id);
+        return { disruptions: remaining, pendingDisruption: remaining[0] ?? null };
+      }),
+
+    spawnDoublerCell: (column, durationMs = 30_000) =>
+      set(s => {
+        const filtered = s.doublerCells.filter(d => d.column !== column);
+        return { doublerCells: [...filtered, { column, active: true, expiresAt: Date.now() + durationMs }] };
+      }),
+
+    consumeDoublerCell: (column) =>
+      set(s => ({
+        doublerCells: s.doublerCells.filter(d => d.column !== column),
+      })),
   }))
 );
