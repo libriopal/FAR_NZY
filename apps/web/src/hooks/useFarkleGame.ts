@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { buildScoreTable, lookupScore } from '@match3d/farkle-engine';
-import type { DieFace, LevelDef } from '@match3d/farkle-shared';
+import type { DieFace, LevelDef, GameMode } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, CATALYST_WILD_BOOST, CATALYST_MAX_BOOST } from '@match3d/farkle-shared';
 import type { VoxelPhysicsSystem } from '@match3d/game-core';
 import { useFarkleStore, MAX_CHAIN } from '../store/farkleStore.js';
@@ -21,6 +21,7 @@ function getTable(): Int32Array {
 export function useFarkleGame(
   physicsRef: MutableRefObject<VoxelPhysicsSystem | null>,
   levelDef?: LevelDef,
+  gameMode?: GameMode,
 ) {
   const store = useFarkleStore;
   const isDragging = useRef(false);
@@ -43,6 +44,7 @@ export function useFarkleGame(
         if (mode === 'PRIME') store.getState().addEnergy(5 * elapsed);
         else if (mode === 'FRENZY') store.getState().addEnergy(-5 * elapsed);
         store.getState().tickDisruptCharge(deltaMs);
+        store.getState().tickTimer(deltaMs);
       }
       // Expire stale doubler cells
       if (doublerCells.length > 0) {
@@ -209,6 +211,19 @@ export function useFarkleGame(
       }
     }
 
+    // CONDUCTOR: +10 energy on chain-6
+    if (result === 'ok' && chainIds.length === MAX_CHAIN && s.rallyRole === 'CONDUCTOR') {
+      store.getState().addEnergy(10);
+    }
+
+    // RAINMAKER: +20% of net banked gain
+    if (result === 'ok' && s.rallyRole === 'RAINMAKER') {
+      const bankedDelta = store.getState().banked - s.banked;
+      if (bankedDelta > 0) {
+        store.setState(prev => ({ banked: prev.banked + Math.round(bankedDelta * 0.2) }));
+      }
+    }
+
     // Remove committed bodies from physics
     for (const id of chainIds) physics?.removeBody(id);
 
@@ -323,11 +338,12 @@ export function useFarkleGame(
     const s = store.getState();
     if (s.gamePhase !== 'playing' || s.unbanked === 0) return;
     store.getState().bankScore();
-    // Every 3rd bank: spawn a 30s doubler on a random column
+    // Every 3rd bank: spawn doublers (ARCHIVIST gets 2, others get 1)
     bankCountRef.current += 1;
     if (bankCountRef.current % 3 === 0) {
-      const [col] = _randomColumns(1);
-      if (col !== undefined) store.getState().spawnDoublerCell(col, 30_000);
+      const count = s.rallyRole === 'ARCHIVIST' ? 2 : 1;
+      const cols = _randomColumns(count);
+      for (const col of cols) store.getState().spawnDoublerCell(col, 30_000);
     }
     const { banked } = store.getState();
     if (banked >= effectiveWinScore) store.setState({ gamePhase: 'win' });
@@ -350,13 +366,21 @@ export function useFarkleGame(
 
   const startGame = useCallback(() => {
     store.getState().resetGame();
-    store.setState({ gamePhase: 'playing', energy: 1 * effectiveEnergyMult, mode: 'PRIME' });
+    let timeRemaining: number | null = null;
+    if (gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') timeRemaining = 90;
+    else if (gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO') timeRemaining = 180;
+    else if (levelDef?.timeLimitSec) timeRemaining = levelDef.timeLimitSec;
+
+    store.setState({
+      gamePhase: 'playing', energy: 1 * effectiveEnergyMult, mode: 'PRIME',
+      ...(timeRemaining !== null ? { timeRemaining } : {}),
+    });
     deadBoardAttemptsRef.current = 0;
     bankCountRef.current = 0;
     frenzyDoublerSpawnedRef.current = false;
     const physics = physicsRef.current;
     if (physics) physics.setSpawnWeights(levelDef?.spawnWeights ?? SPAWN_WEIGHTS.PRIME);
-  }, [physicsRef, levelDef, effectiveEnergyMult]);
+  }, [physicsRef, levelDef, effectiveEnergyMult, gameMode]);
 
   return { startChain, extendChain, endChain, tapSphere, tapEntity, bankScore, startGame };
 }

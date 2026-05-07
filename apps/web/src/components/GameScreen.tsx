@@ -22,8 +22,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const physicsRef = useRef<VoxelPhysicsSystem | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
-  const { startChain, extendChain, endChain, tapSphere, bankScore, startGame } = useFarkleGame(physicsRef, levelDef);
   const gameMode = useGameStore(s => s.gameMode);
+  const { startChain, extendChain, endChain, tapSphere, bankScore, startGame } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined);
   const { state: mpState, sendDisruption } = useMultiplayer();
   const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
     || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
@@ -61,6 +61,11 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       physicsRef.current = null;
     };
   }, []);
+
+  // Sync rally role from multiplayer state into farkle store
+  useEffect(() => {
+    useFarkleStore.getState().setRallyRole(mpState.myRole);
+  }, [mpState.myRole]);
 
   // Apply incoming disruptions from multiplayer to local physics
   useEffect(() => {

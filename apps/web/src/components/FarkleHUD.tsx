@@ -294,6 +294,51 @@ function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void
   );
 }
 
+// ── Timer Display ─────────────────────────────────────────────────────────────
+
+function TimerDisplay() {
+  const timeRemaining = useFarkleStore(s => s.timeRemaining);
+  if (timeRemaining === null) return null;
+  const secs = Math.ceil(timeRemaining);
+  const isLow = secs <= 30;
+  return (
+    <div style={{
+      position: 'absolute', top: 50, left: 12,
+      color: isLow ? 'var(--ba-danger)' : 'var(--ba-marble-200)',
+      fontSize: isLow ? 17 : 14, fontFamily: 'monospace', fontWeight: 700,
+      textShadow: isLow ? '0 0 10px var(--ba-danger)' : 'none',
+      pointerEvents: 'none',
+      animation: isLow && secs % 2 === 0 ? 'timerPulse 1s ease infinite' : 'none',
+    }}>
+      {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
+      <style>{`@keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+    </div>
+  );
+}
+
+// ── Role Badge ────────────────────────────────────────────────────────────────
+
+const ROLE_COLORS: Record<string, string> = {
+  RAINMAKER: '#fbbf24', HEADHUNTER: '#ef4444',
+  ARCHIVIST: '#10b981', CONDUCTOR: '#7c3aed',
+};
+
+function RoleBadge() {
+  const rallyRole = useFarkleStore(s => s.rallyRole);
+  if (!rallyRole) return null;
+  const c = ROLE_COLORS[rallyRole] ?? '#fff';
+  return (
+    <div style={{
+      position: 'absolute', top: 72, left: 12,
+      color: c, fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
+      letterSpacing: 1, pointerEvents: 'none',
+      textShadow: `0 0 6px ${c}`,
+    }}>
+      ◈ {rallyRole}
+    </div>
+  );
+}
+
 // ── Disruption Panel (VS / Heist modes only) ─────────────────────────────────
 
 const DISRUPTION_DEFS: { type: DisruptionType; label: string; emoji: string }[] = [
@@ -315,14 +360,18 @@ function DisruptionPanel({ onDisrupt, gameMode }: { onDisrupt: (type: Disruption
   }));
   const spendDisruptCharge = useFarkleStore(s => s.spendDisruptCharge);
 
+  const isHeist = gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
+  const isFrenzy = mode === 'FRENZY';
+
   function fireDisrupt(type: DisruptionType) {
+    // HEIST: free disrupts while in FRENZY
+    if (isHeist && isFrenzy) { onDisrupt(type); return; }
     if (disruptCharges <= 0) return;
     if (!spendDisruptCharge()) return;
     onDisrupt(type);
   }
 
-  const hasCharge = disruptCharges > 0;
-  const isFrenzy = mode === 'FRENZY';
+  const hasCharge = disruptCharges > 0 || (isHeist && isFrenzy);
 
   return (
     <div style={{
@@ -354,10 +403,11 @@ function DisruptionPanel({ onDisrupt, gameMode }: { onDisrupt: (type: Disruption
           }} />
         ))}
         <span style={{
-          fontSize: 9, color: isFrenzy ? '#a78bfa' : 'var(--ba-marble-800)',
+          fontSize: 9,
+          color: isHeist && isFrenzy ? '#22c55e' : isFrenzy ? '#a78bfa' : 'var(--ba-marble-800)',
           fontFamily: 'monospace',
         }}>
-          {isFrenzy ? 'CHARGING' : 'FRENZY TO CHARGE'}
+          {isHeist ? (isFrenzy ? '🔥 FREE NOW' : 'FREE IN FRENZY') : (isFrenzy ? 'CHARGING' : 'FRENZY TO CHARGE')}
         </span>
       </div>
 
@@ -439,6 +489,8 @@ export function FarkleHUD({ onBank, onBack, onDisrupt, gameMode }: FarkleHUDProp
       <EnergyBar />
       <ScoreDisplay />
       <BankButton onBank={onBank} onBack={onBack} />
+      <TimerDisplay />
+      <RoleBadge />
       <ChainPreview />
       <FarkleFlash />
       <ModePulse />

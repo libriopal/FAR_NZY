@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import type { GameMode } from '@match3d/farkle-shared';
@@ -50,13 +50,14 @@ const S = {
 
 const MODE_OPTIONS: { value: GameMode; label: string; desc: string }[] = [
   { value: 'VS_FREE',    label: '⚔ VS',    desc: '1v1 — disrupt your opponent' },
-  { value: 'HEIST_FREE', label: '💀 Heist', desc: 'Score under fire — disruptions enabled' },
+  { value: 'HEIST_FREE', label: '💀 Heist', desc: 'Score under fire — 90s, free disrupts in FRENZY' },
+  { value: 'RALLY_FREE', label: '🏆 Rally', desc: '4 roles — 180s team blitz' },
 ];
 
 export function MultiplayerLobby() {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const setGameMode = useGameStore(s => s.setGameMode);
-  const { state, createRoom, joinRoom, leaveRoom } = useMultiplayer();
+  const { state, createRoom, joinRoom, startGame, leaveRoom } = useMultiplayer();
 
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -65,10 +66,15 @@ export function MultiplayerLobby() {
 
   const myId = state.playerId;
 
+  // Auto-navigate when server broadcasts GAME_STARTED
+  useEffect(() => {
+    if (state.status === 'playing') setActiveScreen('game');
+  }, [state.status, setActiveScreen]);
+
   function handleCreate() {
     if (!playerName.trim()) return;
     setGameMode(selectedMode);
-    createRoom(playerName.trim());
+    createRoom(playerName.trim(), selectedMode);
   }
 
   function handleJoin() {
@@ -117,6 +123,15 @@ export function MultiplayerLobby() {
         </div>
 
         {state.error && <div style={S.error}>{state.error}</div>}
+
+        {state.players.length >= 2 && (
+          <button style={S.btnPrimary} onClick={startGame}>▶ Start Game</button>
+        )}
+        {state.players.length < 2 && (
+          <div style={{ color: '#4a6080', fontSize: 11, textAlign: 'center' }}>
+            Waiting for {2 - state.players.length} more player{state.players.length === 1 ? '' : 's'}...
+          </div>
+        )}
 
         <button style={S.btnSecondary} onClick={handleLeave}>← Leave Room</button>
       </div>

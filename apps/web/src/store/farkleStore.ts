@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { EntityType, DisruptionEvent, DoublerCell } from '@match3d/farkle-shared';
+import type { EntityType, DisruptionEvent, DoublerCell, RallyRole } from '@match3d/farkle-shared';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,8 @@ export interface FarkleGameState {
   doublerCells: DoublerCell[];
   disruptCharges: number;
   disruptChargeProgress: number;
+  timeRemaining: number | null;
+  rallyRole: RallyRole | null;
 
   // Actions
   setGamePhase: (phase: FarkleGameState['gamePhase']) => void;
@@ -70,6 +72,8 @@ export interface FarkleGameState {
   consumeDoublerCell: (column: number) => void;
   tickDisruptCharge: (deltaMs: number) => void;
   spendDisruptCharge: () => boolean;
+  setRallyRole: (role: RallyRole | null) => void;
+  tickTimer: (deltaMs: number) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -106,6 +110,8 @@ export const useFarkleStore = create<FarkleGameState>()(
     doublerCells: [],
     disruptCharges: 0,
     disruptChargeProgress: 0,
+    timeRemaining: null,
+    rallyRole: null,
 
     setGamePhase: (phase) => set({ gamePhase: phase }),
     setTurnActive: (active) => set({ turnActive: active }),
@@ -209,6 +215,7 @@ export const useFarkleStore = create<FarkleGameState>()(
         multiplierOrbActive: false, catalystBoostPct: 0,
         disruptions: [], pendingDisruption: null, doublerCells: [],
         disruptCharges: 0, disruptChargeProgress: 0,
+        timeRemaining: null, rallyRole: null,
       }),
 
     addDisruption: (event) =>
@@ -237,8 +244,9 @@ export const useFarkleStore = create<FarkleGameState>()(
     tickDisruptCharge: (deltaMs) =>
       set(s => {
         if (s.mode !== 'FRENZY' || s.gamePhase !== 'playing') return s;
-        // 20 progress/s → 5s per charge
-        let progress = s.disruptChargeProgress + (deltaMs / 1000) * 20;
+        // HEADHUNTER charges 2× faster (40/s → 2.5s per charge vs 5s)
+        const rate = s.rallyRole === 'HEADHUNTER' ? 40 : 20;
+        let progress = s.disruptChargeProgress + (deltaMs / 1000) * rate;
         let charges = s.disruptCharges;
         while (progress >= 100 && charges < 3) {
           progress -= 100;
@@ -254,5 +262,15 @@ export const useFarkleStore = create<FarkleGameState>()(
       set({ disruptCharges: charges - 1 });
       return true;
     },
+
+    setRallyRole: (role) => set({ rallyRole: role }),
+
+    tickTimer: (deltaMs) =>
+      set(s => {
+        if (s.timeRemaining === null || s.gamePhase !== 'playing') return s;
+        const timeRemaining = Math.max(0, s.timeRemaining - deltaMs / 1000);
+        if (timeRemaining === 0) return { timeRemaining: 0, gamePhase: 'lose' as const };
+        return { timeRemaining };
+      }),
   }))
 );

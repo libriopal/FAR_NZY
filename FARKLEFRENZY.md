@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FARKLE_FRENZY_DESCRIPTION.xml
+  Complete Game Vision Document — Architecture Preservation Reference
+  
+  PURPOSE:
+    This document is the authoritative description of Farkle Frenzy V3.
+    It exists specifically to help any AI system, developer, or architect
+    who is rebuilding or porting this game to preserve its complete vision.
+    
+    Read this before touching the codebase.
+    Every mechanic described here was designed deliberately.
+    Nothing is an accident. Nothing is optional.
+    
+  VERSION: 1.0 — May 2026
+  WORD COUNT: ~2,200 words in <description>
+-->
+
+<farkle_frenzy_vision version="3.0">
+
+  <description>
+
+WHAT FARKLE FRENZY IS
+
+Farkle Frenzy is a casino-grade browser puzzle game that fuses two distinct
+genres into one coherent experience. From Match-3 puzzle games it borrows the
+spatial board — a grid of tiles, a drag-to-select mechanic, and cascading
+pieces after a clear. From the dice game Farkle it borrows the scoring system
+and, most critically, the risk-reward decision at the heart of every turn:
+do you keep going and risk losing everything, or do you bank your score and
+walk away safely? The game runs in a browser, targets mobile-first portrait
+layouts, and is built for competitive, cooperative, and solo play across eight
+distinct modes. It uses a sweepstakes model with two currencies and a
+provably fair randomness system for casino contexts.
+
+The central thesis is this: Farkle's most powerful moment — the decision to
+keep rolling or stop — becomes dramatically more skillful on a spatial board.
+Players can see the board. They can read which chains will score and which
+will Farkle before committing. They can plan. This is what separates Farkle
+Frenzy from dice-only Farkle — skill informs risk, and the skilled player who
+reads the board will genuinely out-earn the player who selects randomly.
+
+
+THE BOARD AND HOW TILES WORK
+
+The game board is a two-dimensional grid of tiles. Each tile represents a
+physical die face numbered one through six. The face number determines both
+the tile's color and its scoring potential. Face one is gold and scores one
+hundred points alone. Face five is steel-blue and scores fifty points alone.
+Faces two, three, four, and six score zero as singles — they must appear in
+combinations of three or more to contribute anything. This asymmetry is
+intentional and creates strategic board reading: a board dense with ones and
+fives is safer to chain, while a board heavy with twos, threes, and fours
+demands larger combinations or risks a Farkle.
+
+Grid size scales with player count. A solo game uses a seven-by-seven grid.
+Two-player modes use eight-by-eight. Three players use nine-by-nine. Four
+players use ten-by-ten. All tiles spawn from a pre-shuffled pool with exactly
+equal distribution of all six face values, guaranteeing fairness across a
+session. This pool model means players cannot be dealt an unfairly
+unbalanced board — the mathematics ensure each face appears in equal
+proportion before any shuffle is applied.
+
+Beyond playable die tiles, the board contains four special tile states.
+Stone Blockers are dark granite obstacles that cannot be chained but take
+damage from adjacent clears and bomb explosions. They absorb two hits before
+being destroyed, awarding fifty points. Ice Blockers freeze a die face in
+place — the face is visible beneath the frosted surface but cannot be used
+until a bomb destroys the ice. Lock Blockers show their face value through a
+cage overlay and must be included in a scoring chain to unlock, after which
+they become normal die tiles subject to gravity. Wild Blockers are the most
+powerful special state — they carry an underlying face value but automatically
+resolve to whichever face maximizes the chain score. Three or more Wild
+Blockers on the board simultaneously triggers a Wild Scatter event that
+forces all players into Frenzy mode and destroys all tiles matching the wilds'
+underlying face colors across the entire board.
+
+
+HOW TO PLAY — THE CHAIN MECHANIC
+
+The player interacts by pressing down on any die tile, dragging across
+adjacent tiles, and releasing to commit the selection. This drag-and-release
+is called a chain. Chains follow strict rules: movement is four-directional
+only (up, down, left, right — never diagonal), any mix of face values is
+valid in a single chain, and the maximum chain length is six tiles, mirroring
+the six dice of physical Farkle. There is no minimum chain length enforced by
+the scorer, though the game enforces a two-tile minimum before evaluating.
+
+Unlike traditional Match-3, no same-type requirement exists. A chain of
+[Gold, Steel, Gold, Gold] is legal and scores Three-of-a-Kind plus a single
+five. The Farkle scoring engine evaluates whatever faces were selected and
+finds the maximum achievable score from that combination.
+
+Players can backtrack during a drag by re-entering the second-to-last tile in
+the chain, which removes the last tile. This is the only valid undo move.
+Re-entering any other already-selected tile is silently ignored.
+
+When six tiles are selected and the chain is at capacity, all remaining
+adjacent unselected tiles dim and become non-interactive. The player must
+either commit or backtrack.
+
+
+THE FARKLE SCORING ENGINE — THE HEART OF THE GAME
+
+When a chain is committed, the scoring engine receives the array of face
+values and finds the maximum-scoring non-overlapping partition of those dice
+into valid Farkle combinations. Every die participates in exactly one
+combination or contributes zero. The algorithm uses exhaustive recursive
+search to guarantee the optimal result — greedy selection is forbidden because
+it produces wrong scores on combinations like Two Triplets.
+
+The complete scoring table:
+  Single one = 100 points. Single five = 50 points.
+  Three ones = 1000 points (special exception — not one times one hundred).
+  Three of any other face = face value times one hundred (threes = 300, sixes = 600).
+  Four of a kind = 1000 points. Five of a kind = 2000 points.
+  Six of a kind = 3000 points, and also spawns a Standard Bomb on the board.
+  Straight (one through six) = 1500 points, and spawns a Rainbow Bomb.
+  Three Pairs = 1500 points. Two Triplets = 2500 points. Four-of-a-Kind plus a Pair = 1500 points.
+
+Combinations stack — [one, one, one, five] scores 1050, not just 1000. The
+critical rule: [one, one, one, two, two, two] scores 2500 as Two Triplets, not
+1200 as Two Separate Three-of-a-Kinds. The maximum partition always wins.
+
+If the engine returns zero, the chain is a Farkle. The player loses all
+unbanked points accumulated during the current streak, the multiplier ladder
+resets to step zero, and a Farkle animation plays. Banked points are never
+touched by a Farkle.
+
+
+THE MULTIPLIER LADDER AND BANKING DECISION
+
+The multiplier ladder has six steps: times one, times one-point-two-five,
+times one-point-five, times two, times three, and times four. Each scoring
+chain advances the ladder one step. The ladder is capped at step five —
+no multiplier beyond times four exists. Each chain's raw score is multiplied
+by the current step before being added to the unbanked total.
+
+Two events reset the ladder. A Farkle resets it involuntarily and destroys
+all unbanked points. A Bank resets it voluntarily and converts all unbanked
+points permanently into the banked total. The banked total is safe and
+permanent. The unbanked total is always at risk.
+
+The banking decision is the game's primary skill expression. A player at
+times four with ten thousand unbanked points faces a genuine dilemma: the
+board may contain safe scoring chains that could push the total to fifteen
+thousand, but a Farkle loses everything. The skilled player reads the board
+for accessible combinations, estimates Farkle probability, and decides. This
+decision has no correct universal answer — it depends on board state, session
+objective, and risk tolerance. That ambiguity is the game.
+
+
+THE ENERGY SYSTEM AND ROUND FLOW
+
+The energy meter runs from zero to three hundred. Zero to one-fifty is PRIME
+mode: turn-based play where players alternate. One-fifty-one to three hundred
+is FRENZY mode: simultaneous real-time play where all players act at once on
+the shared board and the server resolves conflicts by timestamp.
+
+Any single player exceeding the Frenzy threshold of one-fifty pushes all
+players into Frenzy. Frenzy ends only when all players drop below the
+threshold. The player who first triggered Frenzy is the Anchor — if they drop
+below threshold, a two-second instability warning fires before Frenzy can end.
+
+In PRIME mode, energy regenerates passively at five per second. Chains of
+two through five tiles cost ten energy. A six-tile chain gains ten energy.
+A six-tile chain including a Wild Blocker gains twenty. In FRENZY mode,
+energy drains at five per second. Players below seventy-five drain at only
+three per second (a catch-up mechanic). Any chain gains ten energy, or twenty
+with a Wild involved.
+
+Round end conditions: a six-tile chain continues the round. A chain of two
+through five tiles auto-banks the unbanked total and ends the round (SHORT_CHAIN).
+A Farkle ends the round with no bank and points lost. Energy reaching zero
+auto-banks and ends the round (ENERGY_ZERO). There is no fixed time limit —
+energy is the pacing mechanism.
+
+
+THE TWO CURRENCIES
+
+Farkle Dust (FD) is the free entertainment currency. It has no monetary value,
+cannot be redeemed for prizes, and is earned through gameplay, daily bonuses,
+and watching rewarded advertisements. It uses purple and blue visual styling.
+Players use FD to enter free-to-play modes.
+
+Prime Dice (PDX) is the sweepstakes currency valued at one-to-one with the US
+dollar. It is prize-eligible and requires KYC verification for redemption. It
+uses emerald green and amber gold styling. Players use PDX to enter casino
+modes with real prize potential. The FD/PDX currency mode toggle in the lobby
+is the primary monetization switch — selecting PDX unlocks casino variants of
+all four game modes.
+
+
+THE EIGHT GAME MODES
+
+SOLO FREE uses FD currency on a seven-by-seven solo board. The player builds
+score across rounds, banking when satisfied. A global leaderboard tracks
+personal bests. No time pressure. Full relaxed experience.
+
+SOLO CASINO uses PDX currency on the same solo structure. A mathematical
+normalizer derived from Monte Carlo simulation converts the player's final
+banked score to a PDX payout. The formula is: payout equals session score
+divided by normalizer, multiplied by bet amount. Target RTP ranges from
+eighty-two percent on high blocker density to one-hundred-two percent for
+expert play on low density — the skill ceiling genuinely exceeds one hundred
+percent, which is the game's core legitimacy claim as a skill-based casino game.
+
+VERSUS FREE uses FD on a shared board where two to four players take turns
+in PRIME mode and compete simultaneously in FRENZY. All players see and
+modify the same grid. The highest score when the session ends wins. Grid
+scales to eight-by-eight for two players, nine-by-nine for three, ten-by-ten
+for four.
+
+VERSUS CASINO uses PDX on the same versus structure. The winner takes the pot
+less an eight percent house edge. First player to reach a target score wins,
+or the highest score after a set round count.
+
+RALLY FREE is cooperative. Two to four players work together toward a shared
+total score. After each scoring chain, the active player chooses: Continue
+(keep chaining, multiplier grows), Bank (secure all unbanked, reset ladder,
+end turn), or Pass (hand the current board state, unbanked total, and
+multiplier to the next player — who inherits full responsibility for them).
+A three-second reaction window lets teammates vote on what the active player
+should do. A 3D reaction timer shows after every chain. If the incoming player
+Farkles after a Pass, the full accumulated unbanked total from everyone who
+passed before them is lost. Each player fills one of four roles: Rainmaker
+(chooses Rainbow Bomb target color), Headhunter (destroys Stone in one hit),
+Archivist (recovers fifteen percent of the Farkle Pool per chain), and
+Conductor (adds one extra multiplier step when choosing to Pass).
+
+RALLY CASINO uses PDX with a milestone payout structure. The team scores
+toward four tiers: ten thousand points pays back half the total pot, twenty-
+five thousand pays the full pot, fifty thousand pays twice the pot, and one
+hundred thousand pays five times the pot.
+
+HEIST FREE introduces a vault mechanic. Seventy percent of all scored points
+flow into a shared vault. The remaining thirty percent are personal. When the
+vault reaches five thousand points and any player has fifty or more energy,
+that player can initiate a Heist — stealing the entire vault for themselves
+while other players have five seconds to block it. If the Heist succeeds,
+the thief takes the vault and it resets to zero. The game continues after
+any heist, allowing multiple cycles. Role abilities modify Heist: Archivist
+shields twenty percent of the vault, Conductor increases vault contributions
+by ten percent, Rainmaker extends the heist window by two seconds, and
+Headhunter recovers fifteen percent of the vault to their personal score
+upon successfully blocking a heist.
+
+HEIST CASINO applies PDX stakes to the Heist structure, making every vault
+accumulation and theft a real monetary event.
+
+
+BOMBS — BOARD-CLEARING POWER EVENTS
+
+Bombs are tile objects living in the grid, not separate game entities.
+They fall and cascade exactly like die tiles. Two types exist.
+
+Standard Bombs spawn when a player completes a Six-of-a-Kind chain. They have
+a three-second fuse countdown displayed as a draining ring. When detonated,
+they destroy all tiles in a three-by-three area. Each normal die tile in the
+blast zone awards one hundred flat points — not multiplied by the ladder.
+Stone Blockers award fifty. Ice Blockers are destroyed for zero points. Lock
+Blockers are immune to all bombs. Other bombs in the blast radius are destroyed
+but do not chain-detonate.
+
+Rainbow Bombs spawn from a Straight (one through six). After a three-second
+countdown, they destroy every tile on the board matching a randomly chosen
+color. Red and blue tiles award points scaled by the current multiplier —
+the only bomb rewards that scale with the ladder. Other colors are destroyed
+for zero points. The Rainmaker role converts the random target into a player
+choice during the countdown window. Neither bomb type ever resets or advances
+the multiplier ladder.
+
+
+THE VISUAL AND AUDIO SYSTEM
+
+The interface follows Gothic Bio-Architecture: a dual-theme organism where the
+lobby is the Ivory Sanctuary (alabaster surfaces, liquid gold circulatory
+lines, organic asymmetric curves) and the game grid is the Obsidian Neural
+Core (deep black chitin, bioluminescent cyan neural glows, arterial crimson
+at high stakes). Transitioning from lobby to game is a narrative event: the
+screen cracks, bleeds crimson, and shatters into obsidian.
+
+Die tiles render as isometric gem cubes — three-polygon SVG faces with
+face-color gradients. Face numbers are hidden by default, revealed on hover
+and chain selection. Chained tiles float and oscillate. The glow ring on each
+selected tile breathes at its face's gem color. Stone shows granite with
+crack lines. Ice shows a frosted crystal overlay with an ❄ emoji. Lock shows
+portcullis bars over the visible face with a 🔒 emoji. Wild shows a "W"
+symbol with a rainbow hue-rotating border ring. Standard Bombs are crimson
+spheres with a depleting ring. Rainbow Bombs are prism orbs cycling through
+all six gem colors. Explosions play a multi-phase sequence: sphere scale-up,
+shockwave ring expansion, particle burst from center.
+
+Audio layers are biological: synthesized sounds for all gameplay events (crystal
+tile taps, cascading glass on commit, stone-door slam on Farkle, cathedral
+chord arpeggio on bank), with Howler-loaded ambient music stems that crossfade
+based on the current multiplier step and energy state.
+
+
+USER IDENTITY AND PERSISTENCE
+
+Each player has a local profile: a username (three to twenty alphanumeric
+characters), a chosen color from six gem-echo options, and a generated geometric
+avatar derived deterministically from their username via FNV-1a hash. No two
+users have the same avatar. Profiles are stored in browser localStorage with
+SHA-256 password hashing via Web Crypto API. Guest play is permitted without
+account creation. Scores persist to Supabase for global leaderboards partitioned
+by game mode.
+
+
+THE FAIRNESS GUARANTEE
+
+Casino sessions use HMAC-SHA256 cryptographic random number generation. Before
+play begins, the server commits to its random seed by sharing a SHA-256 hash.
+After the session, the seed is revealed and any player can verify the entire
+board sequence was predetermined and unmanipulated. Combined seeds incorporate
+all players' client seeds so no single party controls the outcome. This
+provably fair protocol is the mathematical foundation that makes casino play
+legitimate rather than predatory.
+
+  </description>
+
+
+  <!-- ═══════════════════════════════
+       QUICK REFERENCE FOR CLAUDE CODE
+       ═══════════════════════════════ -->
+
+  <critical_numbers>
+    <n name="grid_solo"            value="7x7"/>
+    <n name="grid_2p"              value="8x8"/>
+    <n name="grid_3p"              value="9x9"/>
+    <n name="grid_4p"              value="10x10"/>
+    <n name="chain_max"            value="6"/>
+    <n name="chain_min_game"       value="2"/>
+    <n name="multiplier_cap"       value="4.0"/>
+    <n name="multiplier_steps"     value="6 (×1.0/×1.25/×1.5/×2.0/×3.0/×4.0)"/>
+    <n name="fuse_duration_ms"     value="3000"/>
+    <n name="bomb_radius"          value="3x3"/>
+    <n name="energy_max"           value="300"/>
+    <n name="frenzy_threshold"     value="150"/>
+    <n name="vault_split"          value="0.70"/>
+    <n name="vault_threshold"      value="5000"/>
+    <n name="heist_energy_cost"    value="50"/>
+    <n name="heist_window_ms"      value="5000"/>
+    <n name="wild_scatter_trigger" value="3+ wilds on board"/>
+    <n name="rtp_skill_ceiling"    value="1.02 (102%)"/>
+    <n name="house_edge_versus"    value="0.08 (8%)"/>
+    <n name="cascade_ms"           value="80 (160 if physics gravity enabled)"/>
+  </critical_numbers>
+
+  <scoring_table>
+    <row faces="[1]"           score="100"  note="Single — scores alone"/>
+    <row faces="[5]"           score="50"   note="Single — scores alone"/>
+    <row faces="[other]"       score="0"    note="Farkle if alone"/>
+    <row faces="[1,1,1]"       score="1000" note="EXCEPTION: not 1×100"/>
+    <row faces="[N,N,N]"       score="N×100" note="N = 2,3,4,5,6"/>
+    <row faces="4-of-a-kind"   score="1000"/>
+    <row faces="5-of-a-kind"   score="2000"/>
+    <row faces="6-of-a-kind"   score="3000" note="+ BOMB_STANDARD spawns"/>
+    <row faces="Straight 1-6"  score="1500" note="+ BOMB_RAINBOW spawns"/>
+    <row faces="Three Pairs"   score="1500"/>
+    <row faces="Two Triplets"  score="2500" note="beats 1200 — max partition wins"/>
+    <row faces="4oaK + Pair"   score="1500"/>
+    <row faces="[1,1,1,5]"     score="1050" note="stacking example"/>
+    <row faces="[1,1,1,2,2,2]" score="2500" note="Two Triplets not 1200"/>
+  </scoring_table>
+
+  <game_modes>
+    <mode id="SOLO_FREE"   currency="FD"  players="1" grid="7x7"
+          description="Solo score chase, leaderboard, no monetary stakes"/>
+    <mode id="SOLO_CASINO" currency="PDX" players="1" grid="7x7"
+          description="RTP-calibrated payout, provably fair, skill ceiling 102%"/>
+    <mode id="VS_FREE"     currency="FD"  players="2-4" grid="scales"
+          description="Shared board competition, turn-based PRIME, simultaneous FRENZY"/>
+    <mode id="VS_CASINO"   currency="PDX" players="2-4" grid="scales"
+          description="Winner takes pot less 8% house edge"/>
+    <mode id="RALLY_FREE"  currency="FD"  players="2-4" grid="scales"
+          description="Cooperative, Continue/Bank/Pass decisions,

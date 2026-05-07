@@ -49,7 +49,9 @@ wss.on('connection', (ws: WebSocket) => {
     if (msg.type === 'CREATE_ROOM') {
       roomCode = nanoid(6).toUpperCase();
       playerId = (msg.playerId as string) || nanoid(8);
+      const gameMode = (msg.gameMode as string) || 'VS_FREE';
       const room = getOrCreateRoom(roomCode);
+      room.setGameMode(gameMode);
       room.addPlayer(ws, playerId, (msg.playerName as string) || 'Player');
       ws.send(JSON.stringify({ type: 'ROOM_CREATED', roomCode, playerId }));
       return;

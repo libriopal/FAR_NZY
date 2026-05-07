@@ -61,6 +61,8 @@ export class GameRoom {
   private settings: LobbySettings;
   private turnTimer: ReturnType<typeof setTimeout> | null = null;
   private energyInterval: ReturnType<typeof setInterval> | null = null;
+  private gameMode: string = 'VS_FREE';
+  private roleMap: Map<string, string> = new Map();
 
   constructor(settings: LobbySettings) {
     this.id = nanoid(8).toUpperCase();
@@ -162,6 +164,9 @@ export class GameRoom {
       case 'PASS':
         this.nextTurn();
         break;
+      case 'START_GAME':
+        this.handleStartGame(playerId);
+        break;
       case 'DISRUPT': {
         const disruptType = msg.disruptType as string;
         const targetColumns = msg.targetColumns as number[];
@@ -201,6 +206,33 @@ export class GameRoom {
     this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
     this.startTurnTimer();
+  }
+
+  setGameMode(mode: string) {
+    this.gameMode = mode;
+  }
+
+  private handleStartGame(_fromPlayerId: string) {
+    this.roleMap = this.assignRoles();
+    const roles: Record<string, string | null> = {};
+    for (const [pid] of this.players) {
+      roles[pid] = this.roleMap.get(pid) ?? null;
+    }
+    this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles });
+  }
+
+  private assignRoles(): Map<string, string> {
+    const map = new Map<string, string>();
+    const ids = [...this.players.keys()];
+    const RALLY_ROLES = ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'];
+    const HEIST_ROLES = ['RAINMAKER', 'HEADHUNTER'];
+
+    if (this.gameMode === 'RALLY_FREE' || this.gameMode === 'RALLY_CASINO') {
+      ids.forEach((id, i) => map.set(id, RALLY_ROLES[i % RALLY_ROLES.length]!));
+    } else if (this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO') {
+      ids.forEach((id, i) => map.set(id, HEIST_ROLES[i % HEIST_ROLES.length]!));
+    }
+    return map;
   }
 
   private handleDisrupt(fromPlayerId: string, disruptType: string, targetColumns: number[]) {
