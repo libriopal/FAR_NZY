@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';

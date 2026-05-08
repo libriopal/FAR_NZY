@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useState, useCallback, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { DEFAULT_PRICING_TIERS, AD_REWARD_AMOUNTS, BATTLE_PASS_TIERS } from '@match3d/economy';

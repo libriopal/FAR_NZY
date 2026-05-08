@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 import type { DieFace } from '@match3d/farkle-shared';
 import { lookupScore, buildScoreTable } from './chainIndex.js';
 
@@ -27,12 +38,18 @@ export function scoreFarkle(
   const isFarkle = faces.length > 0 && score === 0;
   const combo = isFarkle ? 'Farkle' : describeCombo(faces, score);
 
+  let triggersBomb: null | 'BOMB_STANDARD' | 'BOMB_RAINBOW' = null;
+  if (!isFarkle && faces.length === 6) {
+    if (combo === 'Six of a Kind') triggersBomb = 'BOMB_STANDARD';
+    else if (combo === 'Straight') triggersBomb = 'BOMB_RAINBOW';
+  }
+
   return {
     score,
     scaledScore: Math.round(score * multiplier),
     isFarkle,
     combo,
-    triggersBomb: null,
+    triggersBomb,
   };
 }
 

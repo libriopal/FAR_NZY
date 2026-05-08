@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
 import { GAME_CONSTANTS } from '@match3d/farkle-shared';
@@ -102,14 +113,21 @@ export class GameRoom {
   }
 
   private startEnergyTick() {
+    const FRENZY_THRESHOLD = 150;
+    const MAX_ENERGY = 300;
+    const TICK_MS = 200; // 200ms tick → ×5 per second = 5/sec rate
     this.energyInterval = setInterval(() => {
       for (const [id, p] of this.players.entries()) {
-        p.energy = Math.max(0, p.energy - 1);
+        const inFrenzy = p.energy >= FRENZY_THRESHOLD;
+        // PRIME: +5/sec passive gain; FRENZY: -5/sec drain
+        const delta = inFrenzy ? -1 : 1; // per 200ms tick = 5/sec
+        p.energy = Math.max(0, Math.min(MAX_ENERGY, p.energy + delta));
         if (p.energy === 0) {
           this.broadcast({ type: 'ENERGY_ZERO', playerId: id });
         }
+        this.broadcast({ type: 'ENERGY_UPDATE', playerId: id, energy: p.energy });
       }
-    }, 1000);
+    }, TICK_MS);
   }
 
   addPlayer(ws: WebSocket, playerId: string, playerName: string) {

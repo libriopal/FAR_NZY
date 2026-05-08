@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';

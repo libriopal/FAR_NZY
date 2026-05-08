@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback } from 'react';
 import { questManager } from '@match3d/ai-quests';
 import type { QuestTheme } from '@match3d/ai-quests';

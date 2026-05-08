@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';

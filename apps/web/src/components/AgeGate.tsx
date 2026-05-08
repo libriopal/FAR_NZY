@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useState } from 'react';
 import { createAgeGateStateMachine, ComplianceService } from '@match3d/compliance';
 import type { AgeGateState, ComplianceProfile } from '@match3d/compliance';

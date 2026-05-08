@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import { useCallback, useRef } from 'react';
 import { EconomyClient } from '@match3d/economy';
 import type { TransactionRequest, TransactionRecord, BattlePassTier } from '@match3d/economy';

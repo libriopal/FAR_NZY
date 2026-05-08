@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 import type { Cell, DieFace, GridPos, LobbySettings } from '@match3d/farkle-shared';
 import { FACE_TO_COLOR, GAME_CONSTANTS } from '@match3d/farkle-shared';
 import { CSPRNG, seededRng } from './csprng.js';
@@ -34,8 +45,10 @@ function makeDieCell(face: DieFace): Cell {
   return { id: nanoid(), face, type: FACE_TO_COLOR[face], state: 'NORMAL' };
 }
 
-function makeStoneCell(): Cell {
-  return { id: nanoid(), face: null, type: 'STONE', state: 'NORMAL', health: GAME_CONSTANTS.STONE_HP };
+function makeStoneCell(rng?: () => number): Cell {
+  const maxHp = GAME_CONSTANTS.STONE_HP;
+  const health = rng ? Math.floor(rng() * maxHp) + 1 : maxHp;
+  return { id: nanoid(), face: null, type: 'STONE', state: 'NORMAL', health };
 }
 
 function makeIceCell(face: DieFace): Cell {
@@ -72,8 +85,7 @@ export class SixPoolManager {
   constructor(playerCount: number, csprng: CSPRNG) {
     this.playerCount = playerCount;
     this.snapCounter = 0;
-    const csprngAny = csprng as unknown as { seed: string };
-    const numericSeed = hashSeedString(csprngAny.seed ?? String(Date.now()));
+    const numericSeed = hashSeedString(csprng.getSeed());
     this.rng = seededRng(numericSeed);
 
     const dim = multiplayerGridSize(playerCount);
@@ -213,7 +225,7 @@ export function createGrid(
       const isLock = lockPos.some(p => p.row === r && p.col === c);
 
       if (isStone) {
-        grid[r][c] = makeStoneCell();
+        grid[r][c] = makeStoneCell(rng);
       } else if (isIce) {
         const d = pool.drawDie();
         const face = (d >= 1 && d <= 6 ? d : 1) as DieFace;

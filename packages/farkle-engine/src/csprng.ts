@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 export function bytesToHex(b: Uint8Array): string {
   return Array.from(b).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -56,6 +67,7 @@ export class CSPRNG {
 
   reset(): void { this.counter = 0; }
   getCounter(): number { return this.counter; }
+  getSeed(): string { return this.seed; }
 }
 
 export async function generateServerSeed(): Promise<string> {

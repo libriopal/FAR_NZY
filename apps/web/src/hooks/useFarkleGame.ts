@@ -1,5 +1,16 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
-import { buildScoreTable, lookupScore } from '@match3d/farkle-engine';
+import { buildScoreTable, lookupScore, seededRng } from '@match3d/farkle-engine';
 import type { DieFace, LevelDef, GameMode } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, CATALYST_WILD_BOOST, CATALYST_MAX_BOOST } from '@match3d/farkle-shared';
 import type { VoxelPhysicsSystem } from '@match3d/game-core';
@@ -7,8 +18,14 @@ import { useFarkleStore, MAX_CHAIN } from '../store/farkleStore.js';
 
 export const WIN_SCORE = 100_000;
 
+// Module-level seeded RNG — replaces Math.random() for game events (W1 compliance).
+// Seeded from 32 bits of crypto entropy so each session is unique.
+const _sessionRng = seededRng(
+  (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0)
+);
+
 // Entities that CAN be included in a drag-chain
-const CHAINABLE: Set<string> = new Set(['die', 'wild', 'mirror', 'catalyst']);
+const CHAINABLE: Set<string> = new Set(['die', 'wild', 'mirror', 'catalyst', 'lock']);
 // Entities handled by tap (not chain)
 const TAPPABLE: Set<string> = new Set(['sphere', 'bomb', 'rainbow_bomb', 'multiplier_orb', 'ghost']);
 
@@ -441,7 +458,7 @@ function _plurality(faces: number[]): number | undefined {
 function _randomColumns(count: number): number[] {
   const all = [0, 1, 2, 3, 4, 5, 6];
   for (let i = all.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(_sessionRng() * (i + 1));
     [all[i], all[j]] = [all[j]!, all[i]!];
   }
   return all.slice(0, count);

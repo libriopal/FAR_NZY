@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import { useMultiplayerStore, mpActions } from '../store/multiplayerStore.js';
 import type { MultiplayerPlayer, MultiplayerStoreState } from '../store/multiplayerStore.js';
 import type { DisruptionType } from '@match3d/farkle-shared';

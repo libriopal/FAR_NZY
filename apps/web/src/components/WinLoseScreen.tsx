@@ -1,6 +1,17 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useState, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { adManager } from '@match3d/ads';
+
+function navigateWithAd(nav: () => void) {
+  adManager.showInterstitial();
+  nav();
+}
 import { analytics } from '@match3d/analytics';
 import { savePlayerData, submitScore } from '@match3d/backend-client';
 
@@ -118,7 +129,7 @@ export function WinScreen() {
             Claim & Continue
           </button>
         ) : (
-          <button onClick={() => setActiveScreen('home')} style={{
+          <button onClick={() => navigateWithAd(() => setActiveScreen('home'))} style={{
             background: 'var(--ba-accent)', border: 'none', color: '#fff', borderRadius: 10,
             padding: '14px 48px', fontSize: 16, cursor: 'pointer', fontFamily: 'monospace',
             fontWeight: 700,
@@ -126,7 +137,7 @@ export function WinScreen() {
             Continue →
           </button>
         )}
-        <button onClick={() => setActiveScreen('game')} className="ba-glass" style={{
+        <button onClick={() => navigateWithAd(() => setActiveScreen('game'))} className="ba-glass" style={{
           border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
           borderRadius: 10, padding: '12px 48px', fontSize: 14, cursor: 'pointer', fontFamily: 'monospace',
         }}>
@@ -187,14 +198,14 @@ export function LoseScreen() {
             {reviving ? 'Loading Ad...' : '▶ Watch Ad → Revive'}
           </button>
         )}
-        <button onClick={() => setActiveScreen('game')} style={{
+        <button onClick={() => navigateWithAd(() => setActiveScreen('game'))} style={{
           background: 'var(--ba-accent)', border: 'none', color: '#fff', borderRadius: 10,
           padding: '14px 24px', fontSize: 15, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
           boxShadow: '0 0 16px var(--ba-accent-glow)',
         }}>
           ↺ Try Again
         </button>
-        <button onClick={() => setActiveScreen('home')} className="ba-glass" style={{
+        <button onClick={() => navigateWithAd(() => setActiveScreen('home'))} className="ba-glass" style={{
           border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
           borderRadius: 10, padding: '14px 24px', fontSize: 15, cursor: 'pointer', fontFamily: 'monospace',
         }}>

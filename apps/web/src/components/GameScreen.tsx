@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { useFarkleStore } from '../store/farkleStore.js';
@@ -6,6 +12,7 @@ import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
 import { FarkleHUD } from './FarkleHUD.js';
 import { VoxelPhysicsSystem } from '@match3d/game-core';
+import { adManager } from '@match3d/ads';
 import { LEVELS, DEFAULT_LEVEL } from '../data/levels.js';
 import type { DisruptionType } from '@match3d/farkle-shared';
 
@@ -47,6 +54,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
         },
         () => useFarkleStore.setState({ gamePhase: 'lose' }),
       );
+      adManager.showInterstitial();
       startGame();
     }).catch(err => {
       if (!cancelled) {

@@ -1,6 +1,18 @@
-import type { GameMode } from '@match3d/farkle-shared';
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
+import type { GameMode, DieFace } from '@match3d/farkle-shared';
 import { seededRng } from './csprng.js';
 import { RTP_CONFIGS } from './rtpConfig.js';
+import { lookupScore, buildScoreTable } from './chainIndex.js';
 
 export interface MonteCarloResult {
   averageScore: number;
@@ -9,10 +21,18 @@ export interface MonteCarloResult {
   sessionsRun: number;
 }
 
+// Lazy-initialized table — uses the same max-partition scorer as the live game (W6 compliance).
+let _mcTable: Int32Array | null = null;
+function getMcTable(): Int32Array {
+  if (!_mcTable) _mcTable = buildScoreTable();
+  return _mcTable;
+}
+
 export function calibrateNormalizer(
   mode: GameMode,
-  sessions: number = 1000
+  sessions: number = 4000
 ): MonteCarloResult {
+  const table = getMcTable();
   let totalScore = 0;
   let totalFarkles = 0;
 
@@ -22,13 +42,13 @@ export function calibrateNormalizer(
     const rng = seededRng(i);
 
     while (score < 50000 && chainCount < 30) {
-      const roll = Array(6).fill(0).map(() => Math.floor(rng() * 6) + 1);
-      const result = scoreFarkleLocal(roll);
-      if (result.isFarkle) {
+      const roll = Array.from({ length: 6 }, () => (Math.floor(rng() * 6) + 1) as DieFace);
+      const chainScore = lookupScore(roll, table);
+      if (chainScore === 0) {
         totalFarkles++;
         break;
       }
-      score += result.score;
+      score += chainScore;
       chainCount++;
     }
 
@@ -47,35 +67,6 @@ export function calibrateNormalizer(
   };
 }
 
-// Local scorer for Monte Carlo simulation (no external dependency on scorer module)
-function scoreFarkleLocal(dice: number[]): { score: number; isFarkle: boolean } {
-  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-  for (const die of dice) counts[die]++;
-
-  let score = 0;
-  let isFarkle = true;
-
-  for (const [die, count] of Object.entries(counts)) {
-    const dieScore = scoreDieFace(parseInt(die), count);
-    if (dieScore > 0) {
-      isFarkle = false;
-      score += dieScore;
-    }
-  }
-
-  return { score, isFarkle };
-}
-
-function scoreDieFace(face: number, count: number): number {
-  if (count === 0) return 0;
-  if (count === 5) return 2000;
-  if (count === 4) return 1000;
-  if (count === 3) return face === 1 ? 1000 : face * 100;
-  if (count === 2) { if (face === 1) return 200; if (face === 5) return 100; }
-  if (count === 1) { if (face === 1) return 100; if (face === 5) return 50; }
-  return 0;
-}
-
-export function runMonteCarlo(mode: GameMode, sessions: number = 1000): MonteCarloResult {
+export function runMonteCarlo(mode: GameMode, sessions: number = 4000): MonteCarloResult {
   return calibrateNormalizer(mode, sessions);
 }

@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────
+// FARKLE FRENZY — SURFACE FILE
+// Visual/presentational layer. Safe to modify appearance.
+// Do not add game logic here. Do not remove imports from CORE files.
+// ─────────────────────────────────────────────────────
+
 import { Router } from 'express';
 import { runMonteCarlo } from '@match3d/farkle-engine';
 import type { GameMode } from '@match3d/farkle-shared';

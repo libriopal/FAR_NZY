@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════
+// FARKLE FRENZY — CORE SACRED FILE
+// This file implements game balance, scoring, or fairness logic.
+// DO NOT MODIFY without:
+//   1. Running all 16 farkleScorer test cases
+//   2. Running npx tsc --noEmit (must show 0 errors)
+//   3. Explicit developer approval
+//   4. Updating DECISIONS_LOCKED_v4.txt if any constant changes
+// See .ff-core-lock for full classification manifest.
+// ═══════════════════════════════════════════════════════
+
 export type DieFace = 1 | 2 | 3 | 4 | 5 | 6;
 
 // ── Voxel entity types ────────────────────────────────────────────────────────
@@ -161,9 +172,9 @@ export interface LobbySettings {
 export const GAME_CONSTANTS = {
   gridRows: 7, gridCols: 7, bombFuseMs: 3000,
   maxChainLength: 6, minChainLength: 2, cascadeMs: 80,
-  MAX_CHAIN: 6, STONE_HP: 3, BOMB_RADIUS: 1,
-  BOMB_STONE_PTS: 50, BOMB_DIE_PTS: 25,
-  FUSE_MS: 3000, ARCHIVIST_PCT: 0.5
+  MAX_CHAIN: 6, STONE_HP: 2, BOMB_RADIUS: 1,
+  BOMB_STONE_PTS: 50, BOMB_DIE_PTS: 100,
+  FUSE_MS: 3000, ARCHIVIST_PCT: 0.15
 } as const;
 
 export const RALLY_MILESTONES = [
@@ -189,8 +200,18 @@ export function getMultiplier(step: number): number {
 }
 
 export function multiplayerGridSize(playerCount: number): number {
-  return playerCount === 1 ? 7 : 7;
+  if (playerCount <= 1) return 7;
+  if (playerCount === 2) return 8;
+  if (playerCount === 3) return 9;
+  return 10;
 }
+
+export const HEIST_CONSTANTS = {
+  VAULT_SPLIT: 0.70,       // 70% of score goes to vault, 30% to banked
+  VAULT_THRESHOLD: 5000,   // vault must reach this to trigger heist
+  HEIST_ENERGY_COST: 50,   // energy cost to initiate a heist
+  HEIST_WINDOW_MS: 5000,   // teammates have 5s to block a heist
+} as const;
 
 export const FD_COLORS = {
   badge: 'bg-violet-900 border-violet-500 text-sky-300',

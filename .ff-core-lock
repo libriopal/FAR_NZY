@@ -1,0 +1,53 @@
+# FARKLE FRENZY — CORE LOCK MANIFEST
+# Generated: 2026-05-07
+#
+# Files listed here are CORE SACRED.
+# They implement game balance, scoring, and fairness.
+# DO NOT MODIFY without running the full test suite and getting explicit approval.
+# Claude Code: if asked to modify a file in this list, STOP and ask the developer first.
+#
+# CORE FILES:
+packages/farkle-shared/src/types.ts
+packages/farkle-shared/src/index.ts
+packages/farkle-engine/src/chainIndex.ts
+packages/farkle-engine/src/farkleScorer.ts
+packages/farkle-engine/src/farkleScorer.test.ts
+packages/farkle-engine/src/csprng.ts
+packages/farkle-engine/src/gridUtils.ts
+packages/farkle-engine/src/floodFill.ts
+packages/farkle-engine/src/monteCarlo.ts
+packages/farkle-engine/src/rtpConfig.ts
+packages/farkle-engine/src/index.ts
+packages/farkle-engine/src/web.ts
+apps/web/src/store/farkleStore.ts
+apps/web/src/store/gameStore.ts
+apps/web/src/hooks/useFarkleGame.ts
+apps/server/src/gameRoom.ts
+#
+# SURFACE FILES (safe to modify visually and structurally):
+apps/web/src/components/GameScreen.tsx
+apps/web/src/components/FarkleHUD.tsx
+apps/web/src/components/HUD.tsx
+apps/web/src/components/HomeScreen.tsx
+apps/web/src/components/MultiplayerLobby.tsx
+apps/web/src/components/WinLoseScreen.tsx
+apps/web/src/components/EstateScreen.tsx
+apps/web/src/components/ShopScreen.tsx
+apps/web/src/components/AgeGate.tsx
+apps/web/src/components/SocialScreen.tsx
+apps/web/src/components/EventBanner.tsx
+apps/web/src/components/QuestPanel.tsx
+apps/web/src/game/VoxelPileScene.tsx
+apps/web/src/styles/bio-architect.css
+apps/web/src/styles/tokens.ts
+apps/web/src/styles/variants.ts
+apps/web/src/App.tsx
+apps/web/src/main.tsx
+apps/web/src/data/levels.ts
+apps/web/src/store/multiplayerStore.ts
+apps/web/src/hooks/useMultiplayer.ts
+apps/web/src/hooks/useEconomy.ts
+apps/web/src/hooks/useLiveEvents.ts
+apps/web/src/hooks/useQuests.ts
+apps/server/src/index.ts
+apps/server/src/sandbox.ts
