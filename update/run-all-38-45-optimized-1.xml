@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<master-run-prompt id="run-all-38-45-optimized" version="2" strategy="deterministic-first-ai-last">
+
+<!--
+  FARKLE FRENZY - OPTIMIZED MASTER UPDATE RUNNER v2
+  Credit-efficient: deterministic checks run before AI calls.
+  AI is only invoked when a file does not exist or fails a gate.
+  Sequence: 38 -> 39 -> 40 -> 41 -> 42 -> 43 -> 44 -> 45
+
+  CREDIT OPTIMIZATION STRATEGY:
+    1. skip-if-already-done: if file exists and passes all gates, zero AI cost.
+    2. TSC diff: only fail on NEW errors vs baseline. Pre-existing errors do not block.
+    3. deterministic-repair: sed/regex fixes run before any AI call.
+    4. min-context: AI receives only direct imports, not full codebase.
+    5. Both small component files generated in one AI call (update-41).
+    6. Vitest runs only after update-40 and at final gate, not after every update.
+-->
+
+<baseline id="baseline-capture">
+  <description>Capture TSC error baseline before any changes. Post-gates compare against this.</description>
+  <command>npx tsc --noEmit 2>&amp;1 | grep "error TS" | sort > /tmp/ff_tsc_baseline.txt; echo "baseline captured: $(wc -l &lt; /tmp/ff_tsc_baseline.txt) errors"</command>
+</baseline>
+
+<global-constraints id="gc">
+  <c>TypeScript strict. No any. Imports via @farkle/shared and @farkle/engine aliases only. Never relative paths to packages/.</c>
+  <c>No Math.random() game events. No better-sqlite3. No framer-motion (use motion/react). No setInterval for cascade or energy (use setTimeout recursion and RAF).</c>
+  <c>No activeBombs array. No SpawnPool class. No recoverDeadBoard(). No React.StrictMode. No rallyGridSize().</c>
+  <c>No emoji or non-ASCII in TypeScript source. No page title FARKLE FRENZY in GameScreen. No SP_FREE/SP_CASINO (use SOLO_FREE/SOLO_CASINO).</c>
+  <c>Analytics inserts are fire-and-forget, never awaited. Gear icon is U+2699 text only. Not emoji. Not Lucide.</c>
+  <c>Output raw TypeScript only. No markdown fences. Do not escape backticks.</c>
+</global-constraints>
+
+<tsc-diff id="tsc-diff-helper">
+  <description>Reused by all post-gates. Pass if no new error lines vs baseline.</description>
+  <command>comm -23 &lt;(npx tsc --noEmit 2>&amp;1 | grep "error TS" | sort) &lt;(sort /tmp/ff_tsc_baseline.txt) > /tmp/ff_new_errors.txt; if [ -s /tmp/ff_new_errors.txt ]; then echo "NEW TSC ERRORS:"; cat /tmp/ff_new_errors.txt; exit 1; fi; echo "TSC diff clean"</command>
+</tsc-diff>
+
+<preflight>
+  <strategy>File-system and grep only. Zero AI cost. All must pass or abort.</strategy>
+  <check cmd="node -e &quot;require('dotenv').config({path:'.env'});if(!process.env.ANTHROPIC_API_KEY)process.exit(1)&quot;" msg="ANTHROPIC_API_KEY missing"/>
+  <check cmd="node -e &quot;require('dotenv').config({path:'.env'});if(!process.env.SUPABASE_URL)process.exit(1)&quot;" msg="SUPABASE_URL missing"/>
+  <check cmd="node -e &quot;require('dotenv').config({path:'.env'});if(!process.env.SUPABASE_SERVICE_KEY)process.exit(1)&quot;" msg="SUPABASE_SERVICE_KEY missing"/>
+  <check cmd="test -f packages/engine/src/farkleScorer.ts" msg="farkleScorer.ts missing. Engine block required."/>
+  <check cmd="test -f packages/engine/src/gridUtils.ts &amp;&amp; grep -ql SixPoolManager packages/engine/src/gridUtils.ts" msg="SixPoolManager not in gridUtils.ts. Engine patch A2 required."/>
+  <check cmd="test -f packages/engine/src/csprng.ts" msg="csprng.ts missing."/>
+  <check cmd="grep -rql better-sqlite3 apps/server/src/ 2>/dev/null; test $? -ne 0" msg="better-sqlite3 in server. Remove first."/>
+  <check cmd="grep -ql SpawnPool packages/engine/src/gridUtils.ts 2>/dev/null; test $? -ne 0" msg="SpawnPool still in gridUtils. Must be deleted."/>
+  <on-failure>ABORT. Zero files written.</on-failure>
+</preflight>
+
+<!-- UPDATE 38: skillMetrics.ts + analytics.ts -->
+<update id="u38" sequence="1">
+  <skip-if>
+    test -f packages/engine/src/skillMetrics.ts &amp;&amp;
+    test -f apps/server/src/analytics.ts &amp;&amp;
+    grep -ql computeSkillScore packages/engine/src/skillMetrics.ts &amp;&amp;
+    grep -ql isOptimalDecision packages/engine/src/skillMetrics.ts &amp;&amp;
+    grep -ql DecisionContext packages/shared/src/types.ts
+  </skip-if>
+  <pre-gate>
+    <check cmd="test ! -f packages/engine/src/skillMetrics.ts" msg="skillMetrics.ts exists but skip conditions not met. Delete and rerun."/>
+  </pre-gate>
+  <ai-prompt context="packages/shared/src/types.ts,packages/engine/src/farkleScorer.ts">
+    Create two files. Concise. No decorative comments.
+
+    FILE 1: packages/engine/src/skillMetrics.ts
+    Export only:
+      interface SessionAnalytics{id:string;player_id:string;mode:string;seed_hash:string;started_at:string;ended_at:string|null;total_chains:number;scoring_chains:number;farkle_count:number;banks_taken:number;peak_multiplier:number;final_banked:number;final_score:number;avg_chain_score:number;skill_score:number}
+      interface ChainDecision{id:string;session_id:string;player_id:string;chain_number:number;faces_played:number[];score_result:number;multiplier_at:number;unbanked_before:number;decision:'CONTINUE'|'BANK'|'PASS'|'FARKLE';was_optimal:boolean;timestamp:string}
+      function computeSkillScore(s:Omit&lt;SessionAnalytics,'skill_score'&gt;):number
+        chainQuality=s.scoring_chains/s.total_chains
+        bankEfficiency=s.peak_multiplier/4.0
+        farkleResistance=1-(s.farkle_count/s.total_chains)
+        return (chainQuality*0.4)+(bankEfficiency*0.35)+(farkleResistance*0.25) clamped 0-1
+      function isOptimalDecision(decision:'BANK'|'CONTINUE',unbanked:number,step:number,risk:number):boolean
+        STEPS=[1.0,1.25,1.5,2.0,3.0,4.0]
+        ev=unbanked*(1-risk)*STEPS[Math.min(step+1,5)]
+        CONTINUE optimal when ev>unbanked
+      function estimateFarkleRisk(f1:number,f5:number,total:number):number
+        if total===0 return 0.9
+        scoringRatio=(f1+f5)/total
+        return Math.max(0,Math.min(1,0.9-(scoringRatio*1.5)))
+    No imports from apps/. No Math.random().
+
+    FILE 2: apps/server/src/analytics.ts
+    import {SessionAnalytics,ChainDecision,computeSkillScore} from '@farkle/engine/skillMetrics'
+    import {createClient} from '@supabase/supabase-js'
+    const sb=createClient(process.env.SUPABASE_URL!,process.env.SUPABASE_SERVICE_KEY!)
+    export async function insertSession(s:Omit&lt;SessionAnalytics,'skill_score'&gt;):Promise&lt;void&gt;{try{const skill_score=computeSkillScore(s);await sb.from('session_analytics').upsert({...s,skill_score})}catch{}}
+    export async function insertChainDecision(d:ChainDecision):Promise&lt;void&gt;{try{await sb.from('chain_decisions').insert(d)}catch{}}
+    export async function getSkillPercentile(player_id:string):Promise&lt;number&gt;{try{const{data}=await sb.from('session_analytics').select('skill_score').eq('player_id',player_id).order('started_at',{ascending:false}).limit(100);if(!data?.length)return 0;return data.reduce((a,r)=>a+r.skill_score,0)/data.length}catch{return 0}}
+    export async function getSkillDifferentialReport():Promise&lt;{topDecile:number;bottomHalf:number;ratio:number}&gt;{try{const{data}=await sb.from('session_analytics').select('skill_score,final_score').order('skill_score',{ascending:false});if(!data?.length)return{topDecile:0,bottomHalf:0,ratio:1};const top=data.slice(0,Math.ceil(data.length*0.1));const bot=data.slice(Math.floor(data.length*0.5));const topDecile=top.reduce((a,r)=>a+r.final_score,0)/top.length;const bottomHalf=bot.reduce((a,r)=>a+r.final_score,0)/bot.length;return{topDecile,bottomHalf,ratio:topDecile/Math.max(1,bottomHalf)}}catch{return{topDecile:0,bottomHalf:0,ratio:1}}}
+
+    Also append to packages/shared/src/types.ts after // PATCH ANCHOR: types:
+    export interface DecisionContext{decision:'BANK'|'CONTINUE'|'PASS';unbanked:number;multiplierStep:number;chainNumber:number}
+  </ai-prompt>
+  <post-gate>
+    <check cmd="test -f packages/engine/src/skillMetrics.ts" msg="skillMetrics.ts not created"/>
+    <check cmd="test -f apps/server/src/analytics.ts" msg="analytics.ts not created"/>
+    <check cmd="grep -ql computeSkillScore packages/engine/src/skillMetrics.ts" msg="computeSkillScore missing"/>
+    <check cmd="grep -ql isOptimalDecision packages/engine/src/skillMetrics.ts" msg="isOptimalDecision missing"/>
+    <check cmd="grep -ql DecisionContext packages/shared/src/types.ts" msg="DecisionContext not in types.ts"/>
+    <check cmd="grep -ql Math.random packages/engine/src/skillMetrics.ts 2>/dev/null; test $? -ne 0" msg="Math.random in skillMetrics -- violation"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 39: useEnergy.ts -->
+<update id="u39" sequence="2">
+  <skip-if>
+    test -f apps/client/src/hooks/useEnergy.ts &amp;&amp;
+    grep -ql MAX_ENERGY apps/client/src/hooks/useEnergy.ts &amp;&amp;
+    grep -ql requestAnimationFrame apps/client/src/hooks/useEnergy.ts &amp;&amp;
+    grep -ql cancelAnimationFrame apps/client/src/hooks/useEnergy.ts &amp;&amp;
+    ! grep -ql setInterval apps/client/src/hooks/useEnergy.ts 2>/dev/null
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/hooks/useEnergy.ts 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="packages/shared/src/types.ts">
+    Create apps/client/src/hooks/useEnergy.ts. Concise.
+    export const MAX_ENERGY=300
+    export const FRENZY_THRESHOLD=150
+    export const CATCHUP_THRESHOLD=75
+    export interface EnergyState{energy:number;globalMode:'PRIME'|'FRENZY';isAnchor:boolean;isCatchup:boolean;isInstability:boolean}
+    export interface UseEnergyReturn extends EnergyState{applyChainEnergy:(len:number,wild:boolean)=>void;forceToFrenzy:()=>void}
+    export function useEnergy(globalMode:'PRIME'|'FRENZY',onModeChange:(m:'PRIME'|'FRENZY')=>void,onEnergyZero:()=>void):UseEnergyReturn
+
+    RAF loop: useRef for rafId,lastTs,isAnchor,zeroFired,lastChainMs,instabilityTimer
+    Each frame: delta=ms since lastTs in seconds. Clamp energy [0,MAX_ENERGY].
+    PRIME: +5*delta/sec passive. FRENZY: isCatchup=(energy&lt;75), drain=(isCatchup?3:5)*delta.
+    Energy crosses 150 upward while globalMode=PRIME: call onModeChange('FRENZY'), set isAnchor ref true.
+    isAnchor and energy drops below 150 during FRENZY: set instability=true, setTimeout 2000ms, if not recovered call onModeChange('PRIME').
+    Energy hits 0: if !zeroFired.current call onEnergyZero() and set zeroFired=true. Reset zeroFired when energy>0.
+    applyChainEnergy: if Date.now()-lastChainMs.current&lt;100 return (100ms lock). Apply delta by mode+len+wild.
+      PRIME: len2-5=-10, len6=+10, len6+wild=+20. FRENZY: +10 always, +20 with wild, +2 if catchup.
+    forceToFrenzy: set energy to FRENZY_THRESHOLD+1.
+    globalMode is a prop not owned internally.
+    cleanup: cancelAnimationFrame on unmount.
+    No setInterval. No Math.random(). No framer-motion.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="test -f apps/client/src/hooks/useEnergy.ts" msg="useEnergy.ts not created"/>
+    <check cmd="grep -ql MAX_ENERGY apps/client/src/hooks/useEnergy.ts" msg="MAX_ENERGY missing"/>
+    <check cmd="grep -ql requestAnimationFrame apps/client/src/hooks/useEnergy.ts" msg="RAF missing"/>
+    <check cmd="grep -ql cancelAnimationFrame apps/client/src/hooks/useEnergy.ts" msg="cancelAnimationFrame cleanup missing"/>
+    <check cmd="grep -ql setInterval apps/client/src/hooks/useEnergy.ts 2>/dev/null; test $? -ne 0" msg="setInterval found -- RAF required"/>
+    <check cmd="grep -ql framer-motion apps/client/src/hooks/useEnergy.ts 2>/dev/null; test $? -ne 0" msg="framer-motion found"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 40: useGame.ts major patch -->
+<update id="u40" sequence="3">
+  <skip-if>
+    grep -ql ROUND_END apps/client/src/hooks/useGame.ts 2>/dev/null &amp;&amp;
+    grep -ql SixPoolManager apps/client/src/hooks/useGame.ts 2>/dev/null &amp;&amp;
+    grep -ql insertChainDecision apps/client/src/hooks/useGame.ts 2>/dev/null &amp;&amp;
+    ! grep -ql setInterval apps/client/src/hooks/useGame.ts 2>/dev/null &amp;&amp;
+    ! grep -ql activeBombs apps/client/src/hooks/useGame.ts 2>/dev/null
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/hooks/useGame.ts 2>/dev/null; true</rule>
+    <rule>sed -i 's/SP_FREE/SOLO_FREE/g; s/SP_CASINO/SOLO_CASINO/g' apps/client/src/hooks/useGame.ts 2>/dev/null; true</rule>
+    <rule>sed -i 's/rallyGridSize/multiplayerGridSize/g' apps/client/src/hooks/useGame.ts 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="packages/shared/src/types.ts,packages/engine/src/skillMetrics.ts,apps/client/src/hooks/useEnergy.ts,apps/server/src/analytics.ts">
+    Patch apps/client/src/hooks/useGame.ts for V3 round flow. Read file first. Targeted additions only -- do not rewrite from scratch.
+
+    ADD to action union: APPLY_CHAIN_ENERGY, ROUND_END:{reason:'SHORT_CHAIN'|'FARKLE'|'ENERGY_ZERO'}, LOG_DECISION, WILD_SCATTER, ARCHIVIST_RECOVER
+
+    REPLACE commit/match handling with round flow rules:
+      chain.length &lt; 2: return without dispatch
+      chain.length===6 + score&gt;0: CONTINUE (advance multiplierStep, stay ROLLING)
+      chain.length 2-5 + score&gt;0: AUTO-BANK (unbanked->banked, multiplierStep=0) then dispatch ROUND_END reason:SHORT_CHAIN
+      score===0: dispatch ROUND_END reason:FARKLE (unbanked=0, multiplierStep=0, rally: unbanked->farklePool)
+      energy zero (onEnergyZero callback): AUTO-BANK then ROUND_END reason:ENERGY_ZERO
+
+    ADD SixPoolManager in useRef. spawnTiles calls pool.draw(). Dead board: !hasValidChain(grid) -> pool.reshuffle() -> respawn.
+    CASCADE: setTimeout recursion 80ms. Never setInterval.
+    ADD in COMMIT_CHAIN: if result.isSixOfAKind place BOMB_STANDARD. if result.isStraight place BOMB_RAINBOW. Both at chain[Math.floor(chain.length/2)].
+    ADD: insertChainDecision({...}) without await. insertSession({...}) without await on session end.
+    ADD: after cascade check scanForWilds(grid)>=3 -> dispatch WILD_SCATTER.
+
+    KEEP all existing bomb tick/detonate/fuse logic. KEEP pointer event wiring. KEEP existing cascade structure shape.
+    DO NOT ADD activeBombs array. DO NOT regenerate AP system speedMeter old isFrenzy.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="grep -ql ROUND_END apps/client/src/hooks/useGame.ts" msg="ROUND_END missing"/>
+    <check cmd="grep -ql SixPoolManager apps/client/src/hooks/useGame.ts" msg="SixPoolManager not wired"/>
+    <check cmd="grep -ql insertChainDecision apps/client/src/hooks/useGame.ts" msg="analytics not wired"/>
+    <check cmd="grep -ql setInterval apps/client/src/hooks/useGame.ts 2>/dev/null; test $? -ne 0" msg="setInterval found"/>
+    <check cmd="grep -ql activeBombs apps/client/src/hooks/useGame.ts 2>/dev/null; test $? -ne 0" msg="activeBombs found"/>
+    <check cmd="grep -ql SpawnPool apps/client/src/hooks/useGame.ts 2>/dev/null; test $? -ne 0" msg="SpawnPool referenced"/>
+    <tsc-diff/>
+    <check cmd="npx vitest run --reporter=verbose 2>&amp;1 | grep -E '(passed|failed)'" msg="Vitest failed after useGame patch"/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 41: EnergyMeter.tsx + FrenzyOverlay.tsx (one AI call for both) -->
+<update id="u41" sequence="4">
+  <skip-if>
+    test -f apps/client/src/components/EnergyMeter.tsx &amp;&amp;
+    test -f apps/client/src/components/FrenzyOverlay.tsx &amp;&amp;
+    grep -ql pointerEvents apps/client/src/components/FrenzyOverlay.tsx
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/components/EnergyMeter.tsx 2>/dev/null; true</rule>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/components/FrenzyOverlay.tsx 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="apps/client/src/hooks/useEnergy.ts">
+    Create two files in one response. Concise. No decorative comments. No non-ASCII chars.
+
+    FILE 1: apps/client/src/components/EnergyMeter.tsx
+    Props: energy:number,globalMode:'PRIME'|'FRENZY',isInstability:boolean,isCatchup:boolean,playerEnergies?:number[]
+    Full-width 48px bar. FRENZY_THRESHOLD tick at 50%. PRIME=amber-500 gradient fill. FRENZY=violet-500 gradient.
+    Instability: motion/react animate keyframes pulse red. Bar width via motion/react spring. Labels left=mode right=integer.
+    playerEnergies: 8px dots above bar. aria-label. No emoji. No non-ASCII.
+
+    FILE 2: apps/client/src/components/FrenzyOverlay.tsx
+    Props: isActive:boolean,isInstability:boolean
+    style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:10}}
+    Active: violet 4px border animates opacity 0.4-0.8. Text "FRENZY" top-center amber font-mono font-black.
+    Instability: border and text shift red. Text becomes "INSTABILITY" and pulses.
+    motion/react AnimatePresence. Fade in 300ms out 200ms. No emoji. No non-ASCII.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="test -f apps/client/src/components/EnergyMeter.tsx" msg="EnergyMeter.tsx missing"/>
+    <check cmd="test -f apps/client/src/components/FrenzyOverlay.tsx" msg="FrenzyOverlay.tsx missing"/>
+    <check cmd="grep -ql pointerEvents apps/client/src/components/FrenzyOverlay.tsx" msg="pointerEvents none missing from FrenzyOverlay"/>
+    <check cmd="grep -ql framer-motion apps/client/src/components/EnergyMeter.tsx 2>/dev/null; test $? -ne 0" msg="framer-motion in EnergyMeter"/>
+    <check cmd="grep -ql framer-motion apps/client/src/components/FrenzyOverlay.tsx 2>/dev/null; test $? -ne 0" msg="framer-motion in FrenzyOverlay"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/client/src/components/EnergyMeter.tsx','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in EnergyMeter.tsx"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/client/src/components/FrenzyOverlay.tsx','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in FrenzyOverlay.tsx"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 42: Tile.tsx Wild Blocker + Ad Slot -->
+<update id="u42" sequence="5">
+  <skip-if>
+    grep -ql "'WILD'" apps/client/src/components/Tile.tsx 2>/dev/null &amp;&amp;
+    grep -ql showAdSlot apps/client/src/components/Tile.tsx 2>/dev/null &amp;&amp;
+    grep -ql BOMB_STANDARD apps/client/src/components/Tile.tsx 2>/dev/null
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/components/Tile.tsx 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="packages/shared/src/types.ts">
+    Patch apps/client/src/components/Tile.tsx. Read file first. Targeted additions only.
+
+    ADD at // PATCH ANCHOR: tile-render (before default die branch):
+      if(cell.state==='WILD'){return(&lt;div ...faceColorBg... style={{boxShadow:'inset -2px -3px 0 rgba(0,0,0,0.3),inset 2px 2px 0 rgba(255,255,255,0.15)'}}&gt;&lt;span style={{fontFamily:'monospace',fontWeight:900,fontSize:'60%',filter:'brightness(0.6)',animationName:'hue-rotate',animationDuration:'2s',animationTimingFunction:'linear',animationIterationCount:'infinite'}}&gt;F&lt;/span&gt;&lt;/div&gt;)}
+
+    ADD boxShadow 'inset -2px -3px 0 rgba(0,0,0,0.3),inset 2px 2px 0 rgba(255,255,255,0.15)' to ALL die tile renders for 3D effect.
+    Selected die: boxShadow enhanced + transform translateY(-2px).
+
+    ADD optional props showAdSlot?:boolean, onAdSlotClick?:()=>void to Tile props interface.
+    When showAdSlot===true and cell.type==='NONE': render centered "+" at opacity 0.3, onClick=onAdSlotClick.
+
+    DO NOT modify bomb rendering branches. DO NOT touch Grid.tsx.
+    WILD cell: pointer-events normal (chainable). Chain ring visible when isChained. No pips. No face number.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="grep -ql BOMB_STANDARD apps/client/src/components/Tile.tsx" msg="Bomb branch removed -- regression"/>
+    <check cmd="grep -ql WILD apps/client/src/components/Tile.tsx" msg="WILD branch missing"/>
+    <check cmd="grep -ql showAdSlot apps/client/src/components/Tile.tsx" msg="showAdSlot prop missing"/>
+    <check cmd="grep -ql framer-motion apps/client/src/components/Tile.tsx 2>/dev/null; test $? -ne 0" msg="framer-motion found"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/client/src/components/Tile.tsx','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in Tile.tsx"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 43: SettingsModal.tsx -->
+<update id="u43" sequence="6">
+  <skip-if>
+    test -f apps/client/src/components/SettingsModal.tsx &amp;&amp;
+    grep -ql "React.lazy" apps/client/src/components/SettingsModal.tsx &amp;&amp;
+    grep -ql adsEnabled apps/client/src/components/SettingsModal.tsx
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/components/SettingsModal.tsx 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="apps/client/src/hooks/useTheme.ts,apps/client/src/hooks/useWallet.ts">
+    Create apps/client/src/components/SettingsModal.tsx. Concise. No non-ASCII chars.
+
+    Props: isOpen:boolean, onClose:()=>void, initialTab?:'THEME'|'AUDIO'|'SANDBOX'|'ACCOUNT'|'ADS', adsEnabled?:boolean, onRewardedAdRequest?:()=>void
+
+    Modal: overlay backdrop-blur-sm bg-black/70. Inner max-w-[480px] max-h-[80dvh] bg-zinc-900 rounded-lg overflow-hidden.
+    Tab row: [THEME][AUDIO][SANDBOX][ACCOUNT] then [X button]. ACCOUNT is immediately left of X.
+    ADS tab only added to tab row when adsEnabled===true.
+    Gear character that opens this modal lives in parent -- this file only renders the modal.
+
+    THEME tab: dark/light toggle via useTheme() inline. 6 accent color swatches.
+    AUDIO tab: master volume input range 0-100. 5 boolean toggles: chain match farkle bank bomb sounds. Store in localStorage.
+    SANDBOX tab: const SandboxTab=React.lazy(()=>import('./SandboxTab')). Wrap in Suspense fallback="Loading...". If mode is not SOLO show "Sandbox available in SOLO mode only" text.
+    ACCOUNT tab: show username and FD balance from useWallet(). PDX balance grayed text-zinc-500 "Coming Soon". Edit Profile button toggles inline edit form.
+    ADS tab (adsEnabled only): toggle rewarded ads on/off (localStorage). Button "Watch ad +50 FD" calls onRewardedAdRequest. Select interstitial frequency 3|5|10 rounds (localStorage).
+
+    motion/react AnimatePresence: scale 0.95->1 opacity 0->1 200ms on open. Overlay only, no page push. Close on backdrop click and X.
+    No framer-motion. No non-ASCII.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="test -f apps/client/src/components/SettingsModal.tsx" msg="SettingsModal.tsx not created"/>
+    <check cmd="grep -ql React.lazy apps/client/src/components/SettingsModal.tsx" msg="SandboxTab not lazy loaded"/>
+    <check cmd="grep -ql framer-motion apps/client/src/components/SettingsModal.tsx 2>/dev/null; test $? -ne 0" msg="framer-motion found"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/client/src/components/SettingsModal.tsx','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in SettingsModal.tsx"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 44: GameScreen.tsx revised -->
+<update id="u44" sequence="7">
+  <skip-if>
+    grep -ql dvh apps/client/src/components/GameScreen.tsx 2>/dev/null &amp;&amp;
+    grep -ql ResizeObserver apps/client/src/components/GameScreen.tsx 2>/dev/null &amp;&amp;
+    grep -ql EnergyMeter apps/client/src/components/GameScreen.tsx 2>/dev/null &amp;&amp;
+    ! grep -ql "FARKLE FRENZY" apps/client/src/components/GameScreen.tsx 2>/dev/null
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/client/src/components/GameScreen.tsx 2>/dev/null; true</rule>
+    <rule>grep -n "FARKLE FRENZY" apps/client/src/components/GameScreen.tsx 2>/dev/null | head -3</rule>
+  </deterministic-repair>
+  <ai-prompt context="apps/client/src/hooks/useGame.ts,apps/client/src/hooks/useEnergy.ts">
+    Rewrite apps/client/src/components/GameScreen.tsx zone layout. Read current file first. Preserve all game logic wiring.
+
+    ROOT: className="flex flex-col overflow-hidden bg-zinc-950" style={{height:'100dvh'}}
+
+    TopBar h-[44px] bg-zinc-900: left=mode label text-amber-400 font-mono font-bold. center=round number. right=button renders char "\u2699" (code 9881) opens SettingsModal.
+    EnergyBar h-[48px]: &lt;EnergyMeter energy={...} globalMode={...} isInstability={...} isCatchup={...}/&gt;
+    InfoStrip h-[36px] bg-zinc-950 border-b border-zinc-800: left=multiplier badge. center=MultiplierLadder. right=lastCombo text-xs font-mono text-zinc-400.
+    Grid zone flex-1 relative overflow-hidden: &lt;Grid .../&gt; then &lt;FrenzyOverlay isActive={...} isInstability={...}/&gt; absolutely positioned. Chain preview banner absolute top-2 left-0 right-0 text-center font-mono text-sm. Shows live score while dragging. Red text when score===0 with "FARKLE" prefix.
+    BankBar h-[68px] bg-zinc-900 border-t border-zinc-800: three sections flex. BANKED value text-emerald-400 font-black. AT RISK value text-amber-400 font-black animate-pulse when &gt;0. BANK button bg-amber-400 text-black font-black disabled+opacity-50 when unbanked===0. When adsEnabled show small text below button "Watch ad +50 FD" onClick=onRewardedAdRequest.
+
+    ROUND_END overlay: absolute inset-0 bg-zinc-950/90 flex flex-col items-center justify-center. Shows score summary. "Watch Ad" button calls onInterstitialRequest. "Continue" button. Auto-continue setTimeout 5000ms.
+
+    ResizeObserver on grid container ref. cellSize=Math.max(28,Math.min(72,Math.floor((Math.min(entry.contentRect.width,entry.contentRect.height)-16)/gridDim))). Pass to Grid. Cleanup disconnect on unmount.
+
+    SettingsModal rendered at end of root. const [settingsOpen,setSettingsOpen]=useState(false).
+
+    Props: mode:GameMode, gridDim:number, adsEnabled?:boolean, onRewardedAdRequest?:()=>void, onInterstitialRequest?:()=>void
+
+    NO "FARKLE FRENZY" title text. NO sidebar HUD. NO BankButton import. NO ThemeToggle import. No framer-motion. No non-ASCII.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="grep -ql dvh apps/client/src/components/GameScreen.tsx" msg="100dvh missing"/>
+    <check cmd="grep -ql ResizeObserver apps/client/src/components/GameScreen.tsx" msg="ResizeObserver missing"/>
+    <check cmd="grep -ql EnergyMeter apps/client/src/components/GameScreen.tsx" msg="EnergyMeter not used"/>
+    <check cmd="grep -ql FrenzyOverlay apps/client/src/components/GameScreen.tsx" msg="FrenzyOverlay not used"/>
+    <check cmd="grep -ql SettingsModal apps/client/src/components/GameScreen.tsx" msg="SettingsModal not used"/>
+    <check cmd="grep -ql "FARKLE FRENZY" apps/client/src/components/GameScreen.tsx 2>/dev/null; test $? -ne 0" msg="Page title found -- remove it"/>
+    <check cmd="grep -ql BankButton apps/client/src/components/GameScreen.tsx 2>/dev/null; test $? -ne 0" msg="BankButton import found"/>
+    <check cmd="grep -ql framer-motion apps/client/src/components/GameScreen.tsx 2>/dev/null; test $? -ne 0" msg="framer-motion found"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/client/src/components/GameScreen.tsx','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in GameScreen.tsx"/>
+    <tsc-diff/>
+  </post-gate>
+</update>
+
+<!-- UPDATE 45: gameRoom.ts server final -->
+<update id="u45" sequence="8">
+  <skip-if>
+    test -f apps/server/src/gameRoom.ts &amp;&amp;
+    grep -ql SixPoolManager apps/server/src/gameRoom.ts &amp;&amp;
+    grep -ql insertChainDecision apps/server/src/gameRoom.ts &amp;&amp;
+    grep -ql SEED_REVEAL apps/server/src/gameRoom.ts &amp;&amp;
+    ! grep -ql better-sqlite3 apps/server/src/gameRoom.ts 2>/dev/null &amp;&amp;
+    ! grep -ql activeBombs apps/server/src/gameRoom.ts 2>/dev/null
+  </skip-if>
+  <deterministic-repair>
+    <rule>sed -i "s|require('better-sqlite3')|require('sql.js')|g; s|from 'better-sqlite3'|from 'sql.js'|g" apps/server/src/gameRoom.ts 2>/dev/null; true</rule>
+    <rule>sed -i "s|from 'framer-motion'|from 'motion/react'|g" apps/server/src/gameRoom.ts 2>/dev/null; true</rule>
+  </deterministic-repair>
+  <ai-prompt context="packages/shared/src/types.ts,packages/engine/src/skillMetrics.ts,apps/server/src/analytics.ts">
+    Create apps/server/src/gameRoom.ts. Concise. No decorative comments. No non-ASCII.
+
+    Imports: SixPoolManager,hasValidChain,stepGravity,spawnTiles,normalizeTiles from '@farkle/engine/gridUtils'. scoreFarkle from '@farkle/engine/farkleScorer'. types from '@farkle/shared/types'. insertChainDecision,insertSession from './analytics'. crypto from 'node:crypto'. sql from 'sql.js'. NEVER better-sqlite3.
+
+    export class GameRoom {
+      Fields: grid:Cell[][],players:Map&lt;string,Player&gt;,phase:string,activePlayerId:string,unbanked:number,banked:Record&lt;string,number&gt;,multiplierStep:number,farklePool:number,vault:number,roundNumber:number,globalMode:'PRIME'|'FRENZY',playerEnergies:Record&lt;string,number&gt;,anchorPlayerId:string|null,sessionId:string,chainCount:number,serverSeed:string,serverSeedHash:string,combinedSeed:string|null,pool:SixPoolManager,lastChainMs:Record&lt;string,number&gt;,timerHandle:ReturnType&lt;typeof setTimeout&gt;|null
+
+      constructor(gridSize:number,csprng:()=>number): generate serverSeed=crypto.randomBytes(32).toString('hex'). serverSeedHash=SHA256(serverSeed). init pool=new SixPoolManager(gridSize,csprng).
+
+      handleMessage(playerId:string,msg:{type:string,[k:string]:unknown}):void
+        switch msg.type:
+          'SUBMIT_CHAIN': validate phase==='IDLE' and playerId===activePlayerId and Date.now()-lastChainMs[playerId]>=100. lastChainMs[playerId]=Date.now(). score=scoreFarkle(faces). Apply round flow (len6+score>0=CONTINUE, len2-5+score>0=AUTO-BANK+ROUND_END, score===0=FARKLE). Call insertChainDecision({...}) no await. Run cascade. Broadcast CHAIN_RESULT+BOARD_UPDATE.
+          'BANK': unbanked->banked[playerId], multiplierStep=0, ROUND_END. insertChainDecision decision:BANK no await.
+          'PASS': Rally. If Conductor role multiplierStep=Math.min(5,multiplierStep+1). Transfer to next player.
+          'VOTE_REACT': broadcast VOTE_UPDATE.
+          'INITIATE_HEIST': check vault>=5000 and playerEnergies[playerId]>=50. Start HEIST_WINDOW_MS=5000 timer.
+          'LEAVE_ROOM': mark disconnected. Broadcast PLAYER_DISCONNECTED.
+
+      cascade(): private. async. stepGravity->spawnTiles(pool)->normalizeTiles. setTimeout recursion 80ms. After stable: if !hasValidChain(grid) pool.reshuffle() + respawn. Broadcast BOARD_UPDATE each step. NEVER setInterval.
+
+      applyChainEnergy(playerId:string,len:number,wild:boolean): update playerEnergies[playerId]. If any player>150 set globalMode='FRENZY'. Broadcast ENERGY_UPDATE.
+
+      setClientSeed(playerId:string,seed:string): store seed. When all players submitted: combinedSeed=SHA256(serverSeed+seeds.join('')). pool.reseed(combinedSeed).
+
+      endSession(): computeSkillScore from session totals. insertSession({...}) no await. broadcast SEED_REVEAL:{serverSeed}.
+
+      startTurnTimer(ms:number): timerHandle=setTimeout(()=>this.handleMessage(activePlayerId,{type:'BANK'}),ms).
+      clearTurnTimer(): if timerHandle clearTimeout(timerHandle).
+    }
+
+    No activeBombs array. No Math.random(). No setInterval. No relative paths to packages/.
+    sql.js for local room/player storage. Import paths @farkle/ only.
+  </ai-prompt>
+  <post-gate>
+    <check cmd="test -f apps/server/src/gameRoom.ts" msg="gameRoom.ts not created"/>
+    <check cmd="grep -ql better-sqlite3 apps/server/src/gameRoom.ts 2>/dev/null; test $? -ne 0" msg="better-sqlite3 found -- arm64 incompatible"/>
+    <check cmd="grep -ql activeBombs apps/server/src/gameRoom.ts 2>/dev/null; test $? -ne 0" msg="activeBombs found"/>
+    <check cmd="grep -ql setInterval apps/server/src/gameRoom.ts 2>/dev/null; test $? -ne 0" msg="setInterval found"/>
+    <check cmd="grep -ql "Math.random()" apps/server/src/gameRoom.ts 2>/dev/null; test $? -ne 0" msg="Math.random() found"/>
+    <check cmd="grep -ql insertChainDecision apps/server/src/gameRoom.ts" msg="analytics not wired"/>
+    <check cmd="grep -ql SEED_REVEAL apps/server/src/gameRoom.ts" msg="SEED_REVEAL missing"/>
+    <check cmd="grep -ql SixPoolManager apps/server/src/gameRoom.ts" msg="SixPoolManager not used"/>
+    <check cmd="node -e &quot;const s=require('fs').readFileSync('apps/server/src/gameRoom.ts','utf8');if(s.split('').some(c=>c.charCodeAt(0)>127))process.exit(1)&quot;" msg="non-ASCII in gameRoom.ts"/>
+    <tsc-diff/>
+    <check cmd="npx vitest run 2>&amp;1 | grep -E '(passed|failed)'" msg="Final vitest run. All 16 farkleScorer tests must pass."/>
+  </post-gate>
+</update>
+
+<final-gate>
+  <check cmd="npx tsc --noEmit" msg="FINAL: TSC errors present"/>
+  <check cmd="npx vitest run 2>&amp;1 | grep passed" msg="FINAL: Vitest not all passing"/>
+  <check cmd="grep -rql framer-motion apps/client/src/ 2>/dev/null | grep -v node_modules; test $? -ne 0" msg="FINAL: framer-motion in client"/>
+  <check cmd="grep -rql better-sqlite3 apps/server/src/ 2>/dev/null | grep -v node_modules; test $? -ne 0" msg="FINAL: better-sqlite3 in server"/>
+  <check cmd="grep -rql activeBombs apps/ 2>/dev/null | grep -v node_modules; test $? -ne 0" msg="FINAL: activeBombs in source"/>
+  <check cmd="grep -rql SpawnPool packages/engine/src/ 2>/dev/null | grep -v node_modules; test $? -ne 0" msg="FINAL: SpawnPool class found"/>
+  <on-success>
+    Updates 38-45 complete. Credit usage minimized via skip-if and deterministic-repair.
+    MANUAL: Run Supabase migration 001_skill_analytics if not done.
+    MANUAL: npx vite build to confirm production bundle.
+  </on-success>
+</final-gate>
+
+</master-run-prompt>

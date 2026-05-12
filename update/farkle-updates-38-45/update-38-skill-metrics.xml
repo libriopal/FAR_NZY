@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-38" name="Skill Differential Logging System" block="B" priority="LEGAL-CRITICAL">
+
+  <context>
+    Farkle Frenzy uses a sweepstakes PDX model (1:1 USD prize-eligible currency).
+    To legally defend skill predominance classification under state AG scrutiny,
+    the server must log per-session and per-decision analytics from day one.
+    This data proves that skilled players consistently outperform random play —
+    the core legal requirement for the predominance test.
+    Stack: React 19 + TypeScript strict + Express v5 + Supabase + Node 25.x.
+    Monorepo: packages/shared, packages/engine, apps/client, apps/server.
+  </context>
+
+  <dependencies>
+    <dep status="complete">packages/shared/src/types.ts — base Cell/GameState types exist</dep>
+    <dep status="complete">packages/engine/src/farkleScorer.ts — scoreFarkle() exists</dep>
+    <dep status="complete">packages/engine/src/RTPEngine.ts — Monte Carlo exists</dep>
+    <dep status="pending">apps/server/src/gameRoom.ts — E1 patch will consume this</dep>
+  </dependencies>
+
+  <new-files>
+
+    <file path="packages/engine/src/skillMetrics.ts">
+      <description>
+        Pure computation module. No side effects. No imports from apps/.
+        Exports three functions used by server to evaluate every player decision.
+      </description>
+      <specification>
+        <![CDATA[
+// MULTIPLIER_STEPS array: [1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+// Matches the 6-step ladder locked in game design.
+
+export interface SessionAnalytics {
+  id: string;
+  player_id: string;
+  mode: string;
+  seed_hash: string;
+  started_at: string;
+  ended_at: string | null;
+  total_chains: number;
+  scoring_chains: number;
+  farkle_count: number;
+  banks_taken: number;
+  peak_multiplier: number;
+  final_banked: number;
+  final_score: number;
+  avg_chain_score: number;
+  skill_score: number;
+}
+
+export interface ChainDecision {
+  id: string;
+  session_id: string;
+  player_id: string;
+  chain_number: number;
+  faces_played: number[];
+  score_result: number;
+  multiplier_at: number;
+  unbanked_before: number;
+  decision: 'CONTINUE' | 'BANK' | 'PASS' | 'FARKLE';
+  was_optimal: boolean;
+  timestamp: string;
+}
+
+// computeSkillScore: weights chain quality, bank efficiency, farkle resistance.
+// Expert players return > 0.65. Random play returns 0.30-0.40.
+// Weight split: chainQuality 40%, bankEfficiency 35%, farkleResistance 25%.
+export function computeSkillScore(session: Omit<SessionAnalytics, 'skill_score'>): number
+
+// isOptimalDecision: computes whether BANK or CONTINUE was EV-maximizing.
+// Uses unbanked amount, current multiplier step index (0-5),
+// and estimated farkle risk (0.0-1.0 from remaining pool composition).
+// CONTINUE is optimal when expectedContinueValue > bankValue.
+// expectedContinueValue = unbanked * (1 - farkleRisk) * MULTIPLIER_STEPS[step + 1]
+// If step is already 5 (cap), CONTINUE EV = unbanked * (1 - farkleRisk) * 4.0
+export function isOptimalDecision(
+  decision: 'BANK' | 'CONTINUE',
+  unbanked: number,
+  multiplierStep: number,
+  estimatedFarkleRisk: number
+): boolean
+
+// estimateFarkleRisk: derives probability of a Farkle given pool state.
+// Simplified model: fewer face-1 and face-5 tiles remaining = higher risk.
+// face1Count and face5Count are current counts remaining in the live die pool.
+// totalRemaining is total live die pool size.
+// Returns 0.0-1.0. Baseline random risk is approximately 0.37.
+export function estimateFarkleRisk(
+  face1Count: number,
+  face5Count: number,
+  totalRemaining: number
+): number
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>TypeScript strict mode. No any. No unknown without narrowing.</constraint>
+        <constraint>No Math.random(). Pure deterministic functions only.</constraint>
+        <constraint>No imports from apps/ directories.</constraint>
+        <constraint>Export SessionAnalytics and ChainDecision interfaces — they are consumed by apps/server.</constraint>
+      </constraints>
+    </file>
+
+    <file path="apps/server/src/analytics.ts">
+      <description>
+        Supabase insert/query wrappers for session_analytics and chain_decisions tables.
+        Called by gameRoom.ts on every chain decision and session end.
+      </description>
+      <specification>
+        <![CDATA[
+// Import SessionAnalytics, ChainDecision from @farkle/engine/skillMetrics
+// Import supabase client (already exists or create via createClient from @supabase/supabase-js)
+// SUPABASE_URL and SUPABASE_SERVICE_KEY from process.env (root .env)
+
+// insertSession(session: Omit<SessionAnalytics, 'skill_score'>): Promise<void>
+//   Computes skill_score via computeSkillScore() before insert.
+//   Upserts on id conflict.
+
+// insertChainDecision(decision: ChainDecision): Promise<void>
+//   Inserts single row. Fire-and-forget — do NOT await in hot path.
+//   Wrap in try/catch, log error but never throw (analytics must never crash game).
+
+// getSkillPercentile(player_id: string): Promise<number>
+//   Queries avg skill_score for player across last 100 sessions.
+//   Returns 0.0-1.0. Used for legal reporting queries only.
+
+// getSkillDifferentialReport(): Promise<{ topDecile: number; bottomHalf: number; ratio: number }>
+//   Aggregates skill_score across all sessions.
+//   Returns avg final_score for top 10% vs bottom 50% of skill_score.
+//   This is the legal defense query. Must be fast — add index hint in comment.
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>Analytics inserts are fire-and-forget. Never block the game loop.</constraint>
+        <constraint>Use SUPABASE_SERVICE_KEY (not anon key) — writes require service role.</constraint>
+        <constraint>All functions wrapped in try/catch. Errors logged, never thrown.</constraint>
+        <constraint>No sql.js here — Supabase REST only. sql.js is for local session storage only.</constraint>
+      </constraints>
+    </file>
+
+  </new-files>
+
+  <modified-files>
+
+    <file path="packages/shared/src/types.ts">
+      <change type="append" anchor="// PATCH ANCHOR: types">
+        <![CDATA[
+// Add to existing types — do not replace any existing type
+export type { SessionAnalytics, ChainDecision } from '@farkle/engine/skillMetrics';
+
+// DecisionContext passed from client to server on every BANK/CONTINUE/PASS
+export interface DecisionContext {
+  decision: 'BANK' | 'CONTINUE' | 'PASS';
+  unbanked: number;
+  multiplierStep: number;
+  chainNumber: number;
+}
+        ]]>
+      </change>
+    </file>
+
+  </modified-files>
+
+  <supabase-migrations>
+    <migration name="001_skill_analytics">
+      <![CDATA[
+-- Run in Supabase SQL editor before first session
+
+CREATE TABLE IF NOT EXISTS session_analytics (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id       TEXT NOT NULL,
+  mode            TEXT NOT NULL,
+  seed_hash       TEXT NOT NULL,
+  started_at      TIMESTAMPTZ DEFAULT now(),
+  ended_at        TIMESTAMPTZ,
+  total_chains    INTEGER DEFAULT 0,
+  scoring_chains  INTEGER DEFAULT 0,
+  farkle_count    INTEGER DEFAULT 0,
+  banks_taken     INTEGER DEFAULT 0,
+  peak_multiplier NUMERIC DEFAULT 1.0,
+  final_banked    INTEGER DEFAULT 0,
+  final_score     INTEGER DEFAULT 0,
+  avg_chain_score NUMERIC DEFAULT 0,
+  skill_score     NUMERIC DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS chain_decisions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id      UUID REFERENCES session_analytics(id) ON DELETE CASCADE,
+  player_id       TEXT NOT NULL,
+  chain_number    INTEGER NOT NULL,
+  faces_played    INTEGER[] NOT NULL,
+  score_result    INTEGER NOT NULL,
+  multiplier_at   NUMERIC NOT NULL,
+  unbanked_before INTEGER NOT NULL,
+  decision        TEXT NOT NULL CHECK (decision IN ('CONTINUE','BANK','PASS','FARKLE')),
+  was_optimal     BOOLEAN NOT NULL,
+  timestamp       TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index for legal defense query performance
+CREATE INDEX idx_session_skill ON session_analytics(skill_score DESC);
+CREATE INDEX idx_session_player ON session_analytics(player_id, started_at DESC);
+CREATE INDEX idx_decisions_session ON chain_decisions(session_id);
+      ]]>
+    </migration>
+  </supabase-migrations>
+
+  <do-not>
+    <rule>Do not use better-sqlite3. Supabase REST only for analytics.</rule>
+    <rule>Do not await analytics inserts in the game hot path.</rule>
+    <rule>Do not import from framer-motion. Use motion/react.</rule>
+    <rule>Do not add Math.random() anywhere.</rule>
+    <rule>Do not modify farkleScorer.ts — skill metrics are separate from scoring.</rule>
+    <rule>Do not regenerate SpawnPool class — SixPoolManager is the pool implementation.</rule>
+    <rule>Do not add activeBombs array — bombs are Cell.type values in the grid.</rule>
+  </do-not>
+
+  <verification>
+    <check>npx tsc --noEmit returns 0 errors after applying</check>
+    <check>SessionAnalytics and ChainDecision are importable from @farkle/engine/skillMetrics</check>
+    <check>insertChainDecision does not throw when Supabase is unreachable</check>
+    <check>computeSkillScore returns value between 0.0 and 1.0</check>
+    <check>isOptimalDecision returns true for BANK when farkleRisk is 0.9</check>
+  </verification>
+
+</update>

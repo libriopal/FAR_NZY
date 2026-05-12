@@ -25,6 +25,7 @@ interface VoxelBodyData {
   health: number;        // lock/stone HP; 0 = broken
   isGhost: boolean;      // ghost bodies skip column constraint
   handle: number;
+  spawnedAt: number;     // Date.now() at spawn — used for bomb fuse countdown (C10)
 }
 
 export interface VoxelTransform {
@@ -33,6 +34,7 @@ export interface VoxelTransform {
   face: number | null;
   health: number;
   column: number;
+  spawnedAt: number;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number; w: number };
 }
@@ -41,6 +43,7 @@ export interface BombBlastResult {
   removedIds: string[];
   scoreGained: number;
   energyGained: number;
+  pushedSphereIds: string[];  // spheres shockwave-pushed but not destroyed
 }
 
 export interface StoneDestroyResult {
@@ -183,6 +186,7 @@ export class VoxelPhysicsSystem {
       face: resolvedFace, health,
       isGhost: entityType === 'ghost',
       handle: body.handle,
+      spawnedAt: Date.now(),
     });
 
     return id;
@@ -285,9 +289,9 @@ export class VoxelPhysicsSystem {
 
   // ── Bomb: blast radius ────────────────────────────────────────────────────
 
-  activateBomb(bombId: string): BombBlastResult & { stoneHits: StoneDestroyResult[] } {
+  activateBomb(bombId: string, targetFace?: number): BombBlastResult & { stoneHits: StoneDestroyResult[] } {
     const bombData = this.bodies.get(bombId);
-    const empty = { removedIds: [], scoreGained: 0, energyGained: 0, stoneHits: [] };
+    const empty = { removedIds: [], scoreGained: 0, energyGained: 0, stoneHits: [], pushedSphereIds: [] };
     if (!bombData || bombData.entityType !== 'bomb') return empty;
     const bombRb = this.world.getRigidBody(bombData.handle);
     if (!bombRb) return empty;
@@ -297,18 +301,35 @@ export class VoxelPhysicsSystem {
     const R = BOMB_CONSTANTS.STANDARD_RADIUS;
 
     const toRemove: string[] = [];
+    const pushedSpheres: string[] = [];
     const stoneHits: StoneDestroyResult[] = [];
-    let score = 0;
+    let score = BOMB_CONSTANTS.SELF_PTS;
     let energy = 0;
 
     for (const [id, data] of this.bodies) {
       if (id === bombId) continue;
+      // RAINMAKER face-targeted mode: global face match, skip radius/y checks for die entities
+      if (targetFace !== undefined) {
+        if ((data.entityType === 'die' || data.entityType === 'ice' || data.entityType === 'mirror') && data.face === targetFace) {
+          if (data.face === 1) score += BOMB_CONSTANTS.DIE_PTS_ONE;
+          else if (data.face === 5) score += BOMB_CONSTANTS.DIE_PTS_FIVE;
+          toRemove.push(id);
+        }
+        continue;
+      }
       if (Math.abs(data.column - bombCol) > R) continue;
       const rb = this.world.getRigidBody(data.handle);
       if (!rb || Math.abs(rb.translation().y - bombY) > 1.5) continue;
 
       switch (data.entityType) {
-        case 'sphere':         energy += BOMB_CONSTANTS.SPHERE_ENERGY; toRemove.push(id); break;
+        case 'sphere': {
+          // Spec: spheres are NOT destroyable — push away from blast center instead
+          const colDiff = data.column - bombCol;
+          const pushX = colDiff !== 0 ? Math.sign(colDiff) * 4.5 : (this.rng() > 0.5 ? 4.5 : -4.5);
+          rb.applyImpulse({ x: pushX, y: 3.8, z: (this.rng() - 0.5) * 1.2 }, true);
+          pushedSpheres.push(id);
+          break;
+        }
         case 'multiplier_orb': energy += BOMB_CONSTANTS.MULTIPLIER_ORB_ENERGY; toRemove.push(id); break;
         case 'lock':           score += BOMB_CONSTANTS.LOCK_PTS; toRemove.push(id); break;
         case 'wild':           score += BOMB_CONSTANTS.WILD_PTS; toRemove.push(id); break;
@@ -326,39 +347,49 @@ export class VoxelPhysicsSystem {
         case 'ice':
           data.entityType = 'die'; // thaw instead of remove
           break;
-        default: score += BOMB_CONSTANTS.DIE_PTS; toRemove.push(id); break;
+        case 'bomb':
+        case 'rainbow_bomb':
+          toRemove.push(id); // caught in blast, no score
+          break;
+        default:
+          // Farkle-consistent die scoring: 1s=100, 5s=50, others=0
+          if (data.face === 1) score += BOMB_CONSTANTS.DIE_PTS_ONE;
+          else if (data.face === 5) score += BOMB_CONSTANTS.DIE_PTS_FIVE;
+          toRemove.push(id);
+          break;
       }
     }
 
     this.removeBody(bombId);
     for (const id of toRemove) this.removeBody(id);
-    return { removedIds: [bombId, ...toRemove], scoreGained: score, energyGained: energy, stoneHits };
+    return { removedIds: [bombId, ...toRemove], scoreGained: score, energyGained: energy, stoneHits, pushedSphereIds: pushedSpheres };
   }
 
   // ── Rainbow Bomb ──────────────────────────────────────────────────────────
 
   activateRainbowBomb(bombId: string, targetFace?: number): BombBlastResult {
     const bombData = this.bodies.get(bombId);
-    const empty = { removedIds: [], scoreGained: 0, energyGained: 0 };
+    const empty = { removedIds: [], scoreGained: 0, energyGained: 0, pushedSphereIds: [] };
     if (!bombData || bombData.entityType !== 'rainbow_bomb') return empty;
 
     let face = targetFace;
     if (!face) {
-      const counts: Record<number, number> = {};
+      // Collect all face values currently in play, then pick one at random
+      const inPlay = new Set<number>();
       for (const [, d] of this.bodies) {
         if ((d.entityType === 'die' || d.entityType === 'ice' || d.entityType === 'mirror') && d.face) {
-          counts[d.face] = (counts[d.face] ?? 0) + 1;
+          inPlay.add(d.face);
         }
       }
-      let max = 0;
-      for (const [f, c] of Object.entries(counts)) {
-        if (c > max) { max = c; face = Number(f); }
+      const candidates = [...inPlay];
+      if (candidates.length > 0) {
+        face = candidates[Math.floor(this.rng() * candidates.length)];
       }
     }
 
     if (!face) {
       this.removeBody(bombId);
-      return { removedIds: [bombId], scoreGained: 0, energyGained: 0 };
+      return { removedIds: [bombId], scoreGained: 0, energyGained: 0, pushedSphereIds: [] };
     }
 
     const toRemove: string[] = [];
@@ -367,13 +398,29 @@ export class VoxelPhysicsSystem {
       if (id === bombId) continue;
       if ((data.entityType === 'die' || data.entityType === 'ice' || data.entityType === 'mirror') && data.face === face) {
         toRemove.push(id);
-        score += BOMB_CONSTANTS.DIE_PTS;
+        // Farkle-consistent scoring: 1s=100, 5s=50, others=0
+        if (data.face === 1) score += BOMB_CONSTANTS.DIE_PTS_ONE;
+        else if (data.face === 5) score += BOMB_CONSTANTS.DIE_PTS_FIVE;
       }
     }
 
     this.removeBody(bombId);
     for (const id of toRemove) this.removeBody(id);
-    return { removedIds: [bombId, ...toRemove], scoreGained: score, energyGained: 0 };
+    return { removedIds: [bombId, ...toRemove], scoreGained: score, energyGained: 0, pushedSphereIds: [] };
+  }
+
+  // ── Sphere resnap after shockwave push ───────────────────────────────────────
+
+  resnap(bodyId: string): void {
+    const data = this.bodies.get(bodyId);
+    if (!data) return;
+    const rb = this.world.getRigidBody(data.handle);
+    if (!rb) return;
+    const targetX = COLUMN_X[data.column] ?? (data.column - 3);
+    const pos = rb.translation();
+    rb.setLinvel({ x: 0, y: Math.max(0, rb.linvel().y), z: 0 }, true);
+    rb.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    rb.setTranslation({ x: targetX, y: pos.y, z: pos.z }, true);
   }
 
   // ── Mirror: resolve effective face in a chain ─────────────────────────────
@@ -414,6 +461,7 @@ export class VoxelPhysicsSystem {
         face: data.face,
         health: data.health,
         column: data.column,
+        spawnedAt: data.spawnedAt,
         position: { x: t.x, y: t.y, z: t.z },
         rotation: { x: r.x, y: r.y, z: r.z, w: r.w },
       });
@@ -424,6 +472,25 @@ export class VoxelPhysicsSystem {
   getColumnOfBody(id: string): number { return this.bodies.get(id)?.column ?? -1; }
   getEntityType(id: string): EntityType | null { return this.bodies.get(id)?.entityType ?? null; }
   getHealth(id: string): number { return this.bodies.get(id)?.health ?? 0; }
+
+  getWildCount(): number {
+    let n = 0;
+    for (const [, d] of this.bodies) { if (d.entityType === 'wild') n++; }
+    return n;
+  }
+
+  // C4: Wild Scatter — destroys all 'die' tiles whose face is in the provided set.
+  destroyBodiesByFace(faces: number[]): string[] {
+    const faceSet = new Set(faces);
+    const toDestroy: string[] = [];
+    for (const [id, data] of this.bodies) {
+      if (data.entityType === 'die' && data.face !== null && faceSet.has(data.face)) {
+        toDestroy.push(id);
+      }
+    }
+    for (const id of toDestroy) this.removeBody(id);
+    return toDestroy;
+  }
 
   sendDisruption(targetColumns: number[], type: 'ice_send' | 'lock_send' | 'scramble'): void {
     for (const col of targetColumns) {

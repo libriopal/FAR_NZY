@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<claude_code_prompt>
+    
+    <system_role>
+        You are implementing a polished arcade-style bomb, shockwave, physics, and VFX system for a grid/tile puzzle game.
+        
+        Prioritize:
+        - gameplay readability
+        - satisfying feedback
+        - optimized rendering
+        - smooth animation timing
+        - mobile performance
+        - clean architecture
+        - reusable systems
+        - object pooling
+        - deterministic gameplay behavior
+    </system_role>
+
+    <gameplay_objects>
+
+        <regular_bomb>
+            
+            <idle_state>
+                <appearance>
+                    <sphere_color>#111111</sphere_color>
+                    <material>glossy_dark_charcoal</material>
+                    <flash_color>red</flash_color>
+                    <flash_behavior>subtle_pulse</flash_behavior>
+                </appearance>
+
+                <particles>
+                    <smoke type="soft_gray_smoke"/>
+                </particles>
+
+                <audio>
+                    <tick_sound pitch="low" style="mechanical"/>
+                </audio>
+
+            </idle_state>
+
+            <detonation>
+
+                <tile_destruction>
+                    <pattern>3x3_centered</pattern>
+                    <tile_count>9</tile_count>
+
+                    <pre_destroy_feedback>
+                        <tile_glow color="red" duration="0.05-0.12"/>
+                    </pre_destroy_feedback>
+                </tile_destruction>
+
+                <visuals>
+                    <sphere_color>solid_red</sphere_color>
+                    <expand>true</expand>
+                    <transparency>0.5-0.7</transparency>
+                    <fade_during_expansion>true</fade_during_expansion>
+                    <blend_mode>additive</blend_mode>
+                    <edge_style>soft_alpha</edge_style>
+                    <bloom>true</bloom>
+                </visuals>
+
+                <audio>
+                    <explosion type="heavy" bass="strong"/>
+                </audio>
+
+                <camera>
+                    <screen_shake intensity="strong"/>
+                </camera>
+
+                <particles>
+                    <post_explosion>
+                        <particle_colors>
+                            <color>orange</color>
+                            <color>yellow</color>
+                            <color>red</color>
+                            <color>gray</color>
+                        </particle_colors>
+
+                        <behavior>
+                            <drift>true</drift>
+                            <fade>true</fade>
+                            <random_velocity>true</random_velocity>
+                            <random_lifetime>true</random_lifetime>
+                        </behavior>
+                    </post_explosion>
+                </particles>
+
+            </detonation>
+
+        </regular_bomb>
+
+        <rainbow_bomb>
+
+            <idle_state>
+
+                <appearance>
+                    <sphere_color>off_white_pearl</sphere_color>
+                    <spectrum_highlights>true</spectrum_highlights>
+                    <rainbow_flicker>true</rainbow_flicker>
+                </appearance>
+
+                <particles>
+                    <smoke type="rainbow_smoke"/>
+                </particles>
+
+                <audio>
+                    <tick_sound pitch="slightly_high" style="magical"/>
+                </audio>
+
+            </idle_state>
+
+            <detonation>
+
+                <selection_logic>
+                    <select_random_active_tile_type>true</select_random_active_tile_type>
+                </selection_logic>
+
+                <behavior>
+                    <transform_to_selected_color>true</transform_to_selected_color>
+                    <expand_to_full_board>true</expand_to_full_board>
+                    <retain_rainbow_flicker>true</retain_rainbow_flicker>
+                </behavior>
+
+                <tile_targeting>
+                    <destroy_matching_tiles_only>true</destroy_matching_tiles_only>
+
+                    <pre_destroy_feedback>
+                        <glow_selected_tiles>true</glow_selected_tiles>
+                        <glow_color>selected_color</glow_color>
+                        <duration>0.05-0.12</duration>
+                    </pre_destroy_feedback>
+                </tile_targeting>
+
+                <scoring_rules>
+
+                    <rule>
+                        <tile_type>one</tile_type>
+                        <points_per_tile>100</points_per_tile>
+                    </rule>
+
+                    <rule>
+                        <tile_type>five</tile_type>
+                        <points_per_tile>50</points_per_tile>
+                    </rule>
+
+                    <default_rule>
+                        <points_per_tile>0</points_per_tile>
+                    </default_rule>
+
+                </scoring_rules>
+
+                <visuals>
+                    <transparency>0.5-0.7</transparency>
+                    <fade_during_expansion>true</fade_during_expansion>
+                    <blend_mode>soft_additive</blend_mode>
+                    <style>magical_elegant</style>
+                </visuals>
+
+                <audio>
+                    <explosion type="soft_magical"/>
+                </audio>
+
+                <camera>
+                    <screen_shake intensity="minimal"/>
+                    <screen_tint>selected_color</screen_tint>
+                </camera>
+
+                <particles>
+                    <post_explosion>
+                        <particle_colors>
+                            <color>rainbow_spectrum</color>
+                        </particle_colors>
+
+                        <behavior>
+                            <drift>true</drift>
+                            <fade>true</fade>
+                        </behavior>
+                    </post_explosion>
+                </particles>
+
+            </detonation>
+
+        </rainbow_bomb>
+
+        <green_energy_spheres>
+
+            <core_behavior>
+                <destroyable>false</destroyable>
+            </core_behavior>
+
+            <shockwave_reaction>
+
+                <physics_response>
+                    <affected_by_bombs>true</affected_by_bombs>
+                    <force_direction>away_from_blast_center</force_direction>
+                    <distance_falloff>true</distance_falloff>
+                    <motion_style>smooth_floaty</motion_style>
+                    <controlled_damping>true</controlled_damping>
+                </physics_response>
+
+                <grid_resnap>
+
+                    <enabled>true</enabled>
+
+                    <behavior>
+                        <snap_to_nearest_valid_tile>true</snap_to_nearest_valid_tile>
+                        <interpolation>smooth</interpolation>
+                        <easing>soft</easing>
+                        <avoid_teleporting>true</avoid_teleporting>
+                        <maintain_grid_alignment>true</maintain_grid_alignment>
+                    </behavior>
+
+                </grid_resnap>
+
+            </shockwave_reaction>
+
+        </green_energy_spheres>
+
+    </gameplay_objects>
+
+    <shared_systems>
+
+        <particle_system>
+
+            <optimization>
+                <gpu_friendly>true</gpu_friendly>
+                <object_pooling>true</object_pooling>
+                <low_allocation>true</low_allocation>
+            </optimization>
+
+            <motion>
+                <noise_turbulence>true</noise_turbulence>
+                <smooth_alpha_fades>true</smooth_alpha_fades>
+            </motion>
+
+        </particle_system>
+
+        <animation_timing>
+
+            <pre_flash>0.08-0.15</pre_flash>
+            <tile_glow_preview>0.05-0.12</tile_glow_preview>
+            <expansion>0.25-0.45</expansion>
+            <particle_linger>0.5-1.2</particle_linger>
+
+        </animation_timing>
+
+        <shader_requirements>
+
+            <fresnel_glow>true</fresnel_glow>
+            <emissive_pulse>true</emissive_pulse>
+            <radial_alpha>true</radial_alpha>
+            <additive_emission>true</additive_emission>
+            <spectrum_shader>true</spectrum_shader>
+
+        </shader_requirements>
+
+        <performance_requirements>
+
+            <mobile_optimized>true</mobile_optimized>
+            <low_overdraw>true</low_overdraw>
+            <supports_chain_reactions>true</supports_chain_reactions>
+
+        </performance_requirements>
+
+    </shared_systems>
+
+    <desired_feel>
+
+        <regular_bomb>
+            heavy dangerous explosive physical satisfying
+        </regular_bomb>
+
+        <rainbow_bomb>
+            magical elegant strategic rewarding rare
+        </rainbow_bomb>
+
+        <green_energy_spheres>
+            reactive dynamic physical smooth
+        </green_energy_spheres>
+
+    </desired_feel>
+
+</claude_code_prompt>

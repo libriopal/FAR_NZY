@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-41" name="EnergyMeter + FrenzyOverlay Components" block="C" priority="MEDIUM">
+
+  <context>
+    EnergyMeter renders in the EnergyBar zone (48px, full width, below TopBar).
+    FrenzyOverlay renders over the grid during FRENZY mode.
+    Both consume EnergyState from useEnergy hook.
+    Visual direction: actual 3D modern. Real depth, lighting, physical feel.
+    All animations via motion/react (NOT framer-motion).
+    Pure ASCII characters only — no emoji in source files (Termux arm64/esbuild constraint).
+  </context>
+
+  <dependencies>
+    <dep status="required">update-39 complete — useEnergy.ts and EnergyState exist</dep>
+    <dep status="complete">Tailwind v4 — utility classes available</dep>
+  </dependencies>
+
+  <new-files>
+
+    <file path="apps/client/src/components/EnergyMeter.tsx">
+      <specification>
+        <![CDATA[
+// Props:
+//   energy: number         (0-300)
+//   globalMode: 'PRIME' | 'FRENZY'
+//   isInstability: boolean
+//   isCatchup: boolean
+//   playerEnergies?: number[]  (multiplayer: array of all player energy values)
+
+// Layout: full-width bar, 48px height, sits in EnergyBar zone.
+// Single gradient bar that fills left-to-right.
+// FRENZY_THRESHOLD (150) marked with a visible tick at the 50% position.
+
+// Color scheme:
+//   PRIME zone (0-150): zinc-700 → amber-500 gradient fill
+//   FRENZY zone (151-300): amber-500 → violet-500 gradient fill
+//   Instability state: bar pulses red at 1.5Hz using motion/react keyframes
+//   Catchup state: bar has a blue shimmer overlay indicating catch-up active
+
+// Text overlay (font-mono, font-bold):
+//   Left: current mode label — "PRIME" or "FRENZY"
+//   Right: energy value as integer
+//   Center: when crossing threshold, brief flash "FRENZY ACTIVE" text
+
+// Multiplayer: if playerEnergies provided, render small per-player energy dots
+//   above the main bar. Each dot is 8px, colored by player index color.
+
+// Animation:
+//   Bar width animates via motion/react with spring damping (not linear)
+//   FRENZY_THRESHOLD tick mark has a subtle glow when energy is near it
+//   On FRENZY trigger: bar flashes white for 200ms then settles into violet
+
+// Accessibility: aria-label="Energy meter: {energy} of 300, {globalMode} mode"
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>No emoji characters in source. Use text labels only.</constraint>
+        <constraint>motion/react for all animations — not framer-motion.</constraint>
+        <constraint>Pure ASCII source file — no box-drawing or special characters.</constraint>
+        <constraint>No Math.random() — no procedural effects.</constraint>
+      </constraints>
+    </file>
+
+    <file path="apps/client/src/components/FrenzyOverlay.tsx">
+      <specification>
+        <![CDATA[
+// Props:
+//   isActive: boolean
+//   isInstability: boolean
+
+// Renders as an absolutely positioned overlay over the grid div.
+// pointer-events: none — never blocks game interaction.
+// z-index above grid tiles but below chain selection rings.
+
+// FRENZY active state:
+//   Subtle violet gradient border around the grid (4px, animated opacity 0.4-0.8)
+//   Corner accent marks (CSS only, no images) — right-angle bracket shapes
+//   "FRENZY" text badge at top-center of grid in amber, font-mono, font-black
+//   Overlay background: rgba(139, 92, 246, 0.04) — barely visible tint
+
+// INSTABILITY state (isInstability = true):
+//   Border color shifts from violet to red
+//   Badge text changes to "INSTABILITY" and pulses
+//   Background tint shifts to rgba(239, 68, 68, 0.06)
+
+// Entry animation (isActive becomes true):
+//   Border fades in over 300ms
+//   Badge slides down from -20px with opacity 0 to position with opacity 1
+//   Use motion/react AnimatePresence for mount/unmount
+
+// Exit animation (isActive becomes false):
+//   All elements fade out over 200ms simultaneously
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>pointer-events: none on the entire overlay — never blocks input.</constraint>
+        <constraint>motion/react AnimatePresence for mount/unmount.</constraint>
+        <constraint>No emoji. No non-ASCII characters.</constraint>
+        <constraint>No Math.random() for animation parameters.</constraint>
+      </constraints>
+    </file>
+
+  </new-files>
+
+  <do-not>
+    <rule>Do not use framer-motion — use motion/react.</rule>
+    <rule>Do not add pointer-events to overlay — it must be none.</rule>
+    <rule>Do not use emoji characters in source files.</rule>
+    <rule>Do not use Math.random() for visual effects.</rule>
+    <rule>Do not import from apps/server or packages/engine — UI only.</rule>
+  </do-not>
+
+  <verification>
+    <check>FrenzyOverlay does not block pointer events on grid tiles</check>
+    <check>EnergyMeter renders correctly at energy=0, energy=150, energy=300</check>
+    <check>Instability state visually distinct from normal FRENZY state</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+    <check>No framer-motion import present in either file</check>
+  </verification>
+
+</update>

@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<research_brief
+  id="farkle-frenzy-pass-3"
+  version="3.0"
+  type="gap-fill"
+  depends_on="pass-1 pass-2"
+  priority="CRITICAL">
+
+  <!--
+  ═══════════════════════════════════════════════════════════════════
+  WHAT THIS FILE IS
+  ═══════════════════════════════════════════════════════════════════
+
+  This is Research Pass 3 for Match-3 Farkle Frenzy — a browser-based
+  casino-grade puzzle game that fuses match-3 spatial mechanics with
+  Farkle dice scoring. Two prior research passes were conducted and
+  returned incomplete output. This file contains:
+
+    1. CONTEXT    — What the game is, what decisions are still open,
+                    what the researcher must not assume.
+    2. GAPS       — Exactly what the prior passes failed to produce.
+    3. STEPS      — Six targeted research steps covering only what
+                    is missing. Do not re-research completed steps.
+    4. PREBRIEF   — Ten pre-answered clarification questions embedded
+                    directly so no assumption survives to the output.
+    5. SYNTHESIS  — Four named deliverables with explicit input mapping.
+
+  EFFICIENCY DIRECTIVES (read before beginning):
+    - Steps are dependency-ordered. Steps 1-5 are independent and
+      may be parallelized. Step 6 (math) is independent of 1-5.
+      Step 7 (synthesis) requires all prior steps complete.
+    - Each step declares its VERDICT_TYPE so the output format
+      is unambiguous before research begins.
+    - PRIOR_ART_THRESHOLD is declared per novelty claim so the
+      researcher does not have to infer what constitutes a match.
+    - All deliverables declare their SCHEMA so output is machine-
+      parseable and directly usable by the development pipeline.
+
+  ═══════════════════════════════════════════════════════════════════
+  -->
+
+  <!-- ═══════════════════════════════════════════════
+       MANDATORY PRE-READ — PROCESS BEFORE ANY STEP
+  ═══════════════════════════════════════════════ -->
+  <preread mandatory="true" order="first">
+
+    <instruction>Read this entire preread block before beginning any
+    research step. Every open question listed here is still open.
+    Every constraint listed here is still active. Findings from
+    prior passes that conflict with these definitions must be flagged,
+    not silently resolved in the game's favor.</instruction>
+
+    <game_identity>
+      <name>Match-3 Farkle Frenzy</name>
+      <platform>browser, mobile-first</platform>
+      <genre>casino-grade hybrid puzzle</genre>
+      <core_fusion>
+        Spatial match-3 drag-chain mechanics (select adjacent tiles
+        on a grid by dragging) FUSED WITH Farkle dice scoring
+        (the face values of selected tiles ARE the dice rolled).
+        These are not adjacent systems. One drag-chain action
+        simultaneously clears board tiles AND evaluates a Farkle
+        combination. This is the central design claim.
+      </core_fusion>
+    </game_identity>
+
+    <open_questions>
+
+      <question id="OQ1" section="B" status="UNRESOLVED">
+        <text>Should singleplayer Farkle events carry any partial
+        recovery mechanic?</text>
+        <current_state>Hard negative. Board shakes. Unbanked resets
+        to zero. Multiplier resets to x1.0. No redemption path.
+        Banked points are untouched.</current_state>
+        <what_is_needed>A recommendation grounded in research —
+        not a summary of what other games do. Does hard failure
+        produce more memorable sessions than softened failure?
+        Compare Balatro (full run ends), Yahtzee (single turn lost,
+        game continues), Candy Crush (lives gate). The answer
+        is NOT decided. Research must decide it.</what_is_needed>
+      </question>
+
+      <question id="OQ2" section="B" status="CONSTRAINT">
+        <text>There is no decision timer on Continue/Bank/Pass.</text>
+        <current_state>The active player can deliberate indefinitely.
+        The 3-second reaction window applies only to non-active
+        players voting. Energy meter drains passively in Frenzy mode
+        but that is not a decision timer — it is a resource cost.</current_state>
+        <constraint>Do not recommend adding a decision timer without
+        explicit evidence that untimed decisions produce worse
+        engagement than timed ones in comparable push-your-luck games.
+        The default assumption is untimed. Burden of proof is on
+        recommending a timer, not on keeping the current state.</constraint>
+      </question>
+
+      <question id="OQ3" section="B" status="CONSTRAINT">
+        <text>Pass cannot be refused.</text>
+        <current_state>When a player Passes in Rally mode, the
+        incoming player inherits board state, full unbanked total,
+        and current multiplier step. No decline mechanic exists.
+        The 3-second reaction window allows voluntary signaling
+        (hold thumbs-down = "pass to me") but does not allow refusal
+        of an incoming pass.</current_state>
+        <constraint>This is intentional design. Do not recommend
+        a refusal mechanic without explicit evidence it would
+        improve team dynamics in comparable cooperative games.</constraint>
+      </question>
+
+      <question id="OQ4" section="C" status="CONSTRAINT">
+        <text>All role synergies are emergent — no hardcoded
+        cross-role interactions exist.</text>
+        <current_state>Conductor passing to Rainmaker at x3.0 so
+        Rainmaker receives x4.0 is the strongest synergy in the game.
+        It is entirely emergent from the Pass mechanic and timing.
+        There is no coded bonus for using both roles together.
+        This is not a bug. It is the current design.</current_state>
+        <constraint>The research must rule on whether hardcoded
+        synergies should be ADDED. Do not describe emergent synergies
+        as if they are hardcoded. The prior pass made this error.</constraint>
+      </question>
+
+      <question id="OQ5" section="C" status="OPEN_HYPOTHESIS">
+        <text>Suspected role imbalance at high skill levels.</text>
+        <developer_hypothesis>
+          Conductor: near-mandatory (compounding benefit on every Pass
+          is too efficient to skip at high skill).
+          Archivist: undervalued (value collapses when skilled teams
+          rarely Farkle, keeping the pool small).
+          Headhunter: situational (power scales with Stone blocker
+          density, which is a lobby configuration setting).
+          Rainmaker: highest ceiling, lowest floor (Straight chains
+          are rare, so ability fires infrequently).
+        </developer_hypothesis>
+        <constraint>Confirm or refute each hypothesis with named
+        evidence from benchmark games. Do not validate hypotheses
+        by restating them. Do not refute them without counter-evidence.</constraint>
+      </question>
+
+      <question id="OQ6" section="F" status="CONSTRAINT">
+        <text>Do not soften novelty refutations.</text>
+        <constraint>If research reveals a claimed novelty is not novel,
+        state this directly with the counter-evidence and the name
+        of the game that constitutes prior art. False confirmation
+        of novelty wastes more development resources than accurate
+        negation does. This instruction overrides any diplomatic
+        impulse to hedge or partially confirm a refuted claim.</constraint>
+      </question>
+
+    </open_questions>
+
+    <carry_forward_findings>
+      <!-- Confirmed useful findings from passes 1 and 2.
+           Do not re-research these. Build on them. -->
+      <finding id="CF1" source="pass-2" confidence="HIGH">
+        Pandemic: On the Brink Archivist has hand limit 8 and can
+        retrieve discarded city cards. This is a candidate partial
+        prior art for Novelty Claim 3. One element (designated
+        recovery role) is present. Whether the shared-loss-buffer
+        element is also present requires verification in step 4.
+      </finding>
+      <finding id="CF2" source="pass-2" confidence="HIGH">
+        Overwatch Lucio and Brigitte function as Conductor benchmarks
+        via "skill-to-value curve" — value only realized through
+        positional mastery, not raw output.
+      </finding>
+      <finding id="CF3" source="pass-2" confidence="HIGH">
+        Balatro: additive modifiers (+Mult) process before
+        multiplicative modifiers (xMult). This processing order
+        is what makes high-value Joker builds feel exponential.
+        Applicable to Farkle's multiplier ladder feel.
+      </finding>
+      <finding id="CF4" source="pass-2" confidence="MEDIUM">
+        Bust rates cited (66.7% at 1 die, 44.4% at 2 dice, 15.7%
+        at 4 dice) are from independent dice probability model —
+        NOT from the 60-tile pool model. These figures are incorrect
+        for Farkle Frenzy and must be recalculated in step 6.
+      </finding>
+      <finding id="CF5" source="pass-1" confidence="HIGH">
+        Slay the Spire: skilled winners embrace 1.82x more randomness
+        (Entropic options) than losers. High-level play is adaptive
+        agency, not randomness elimination. Supports keeping spawn
+        pool variance high rather than tightening it.
+      </finding>
+      <finding id="CF6" source="pass-1" confidence="HIGH">
+        Hades: Mirror of Night converts failed run currency into
+        permanent upgrades. Failure becomes anticipation, not
+        frustration. Primary template for any singleplayer
+        redemption mechanic if OQ1 recommends one.
+      </finding>
+    </carry_forward_findings>
+
+  </preread>
+
+  <!-- ═══════════════════════════════════════════════
+       GAP DECLARATION
+       What the prior passes failed to produce.
+       Steps below address exactly these gaps.
+  ═══════════════════════════════════════════════ -->
+  <gaps>
+    <gap id="G1" severity="CRITICAL">
+      Novelty claims 1-4 were never researched. Steps 2-5 of the
+      follow-up plan produced zero output. No verdicts exist.
+    </gap>
+    <gap id="G2" severity="HIGH">
+      Per-role scorecard was not produced. Prior pass gave qualitative
+      descriptions only. No Legibility / Strategic Depth / Synergy
+      Potential / Uniqueness ratings exist for any of the four roles.
+    </gap>
+    <gap id="G3" severity="HIGH">
+      Bust probability data uses standard independent dice model,
+      not the 60-tile pool model. The figures are wrong for this game.
+      No corrected table exists.
+    </gap>
+    <gap id="G4" severity="HIGH">
+      EV inflection point calculation was not completed. The hardest
+      Continue/Bank decision points have not been identified.
+    </gap>
+    <gap id="G5" severity="MEDIUM">
+      Open question OQ1 (singleplayer Farkle redemption) was never
+      engaged. Prior passes treated it as settled. A recommendation
+      is required.
+    </gap>
+  </gaps>
+
+  <!-- ═══════════════════════════════════════════════
+       RESEARCH STEPS
+       Steps 1-6 are independent (parallelizable).
+       Step 7 requires all prior steps complete.
+  ═══════════════════════════════════════════════ -->
+  <steps>
+
+    <!-- ─────────────────────────────────────────
+         STEP 1 — ROLE SCORECARD
+         Addresses: G2
+         Parallelizable: YES
+    ───────────────────────────────────────── -->
+    <step id="1" title="Role Scorecard" gap_ref="G2" parallel="yes">
+
+      <instruction>Apply the Pandemic, Overwatch, Puzzle and Dragons,
+      and Rocket League benchmarks already completed in passes 1 and 2
+      to produce scored entries for all four Farkle roles. Where
+      benchmark evidence is insufficient, conduct targeted additional
+      research as specified below.</instruction>
+
+      <targeted_research>
+
+        <research id="1a" role="ARCHIVIST">
+          <question>Does the Pandemic On the Brink Archivist role
+          become less valuable at high skill levels when teams play
+          aggressively and rarely discard cards they need?</question>
+          <apply_to>Farkle Archivist, whose 15%-per-chain pool recovery
+          becomes near-worthless when a skilled team rarely Farkles and
+          the Farkle Pool stays near zero.</apply_to>
+          <hypothesis_to_test ref="OQ5">Archivist undervalued at
+          high skill. Confirm or refute with Pandemic evidence.</hypothesis_to_test>
+        </research>
+
+        <research id="1b" role="CONDUCTOR">
+          <question>Do Lucio or Brigitte in Overwatch create near-mandatory
+          pick patterns at high competitive ranks? If yes, what design
+          interventions were used or proposed?</question>
+          <apply_to>Farkle Conductor, which adds one multiplier step
+          on every Pass — a compounding benefit that applies on every
+          turn transition and may be too efficient to skip at high skill.</apply_to>
+          <hypothesis_to_test ref="OQ5">Conductor near-mandatory.
+          Confirm or refute with Overwatch evidence.</hypothesis_to_test>
+        </research>
+
+        <research id="1c" role="RAINMAKER">
+          <question>In cooperative games with high-ceiling/low-floor roles,
+          does infrequent ability activation kill engagement or amplify it?
+          (The Rainmaker's ability fires only on Straight chains — the rarest
+          6-tile combination in the scoring table.)</question>
+          <find>Games where a role's defining ability fires rarely but
+          produces outsized payoff when it does. How do players sustain
+          engagement during the stretches where their role is inactive?</find>
+        </research>
+
+        <research id="1d" role="HEADHUNTER">
+          <question>In cooperative games, do roles whose value scales with
+          external session configuration feel specialized or broken?</question>
+          <context>Headhunter destroys Stone Blockers in one hit instead of
+          two. Stone Blocker density is a lobby setting (LOW / MEDIUM / HIGH).
+          On LOW density, Headhunter has almost nothing to do. On HIGH density,
+          it is the most impactful role on the board. The player cannot change
+          this after the session begins.</context>
+          <find>Cases where a role's power was configuration-dependent and
+          how those games communicated this dependency to players at
+          selection time.</find>
+        </research>
+
+      </targeted_research>
+
+      <scorecard_schema>
+        <!-- Output must match this schema exactly -->
+        <role name="[ROLE_NAME]">
+          <rating dimension="Legibility"       value="[LOW|MEDIUM|HIGH]" evidence="[one line]"/>
+          <rating dimension="StrategicDepth"   value="[LOW|MEDIUM|HIGH]" evidence="[one line]"/>
+          <rating dimension="SynergyPotential" value="[LOW|MEDIUM|HIGH]" evidence="[one line]"/>
+          <rating dimension="Uniqueness"       value="[LOW|MEDIUM|HIGH]" evidence="[one line]"/>
+          <hypothesis_verdict ref="OQ5" value="[CONFIRMED|REFUTED|PARTIAL]" evidence="[named source]"/>
+          <improvement_recommendation cost="[LOW|MEDIUM|MAJOR_REWORK]" text="[recommendation]"/>
+        </role>
+      </scorecard_schema>
+
+      <synergy_ruling required="yes">
+        Produce a ruling: should hardcoded cross-role synergies be added,
+        or is emergent synergy sufficient? Ground the ruling in benchmark
+        findings. Do not describe current emergent synergies as if they
+        are hardcoded — this error occurred in pass 2 and must not recur.
+        Reference OQ4 before writing this section.
+      </synergy_ruling>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 2 — NOVELTY CLAIM 1
+         Skill-expressed RTP above 100%
+         Addresses: G1
+         Parallelizable: YES
+    ───────────────────────────────────────── -->
+    <step id="2" title="Novelty Claim 1 — Skill-Expressed RTP" gap_ref="G1" parallel="yes">
+
+      <claim id="NC1" confidence="HIGH">
+        Skilled players can provably push RTP above 100% through the
+        game's intended design mechanics — not through exploits, not
+        through card-counting equivalents, not through temporary promotions.
+        The 102% ceiling is built into the base game design.
+      </claim>
+
+      <search_scope>
+        Non-blockchain consumer browser or mobile casino games.
+        Release date: 2010 to present.
+        Exclusions: professional gambling training tools, strategy simulators,
+        games where 100%+ RTP is achieved only through a bonus/promotion,
+        games where the mechanic is an unintended exploit.
+      </search_scope>
+
+      <prior_art_threshold>
+        A game constitutes prior art ONLY if ALL of the following are true:
+        (a) It is a casino game with real or virtual monetary stakes.
+        (b) Expert play, using the game's intended mechanics, can push
+            expected RTP above 100% over a sufficient sample size.
+        (c) This property is part of the base game design, not a loophole.
+        (d) The game is consumer-facing (not a professional tool).
+      </prior_art_threshold>
+
+      <verdict_type>CONFIRMED | PARTIALLY_CONFIRMED | REFUTED</verdict_type>
+      <document_search_methodology>yes — regardless of outcome</document_search_methodology>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 3 — NOVELTY CLAIM 2
+         Spatial Dice — single action, no separate roll
+         Addresses: G1
+         Parallelizable: YES
+    ───────────────────────────────────────── -->
+    <step id="3" title="Novelty Claim 2 — Spatial Dice" gap_ref="G1" parallel="yes">
+
+      <claim id="NC2" confidence="HIGH">
+        The tiles a player chains ARE the dice they roll. Spatial position
+        determines which values are evaluated. No separate dice-rolling step
+        exists. Board position determines both the dice rolled AND the
+        resulting board state after commit.
+      </claim>
+
+      <search_scope>All gaming platforms. All release dates.</search_scope>
+
+      <prior_art_threshold>
+        A game constitutes prior art ONLY if ALL of the following are true:
+        (a) Players select or chain tiles spatially on a grid or board.
+        (b) The face values of those tiles are evaluated against a defined
+            Farkle-style combination table (Three of a Kind, Straight, etc.)
+            — NOT against a simple match-by-color or match-by-type rule.
+        (c) Both (a) and (b) occur in the SAME committed action with no
+            intermediate dice-rolling step between selection and scoring.
+
+        NOT prior art:
+        - Match-3 games with color matching only (no face-value evaluation).
+        - Games with match-3 mechanics AND a separate adjacent dice minigame.
+        - Games where dice values are assigned randomly to tiles after selection.
+      </prior_art_threshold>
+
+      <verdict_type>CONFIRMED | PARTIALLY_CONFIRMED | REFUTED</verdict_type>
+      <partial_confirmed_instruction>
+        If PARTIALLY_CONFIRMED: specify which element is present (spatial
+        selection OR combination scoring) and which is absent.
+      </partial_confirmed_instruction>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 4 — NOVELTY CLAIM 3
+         Farkle Pool + Designated Recovery Role
+         Addresses: G1
+         Parallelizable: YES
+    ───────────────────────────────────────── -->
+    <step id="4" title="Novelty Claim 3 — Farkle Pool and Recovery Role" gap_ref="G1" parallel="yes">
+
+      <claim id="NC3" confidence="MEDIUM">
+        Points lost to Farkle events flow into a shared loss-buffer
+        (the Farkle Pool). A dedicated role (Archivist) has the explicit
+        primary ability of recovering 15% of that pool per scoring chain.
+        Both elements must be present and structurally linked.
+      </claim>
+
+      <candidate_prior_art id="CPA1" source="pass-2" status="UNVERIFIED">
+        Pandemic: On the Brink Archivist role has a hand limit of 8 and
+        can retrieve discarded city cards. Confirmed: designated recovery
+        role exists. UNVERIFIED: whether a shared loss-buffer that
+        accumulates specifically from failure events is also present.
+        This must be resolved in this step.
+      </candidate_prior_art>
+
+      <mandatory_sources>
+        Spirit Island | Arkham Horror: The Card Game |
+        Gloomhaven | Aeon's End | Pandemic: On the Brink (resolve CPA1)
+      </mandatory_sources>
+
+      <prior_art_threshold>
+        Prior art requires ALL of the following simultaneously:
+        (a) A shared resource buffer that accumulates from failure events
+            (not a general shared resource pool that exists at all times).
+        (b) A dedicated player role whose PRIMARY defined ability specifically
+            drains or recovers from that buffer (not a role that can
+            optionally interact with it as a secondary effect).
+        (c) Both (a) and (b) are structurally linked — the buffer only
+            has value because of the role, and the role's primary identity
+            is defined by the buffer.
+
+        Element (a) alone is not prior art.
+        Element (b) alone is not prior art.
+        Both elements present but not linked is PARTIALLY_CONFIRMED.
+      </prior_art_threshold>
+
+      <verdict_type>CONFIRMED | PARTIALLY_CONFIRMED | REFUTED</verdict_type>
+      <partial_confirmed_instruction>
+        Name the game. Specify which element is present. Specify which
+        element is absent or structurally unlinked.
+      </partial_confirmed_instruction>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 5 — NOVELTY CLAIM 4
+         Pass with Inherited Full Liability
+         Addresses: G1
+         Parallelizable: YES
+    ───────────────────────────────────────── -->
+    <step id="5" title="Novelty Claim 4 — Inherited Full Liability" gap_ref="G1" parallel="yes">
+
+      <claim id="NC4" confidence="MEDIUM">
+        When a player Passes in Rally mode, the incoming player inherits
+        the ENTIRE team-accumulated unbanked total — not just the current
+        player's contribution. If the incoming player Farkles, they lose
+        points that multiple players built across multiple turns. The
+        spatial board context, the inherited multiplier step, and the
+        reaction window vote are part of the mechanic.
+      </claim>
+
+      <mandatory_sources>
+        Traditional Farkle rules (official and variants) |
+        Cosmic Wimpout | Can't Stop | Zombie Dice |
+        Yahtzee (tournament variants) | Pickomino / Heckmeck
+      </mandatory_sources>
+
+      <prior_art_threshold>
+        Prior art requires ALL of the following:
+        (a) A turn-handoff mechanic where one player passes to another.
+        (b) The incoming player inherits the FULL accumulated unbanked
+            total from ALL previous players in the current streak —
+            not just the passing player's single-turn contribution.
+        (c) If the incoming player fails (Farkles), the entire inherited
+            total is lost — including contributions from players who
+            are no longer active in the current streak.
+
+        NOT prior art:
+        - Games where only the current roller's score is at risk on pass.
+        - Games where the incoming player can choose to start fresh.
+        - Cooperative games where accumulated resources persist but cannot
+          be lost to a Farkle-equivalent event.
+        - Traditional Farkle's "keep rolling" option (only current turn
+          score is at risk, not prior players' contributions).
+      </prior_art_threshold>
+
+      <verdict_type>CONFIRMED | PARTIALLY_CONFIRMED | REFUTED</verdict_type>
+      <partial_confirmed_instruction>
+        Specify the exact degree of overlap. Name which element of the
+        claim has prior art and which does not.
+      </partial_confirmed_instruction>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 6 — CORRECTED PROBABILITY MATH
+         Addresses: G3, G4
+         Parallelizable: YES (independent of 1-5)
+    ───────────────────────────────────────── -->
+    <step id="6" title="Corrected Probability Math — 60-Tile Pool Model" gap_ref="G3 G4" parallel="yes">
+
+      <correction_target>
+        The bust rates cited in pass 2 are from the standard independent
+        dice model (each die rolled independently with P=1/6 per face).
+        Farkle Frenzy uses a pre-shuffled pool of exactly 60 tiles:
+        10 of each face value (1, 2, 3, 4, 5, 6). Tiles are drawn without
+        replacement per pool cycle. This is a fundamentally different
+        probability system — draws are correlated, not independent.
+        The cited figures are wrong for this game. Do not use them.
+      </correction_target>
+
+      <pool_model>
+        <total_tiles>60</total_tiles>
+        <distribution>10 of each face value (1 through 6), equal</distribution>
+        <draw_method>without replacement per cycle</draw_method>
+        <assumption>Calculate from full pool state (60 tiles, 10 of each)
+        — this represents the equal-distribution baseline and produces
+        the most stable probability estimates for design purposes.</assumption>
+      </pool_model>
+
+      <deliverable_1 name="BustProbabilityTable">
+        <instruction>
+          Calculate P(score = 0 | chain length = N) for N = 1 through 6.
+          Score = 0 means the drawn face values, evaluated against the
+          complete Farkle scoring table below, produce no scoring combination.
+        </instruction>
+        <scoring_table>
+          <!-- These are the ONLY combinations that score > 0 -->
+          <combo>Single face-1 = 100 pts</combo>
+          <combo>Single face-5 = 50 pts</combo>
+          <combo>Three face-1 = 1000 pts</combo>
+          <combo>Three of any other face = face*100 pts</combo>
+          <combo>Four of a kind (any) = 1000 pts</combo>
+          <combo>Five of a kind (any) = 2000 pts</combo>
+          <combo>Six of a kind (any) = 3000 pts</combo>
+          <combo>Straight 1-2-3-4-5-6 = 1500 pts</combo>
+          <combo>Three pairs (6 tiles) = 1500 pts</combo>
+          <combo>Two triplets (6 tiles) = 2500 pts</combo>
+          <combo>Four of a kind plus pair (6 tiles) = 1500 pts</combo>
+          <rule>Combinations stack (max-partition). A chain scores
+          the maximum achievable by any non-overlapping partition.</rule>
+        </scoring_table>
+        <thresholds_to_identify>
+          P(Farkle) crosses 10% at chain length: [N]
+          P(Farkle) crosses 25% at chain length: [N]
+          P(Farkle) crosses 50% at chain length: [N]
+        </thresholds_to_identify>
+        <output_schema>
+          <row chain_length="N" p_farkle="[0.0-1.0]" p_farkle_pct="[%]"
+               threshold_crossed="[10%|25%|50%|none]"/>
+        </output_schema>
+      </deliverable_1>
+
+      <deliverable_2 name="EVInflectionTable">
+        <instruction>
+          Calculate the expected value of CONTINUE vs BANK at each
+          combination of chain length (1-6) and multiplier step (x1.0
+          through x4.0). Use the corrected bust probabilities from
+          deliverable_1. Assume average scoring chain = 350 pts
+          (representative midpoint for planning purposes — not a
+          hard figure, adjust if research surfaces a better estimate).
+          Identify combinations where EV(CONTINUE) and EV(BANK) are
+          within 10% of each other — these are the genuinely hard
+          decisions and the design target for the ladder's most
+          impactful steps.
+        </instruction>
+        <output_schema>
+          <row chain_length="N" multiplier="[1.0|1.25|1.5|2.0|3.0|4.0]"
+               ev_continue="[value]" ev_bank="[value]"
+               ev_delta_pct="[%]" hard_decision="[YES|NO]"/>
+        </output_schema>
+      </deliverable_2>
+
+    </step>
+
+    <!-- ─────────────────────────────────────────
+         STEP 7 — SYNTHESIS
+         Requires: steps 1-6 complete
+         Parallelizable: NO
+    ───────────────────────────────────────── -->
+    <step id="7" title="Synthesis — Four Deliverables" parallel="no"
+          requires="1 2 3 4 5 6">
+
+      <deliverable id="7A" title="Per-Role Scorecard" inputs="step_1">
+        <content>
+          Complete 4x4 scorecard using the schema declared in step 1.
+          Synergy ruling (hardcoded vs emergent) with evidence.
+          Improvement recommendations per role.
+          All improvement recommendations labeled LOW / MEDIUM / MAJOR_REWORK.
+        </content>
+      </deliverable>
+
+      <deliverable id="7B" title="Novelty Claim Verdicts" inputs="steps_2_3_4_5 cross_ref_all">
+        <content>
+          Four verdicts in schema format. Cross-reference all findings
+          from passes 1, 2, and 3 before finalizing each verdict.
+          Do not soften refutations — reference OQ6.
+        </content>
+        <verdict_schema>
+          <verdict claim="NC[1-4]"
+                   result="[CONFIRMED|PARTIALLY_CONFIRMED|REFUTED]"
+                   evidence="[named game or source]"
+                   detail="[for PARTIALLY_CONFIRMED: element present and element absent]"/>
+        </verdict_schema>
+      </deliverable>
+
+      <deliverable id="7C" title="Corrected Probability Tables" inputs="step_6">
+        <content>
+          BustProbabilityTable (chain lengths 1-6, pool model).
+          EVInflectionTable (chain length x multiplier, hard decisions flagged).
+          Replace all figures from pass 2 with corrected figures.
+          Do not include the old incorrect figures anywhere in the output.
+        </content>
+      </deliverable>
+
+      <deliverable id="7D" title="OQ1 Recommendation — Singleplayer Farkle Redemption"
+                   inputs="pass_1_roguelike_research pass_2_hades_finding step_1">
+        <content>
+          A recommendation: should singleplayer Farkle events carry a partial
+          recovery mechanic? The answer must be YES or NO with supporting
+          evidence. A summary of what other games do is not sufficient —
+          a recommendation is required. Use CF5 (Slay the Spire adaptive
+          agency finding), CF6 (Hades Mirror of Night model), and the
+          push-your-luck calibration research from pass 1 as primary inputs.
+          If YES: specify what form the mechanic should take and label it
+          LOW / MEDIUM / MAJOR_REWORK.
+          If NO: specify what visual or mechanical changes to the existing
+          hard failure state would maximize its emotional impact without
+          adding a redemption path.
+        </content>
+        <constraint ref="OQ6">
+          Do not recommend a redemption mechanic simply because other games
+          have one. Confirm it would improve Farkle Frenzy specifically.
+        </constraint>
+      </deliverable>
+
+    </step>
+
+  </steps>
+
+  <!-- ═══════════════════════════════════════════════
+       GLOBAL OUTPUT RULES
+  ═══════════════════════════════════════════════ -->
+  <output_rules>
+    <rule id="OR1">Every finding names the specific Farkle mechanic it
+    applies to. No orphaned observations.</rule>
+    <rule id="OR2">Every recommendation labeled: LOW / MEDIUM / MAJOR_REWORK.
+    No unlabeled recommendations in any section.</rule>
+    <rule id="OR3">When a researched mechanic is similar but not identical
+    to a Farkle mechanic, report both the similarity and the exact
+    differences. Do not collapse similar into "already exists."</rule>
+    <rule id="OR4">Failures in comparable designs are as valuable as
+    successes. If a mechanic similar to Farkle's was tried and abandoned
+    or criticised, report this directly.</rule>
+    <rule id="OR5">Do not re-summarize findings from passes 1 or 2.
+    Produce only what was missing. The gap declaration above defines
+    exactly what was missing.</rule>
+    <rule id="OR6">Prior art thresholds are declared per step. Do not
+    expand or contract them. A game that meets 2 of 3 threshold criteria
+    is PARTIALLY_CONFIRMED, not CONFIRMED and not REFUTED.</rule>
+    <rule id="OR7">Begin response with:
+    FRENZY ANALYST — PASS 3 ENGAGED. GAPS LOADED. PRE-BRIEF READ.</rule>
+  </output_rules>
+
+</research_brief>
+```

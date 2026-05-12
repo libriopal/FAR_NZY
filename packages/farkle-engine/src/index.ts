@@ -20,3 +20,5 @@ export * from './gridUtils.js';
 export * from './monteCarlo.js';
 export * from './rtpConfig.js';
 export * from './floodFill.js';
+export * from './skillMetrics.js';
+export * from './avatar.js';

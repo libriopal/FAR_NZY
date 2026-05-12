@@ -5,9 +5,10 @@
 // ─────────────────────────────────────────────────────
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD } from '../store/farkleStore.js';
+import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
+import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
 
 const FACE_COLOR: Record<number, string> = {
   1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
@@ -273,8 +274,8 @@ function ChainPreview() {
 
 // ── Bank Button ───────────────────────────────────────────────────────────────
 
-function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void }) {
-  const unbanked = useFarkleStore(s => s.unbanked);
+function BankButton({ onBank, onBack, onPass }: { onBank: () => void; onBack: () => void; onPass?: () => void }) {
+  const { unbanked, rallyRole } = useFarkleStore(s => ({ unbanked: s.unbanked, rallyRole: s.rallyRole }));
 
   return (
     <div style={{ position: 'absolute', top: 50, right: 12, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
@@ -286,6 +287,17 @@ function BankButton({ onBank, onBack }: { onBank: () => void; onBack: () => void
           boxShadow: '0 0 12px var(--ba-accent-glow)',
         }}>
           BANK {unbanked.toLocaleString()}
+        </button>
+      )}
+      {onPass && unbanked > 0 && (
+        <button onClick={onPass} style={{
+          background: rallyRole === 'CONDUCTOR' ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${rallyRole === 'CONDUCTOR' ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`,
+          color: rallyRole === 'CONDUCTOR' ? '#818cf8' : 'var(--ba-marble-400)',
+          borderRadius: 8, padding: '4px 10px',
+          fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
+        }}>
+          PASS{rallyRole === 'CONDUCTOR' ? ' +STEP' : ''}
         </button>
       )}
       <button onClick={onBack} style={{
@@ -477,32 +489,223 @@ function DisruptionToast() {
   );
 }
 
+// ── Frenzy Instability Warning (B19) ─────────────────────────────────────────
+
+function FrenzyInstabilityWarning() {
+  const { mode, energy } = useFarkleStore(s => ({ mode: s.mode, energy: s.energy }));
+  if (mode !== 'FRENZY' || energy >= FRENZY_INSTABILITY_THRESHOLD) return null;
+  const critical = energy < 30;
+  return (
+    <div style={{
+      position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+      display: 'flex', alignItems: 'center', gap: 6,
+      background: critical ? 'rgba(200,0,0,0.22)' : 'rgba(200,100,0,0.16)',
+      border: `1px solid ${critical ? 'rgba(239,68,68,0.7)' : 'rgba(251,146,60,0.55)'}`,
+      borderRadius: 8, padding: '4px 12px',
+      pointerEvents: 'none',
+      animation: 'instabilityPulse 0.9s ease-in-out infinite',
+    }}>
+      <span style={{ fontSize: 13 }}>⚡</span>
+      <span style={{
+        color: critical ? '#ef4444' : '#fb923c',
+        fontSize: 11, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 1,
+        textShadow: `0 0 8px ${critical ? '#ef4444' : '#fb923c'}`,
+      }}>
+        {critical ? 'ANCHOR CRITICAL' : 'ANCHOR UNSTABLE'}
+      </span>
+      <style>{`
+        @keyframes instabilityPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.45; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── RAINMAKER Bomb Face Picker (B7) ──────────────────────────────────────────
+
+interface RainmakerFacePickerProps { onSelect: (face: number) => void; }
+
+function RainmakerFacePicker({ onSelect }: RainmakerFacePickerProps) {
+  const pendingId = useFarkleStore(s => s.pendingRainmakerBombId);
+  if (!pendingId) return null;
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.55)', pointerEvents: 'auto', zIndex: 20,
+    }}>
+      <div style={{
+        background: '#1a1a2e', border: '1px solid rgba(251,191,36,0.5)', borderRadius: 14,
+        padding: '18px 22px', textAlign: 'center',
+      }}>
+        <div style={{ color: '#fbbf24', fontFamily: 'monospace', fontSize: 12, letterSpacing: 1, marginBottom: 12 }}>
+          RAINMAKER — SELECT TARGET FACE
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[1, 2, 3, 4, 5, 6].map(f => (
+            <button key={f} onClick={() => onSelect(f)} style={{
+              width: 44, height: 44, borderRadius: 8,
+              background: FACE_COLOR[f] ?? '#888',
+              border: '2px solid rgba(255,255,255,0.2)',
+              color: '#fff', fontWeight: 700, fontSize: 18,
+              cursor: 'pointer',
+            }}>{f}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main HUD ──────────────────────────────────────────────────────────────────
 
 const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
 
+// C1: Heist vault meter + initiate/block buttons
+function HeistPanel({ onInitiate, onBlock }: { onInitiate: () => void; onBlock: () => void }) {
+  const vaultPts     = useFarkleStore(s => s.vaultPts);
+  const heistActive  = useFarkleStore(s => s.heistActive);
+  const heistExpires = useFarkleStore(s => s.heistExpiresAt);
+  const energy       = useFarkleStore(s => s.energy);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (!heistActive || heistExpires === null) return;
+    const id = setInterval(() => {
+      const rem = Math.max(0, Math.ceil((heistExpires - Date.now()) / 1000));
+      setCountdown(rem);
+    }, 200);
+    return () => clearInterval(id);
+  }, [heistActive, heistExpires]);
+
+  const pct = Math.min(1, vaultPts / HEIST_CONSTANTS.VAULT_THRESHOLD);
+  const canInitiate = !heistActive && vaultPts >= HEIST_CONSTANTS.VAULT_THRESHOLD && energy >= HEIST_CONSTANTS.HEIST_ENERGY_COST;
+
+  return (
+    <div style={{ position: 'absolute', bottom: 120, left: 12, pointerEvents: 'auto', minWidth: 130 }}>
+      {/* Vault meter */}
+      <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 4, letterSpacing: 1 }}>VAULT</div>
+      <div style={{ background: '#1e1b4b', borderRadius: 4, height: 8, width: 120, overflow: 'hidden', border: '1px solid #4c1d95' }}>
+        <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? '#7c3aed' : '#4f46e5', transition: 'width 0.3s' }} />
+      </div>
+      <div style={{ fontSize: 9, color: '#7c3aed', marginTop: 2 }}>{vaultPts.toLocaleString()} / {HEIST_CONSTANTS.VAULT_THRESHOLD.toLocaleString()}</div>
+      {canInitiate && (
+        <button onClick={onInitiate} style={{ marginTop: 6, padding: '4px 8px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+          HEIST (−{HEIST_CONSTANTS.HEIST_ENERGY_COST}⚡)
+        </button>
+      )}
+      {heistActive && (
+        <button onClick={onBlock} style={{ marginTop: 6, padding: '4px 8px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', animation: 'pulse 0.5s infinite alternate' }}>
+          BLOCK ({countdown}s)
+        </button>
+      )}
+    </div>
+  );
+}
+
+// C15: Rally Continue/Bank/Pass decision panel with vote tally
+function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onRallyBank: () => void; onRallyPass: () => void; onRallyContinue: () => void }) {
+  const active  = useFarkleStore(s => s.rallyDecisionActive);
+  const expires = useFarkleStore(s => s.rallyDecisionExpiresAt);
+  const rallyVotes = useFarkleStore(s => s.rallyVotes);
+  const [countdown, setCountdown] = useState(3);
+  const [myVote, setMyVote] = useState<'bank' | 'pass' | 'continue' | null>(null);
+
+  useEffect(() => {
+    if (!active || expires === null) return;
+    setMyVote(null);
+    const id = setInterval(() => {
+      setCountdown(Math.max(0, Math.ceil((expires - Date.now()) / 1000)));
+    }, 100);
+    return () => clearInterval(id);
+  }, [active, expires]);
+
+  if (!active) return null;
+
+  const voteEntries = Object.entries(rallyVotes);
+  const hasOtherVoters = voteEntries.length > 0;
+
+  const voteColor: Record<string, string> = { bank: '#059669', pass: '#7c3aed', continue: '#1d4ed8' };
+
+  function handleVote(choice: 'bank' | 'pass' | 'continue', fn: () => void) {
+    if (myVote) return;
+    setMyVote(choice);
+    fn();
+  }
+
+  return (
+    <div style={{ position: 'absolute', bottom: '28%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'rgba(10,6,35,0.88)', border: '1px solid #4f46e5', borderRadius: 10, padding: '12px 20px' }}>
+      <div style={{ color: '#a78bfa', fontSize: 11, letterSpacing: 2 }}>RALLY DECISION — {countdown}s</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={() => handleVote('bank', onRallyBank)}
+          disabled={!!myVote}
+          style={{ padding: '6px 14px', background: myVote === 'bank' ? '#059669' : myVote ? '#374151' : '#059669', color: '#fff', border: myVote === 'bank' ? '2px solid #6ee7b7' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'bank' ? 0.45 : 1 }}
+        >BANK</button>
+        <button
+          onClick={() => handleVote('pass', onRallyPass)}
+          disabled={!!myVote}
+          style={{ padding: '6px 14px', background: myVote === 'pass' ? '#7c3aed' : myVote ? '#374151' : '#7c3aed', color: '#fff', border: myVote === 'pass' ? '2px solid #c4b5fd' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'pass' ? 0.45 : 1 }}
+        >PASS</button>
+        <button
+          onClick={() => handleVote('continue', onRallyContinue)}
+          disabled={!!myVote}
+          style={{ padding: '6px 14px', background: myVote === 'continue' ? '#1d4ed8' : myVote ? '#374151' : '#1d4ed8', color: '#fff', border: myVote === 'continue' ? '2px solid #93c5fd' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'continue' ? 0.45 : 1 }}
+        >CONTINUE</button>
+      </div>
+      {hasOtherVoters && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+          {voteEntries.map(([pid, v]) => (
+            <div key={pid} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: voteColor[v] ?? '#374151', color: '#fff', letterSpacing: 1, fontWeight: 700 }}>
+              {v.toUpperCase()}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface FarkleHUDProps {
   onBank: () => void;
   onBack: () => void;
+  onPass?: () => void;
   onDisrupt?: (type: DisruptionType) => void;
+  onRainmakerSelect?: (face: number) => void;
+  onInitiateHeist?: () => void;
+  onBlockHeist?: () => void;
+  onRallyBank?: () => void;
+  onRallyPass?: () => void;
+  onRallyContinue?: () => void;
   gameMode?: GameMode;
 }
 
-export function FarkleHUD({ onBank, onBack, onDisrupt, gameMode }: FarkleHUDProps) {
+export function FarkleHUD({ onBank, onBack, onPass, onDisrupt, onRainmakerSelect, onInitiateHeist, onBlockHeist, onRallyBank, onRallyPass, onRallyContinue, gameMode }: FarkleHUDProps) {
   const showDisruptions = onDisrupt && gameMode && DISRUPTION_MODES.has(gameMode);
+  const isHeist = gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
+  const isRally = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       <EnergyBar />
       <ScoreDisplay />
-      <BankButton onBank={onBank} onBack={onBack} />
+      <BankButton onBank={onBank} onBack={onBack} {...(onPass ? { onPass } : {})} />
       <TimerDisplay />
       <RoleBadge />
       <ChainPreview />
       <FarkleFlash />
       <ModePulse />
+      <FrenzyInstabilityWarning />
       <ScorePopupLayer />
       <DisruptionToast />
       {showDisruptions && <DisruptionPanel onDisrupt={onDisrupt} gameMode={gameMode} />}
+      {onRainmakerSelect && <RainmakerFacePicker onSelect={onRainmakerSelect} />}
+      {isHeist && onInitiateHeist && onBlockHeist && (
+        <HeistPanel onInitiate={onInitiateHeist} onBlock={onBlockHeist} />
+      )}
+      {isRally && onRallyBank && onRallyPass && onRallyContinue && (
+        <RallyDecisionPanel onRallyBank={onRallyBank} onRallyPass={onRallyPass} onRallyContinue={onRallyContinue} />
+      )}
     </div>
   );
 }

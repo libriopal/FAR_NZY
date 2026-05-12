@@ -22,6 +22,9 @@ export const CHAIN6_ENERGY_GAIN = 10;
 export const PRIME_CHAIN_ENERGY_COST = -10;
 export const FRENZY_CHAIN_ENERGY_GAIN = 10;
 export const FRENZY_CATCHUP_BONUS = 2;    // extra energy if energy < 75 in FRENZY
+export const WILD_PRIME_ENERGY = 5;       // energy per wild committed in PRIME chain (B17)
+export const WILD_FRENZY_ENERGY = 3;      // energy per wild committed in FRENZY chain (B18)
+export const FRENZY_INSTABILITY_THRESHOLD = 75; // energy floor; below = instability warning (B19)
 export const MULTIPLIER_LADDER = [1.0, 1.25, 1.5, 2.0, 3.0, 4.0] as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +38,7 @@ export interface FarkleBody {
   face: number | null;
   health: number;          // lock HP; 0 = unlocked
   column: number;
+  spawnedAt: number;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number; w: number };
   inChain: boolean;
@@ -56,6 +60,7 @@ export interface FarkleGameState {
   lastMode: EnergyMode;
   pendingBombScore: number;       // score from bomb blasts, added on next bank
   bombsOnBoard: number;           // count of bomb/rainbow_bomb on board (HUD indicator)
+  farklePool: number;             // accumulated unbanked pts lost to Farkles; ARCHIVIST recovers 15% per chain
   multiplierOrbActive: boolean;   // next commit gets ×1.5 bonus
   catalystBoostPct: number;       // cumulative wild spawn % boost this session (0–10)
   disruptions: DisruptionEvent[];
@@ -65,6 +70,15 @@ export interface FarkleGameState {
   disruptChargeProgress: number;
   timeRemaining: number | null;
   rallyRole: RallyRole | null;
+  // C1: Heist vault
+  vaultPts: number;
+  heistActive: boolean;
+  heistInitiatorId: string | null;
+  heistExpiresAt: number | null;
+  // C2: Rally decision
+  rallyDecisionActive: boolean;
+  rallyDecisionExpiresAt: number | null;
+  rallyVotes: Record<string, string>;
 
   // Actions
   setGamePhase: (phase: FarkleGameState['gamePhase']) => void;
@@ -74,6 +88,13 @@ export interface FarkleGameState {
   removeLastFromChain: () => void;
   clearChain: () => void;
   commitChain: () => 'ok' | 'farkle';
+  passScore: () => void;  // Rally Pass: holds unbanked without banking; resets chain
+  addToFarklePool: (amount: number) => void;
+  drainFarklePool: (pct: number) => number; // returns points recovered; adds to unbanked
+  rainmakerBombFace: number | null;          // RAINMAKER: chosen face for bomb color selection
+  pendingRainmakerBombId: string | null;     // RAINMAKER: bomb waiting for face selection
+  setRainmakerBombFace: (face: number | null) => void;
+  setPendingRainmakerBombId: (id: string | null) => void;
   bankScore: () => void;
   updateBodies: (bodies: FarkleBody[]) => void;
   resetGame: () => void;
@@ -85,6 +106,15 @@ export interface FarkleGameState {
   spendDisruptCharge: () => boolean;
   setRallyRole: (role: RallyRole | null) => void;
   tickTimer: (deltaMs: number) => void;
+  // C1: Heist vault actions
+  addToVault: (pts: number) => void;
+  setHeistActive: (initiatorId: string, expiresAt: number) => void;
+  claimVault: () => void;
+  cancelHeist: () => void;
+  // C2: Rally decision actions
+  setRallyDecision: (active: boolean, expiresAt?: number | null) => void;
+  setRallyVotes: (votes: Record<string, string>) => void;
+  clearRallyVotes: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -114,6 +144,9 @@ export const useFarkleStore = create<FarkleGameState>()(
     lastMode: 'NORMAL' as EnergyMode,
     pendingBombScore: 0,
     bombsOnBoard: 0,
+    farklePool: 0,
+    rainmakerBombFace: null,
+    pendingRainmakerBombId: null,
     multiplierOrbActive: false,
     catalystBoostPct: 0,
     disruptions: [],
@@ -123,6 +156,13 @@ export const useFarkleStore = create<FarkleGameState>()(
     disruptChargeProgress: 0,
     timeRemaining: null,
     rallyRole: null,
+    vaultPts: 0,
+    heistActive: false,
+    heistInitiatorId: null,
+    heistExpiresAt: null,
+    rallyDecisionActive: false,
+    rallyDecisionExpiresAt: null,
+    rallyVotes: {},
 
     setGamePhase: (phase) => set({ gamePhase: phase }),
     setTurnActive: (active) => set({ turnActive: active }),
@@ -164,6 +204,7 @@ export const useFarkleStore = create<FarkleGameState>()(
           chain: [], chainFaces: [], chainScore: 0,
           unbanked: 0, multiplierStep: 0,
           farkleCount: s.farkleCount + 1,
+          farklePool: s.farklePool + s.unbanked,
         });
         return 'farkle';
       }
@@ -204,6 +245,9 @@ export const useFarkleStore = create<FarkleGameState>()(
       return 'ok';
     },
 
+    passScore: () =>
+      set({ chain: [], chainFaces: [], chainScore: 0 }),
+
     bankScore: () =>
       set(s => ({
         banked: s.banked + s.unbanked,
@@ -226,7 +270,10 @@ export const useFarkleStore = create<FarkleGameState>()(
         multiplierOrbActive: false, catalystBoostPct: 0,
         disruptions: [], pendingDisruption: null, doublerCells: [],
         disruptCharges: 0, disruptChargeProgress: 0,
-        timeRemaining: null, rallyRole: null,
+        timeRemaining: null, rallyRole: null, farklePool: 0,
+        rainmakerBombFace: null, pendingRainmakerBombId: null,
+        vaultPts: 0, heistActive: false, heistInitiatorId: null, heistExpiresAt: null,
+        rallyDecisionActive: false, rallyDecisionExpiresAt: null, rallyVotes: {},
       }),
 
     addDisruption: (event) =>
@@ -274,7 +321,44 @@ export const useFarkleStore = create<FarkleGameState>()(
       return true;
     },
 
+    addToFarklePool: (amount) => set(s => ({ farklePool: s.farklePool + amount })),
+
+    drainFarklePool: (pct) => {
+      const s = get();
+      const recovered = Math.round(s.farklePool * pct);
+      if (recovered <= 0) return 0;
+      set(s2 => ({ farklePool: s2.farklePool - recovered, unbanked: s2.unbanked + recovered }));
+      return recovered;
+    },
+
+    setRainmakerBombFace: (face) => set({ rainmakerBombFace: face }),
+
+    setPendingRainmakerBombId: (id) => set({ pendingRainmakerBombId: id }),
+
     setRallyRole: (role) => set({ rallyRole: role }),
+
+    addToVault: (pts) => set(s => ({ vaultPts: s.vaultPts + pts })),
+
+    setHeistActive: (initiatorId, expiresAt) =>
+      set({ heistActive: true, heistInitiatorId: initiatorId, heistExpiresAt: expiresAt }),
+
+    claimVault: () =>
+      set(s => ({
+        unbanked: s.unbanked + s.vaultPts,
+        vaultPts: 0,
+        heistActive: false,
+        heistInitiatorId: null,
+        heistExpiresAt: null,
+      })),
+
+    cancelHeist: () =>
+      set({ vaultPts: 0, heistActive: false, heistInitiatorId: null, heistExpiresAt: null }),
+
+    setRallyDecision: (active, expiresAt = null) =>
+      set({ rallyDecisionActive: active, rallyDecisionExpiresAt: active ? expiresAt : null }),
+
+    setRallyVotes: (votes) => set({ rallyVotes: votes }),
+    clearRallyVotes: () => set({ rallyVotes: {} }),
 
     tickTimer: (deltaMs) =>
       set(s => {

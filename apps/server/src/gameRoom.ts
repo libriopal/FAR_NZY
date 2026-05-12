@@ -11,9 +11,12 @@
 
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
-import { GAME_CONSTANTS } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle } from '@match3d/farkle-engine';
+import { GAME_CONSTANTS, RALLY_MILESTONES } from '@match3d/farkle-shared';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision } from '@match3d/farkle-engine';
+import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
+
+const WIN_SCORE = 100_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,6 +77,17 @@ export class GameRoom {
   private energyInterval: ReturnType<typeof setInterval> | null = null;
   private gameMode: string = 'VS_FREE';
   private roleMap: Map<string, string> = new Map();
+  private committedHash: Promise<string>;
+  private milestonesHit: Map<string, Set<number>> = new Map();
+  private sessionEnded = false;
+  private rallyDecisionTimeout: ReturnType<typeof setTimeout> | null = null;
+  private sessionId = nanoid();
+  private sessionStartedAt = new Date().toISOString();
+  private totalChains = 0;
+  private scoringChains = 0;
+  private banksTaken = 0;
+  private lastActionAt: Map<string, number> = new Map();
+  private readonly INPUT_LOCK_MS = 100;
 
   constructor(settings: LobbySettings) {
     this.id = nanoid(8).toUpperCase();
@@ -91,6 +105,7 @@ export class GameRoom {
       multiplierStep: 0,
       farklePool: 0,
     };
+    this.committedHash = hashServerSeed(this.csprng.getSeed());
     this.startEnergyTick();
   }
 
@@ -168,6 +183,13 @@ export class GameRoom {
           this.send(player.ws, { type: 'ERROR', message: 'Not your turn' });
           return;
         }
+        // 100ms input lock — reject rapid-fire submissions
+        const lastAt = this.lastActionAt.get(playerId) ?? 0;
+        if (Date.now() - lastAt < this.INPUT_LOCK_MS) {
+          this.send(player.ws, { type: 'ERROR', message: 'Too fast' });
+          return;
+        }
+        this.lastActionAt.set(playerId, Date.now());
         const chain = msg.chain as { row: number; col: number }[];
         if (!chain || chain.length < 2) {
           this.send(player.ws, { type: 'ERROR', message: 'Chain too short' });
@@ -194,20 +216,70 @@ export class GameRoom {
       case 'LEAVE_ROOM':
         this.removePlayer(playerId);
         break;
+      case 'RALLY_VOTE': {
+        const vote = msg.vote as 'bank' | 'pass' | 'continue';
+        this.handleRallyVote(playerId, vote);
+        break;
+      }
+      case 'NOTIFY_RALLY_DECISION': {
+        const expiresAt = msg.expiresAt as number;
+        if (this.rallyDecisionTimeout) clearTimeout(this.rallyDecisionTimeout);
+        this.rallyVotes.clear();
+        this.broadcast({ type: 'RALLY_DECISION_START', expiresAt });
+        this.rallyDecisionTimeout = setTimeout(() => this._resolveRallyVotes(), 3000);
+        break;
+      }
     }
   }
 
+  private rallyVotes: Map<string, 'bank' | 'pass' | 'continue'> = new Map();
+
+  private handleRallyVote(playerId: string, vote: 'bank' | 'pass' | 'continue') {
+    this.rallyVotes.set(playerId, vote);
+    this.broadcast({ type: 'RALLY_VOTE_UPDATE', votes: Object.fromEntries(this.rallyVotes) });
+    const playerIds = [...this.players.keys()].filter(id => this.players.get(id)?.ws.readyState === 1);
+    if (this.rallyVotes.size >= playerIds.length) {
+      this._resolveRallyVotes();
+    }
+  }
+
+  private _resolveRallyVotes() {
+    if (this.rallyDecisionTimeout) { clearTimeout(this.rallyDecisionTimeout); this.rallyDecisionTimeout = null; }
+    const tally = { bank: 0, pass: 0, continue: 0 };
+    for (const v of this.rallyVotes.values()) tally[v]++;
+    this.rallyVotes.clear();
+    // Tie-break priority: continue > pass > bank (bias toward keeping play going)
+    let decision: 'bank' | 'pass' | 'continue';
+    if (tally.continue >= tally.pass && tally.continue >= tally.bank) decision = 'continue';
+    else if (tally.pass >= tally.bank) decision = 'pass';
+    else decision = 'bank';
+    this.broadcast({ type: 'RALLY_DECISION', decision });
+    if (decision === 'bank') this.handleBank(this.activePlayerId ?? '');
+    else if (decision === 'pass') this.nextTurn();
+    else this.startTurnTimer(); // continue: keep current player, restart turn timer
+  }
+
   private processChain(playerId: string, chain: { row: number; col: number }[]) {
-    const faces = chain.map(pos => this.state.grid[pos.row][pos.col].face).filter(Boolean);
+    const faces = chain.map(pos => this.state.grid[pos.row]?.[pos.col]?.face).filter(Boolean);
     const result = scoreFarkle(faces as import('@match3d/farkle-shared').DieFace[]);
+    this.totalChains++;
 
     if (result.isFarkle) {
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
       this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
+      // Analytics: log farkle decision (fire-and-forget)
+      insertChainDecision({
+        id: nanoid(), session_id: this.sessionId, player_id: playerId,
+        chain_number: this.totalChains, faces_played: faces as number[],
+        score_result: 0, multiplier_at: 1,
+        unbanked_before: lost, decision: 'FARKLE', was_optimal: false,
+        timestamp: new Date().toISOString(),
+      });
       setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
       return;
     }
+    this.scoringChains++;
 
     const scaled = Math.round(result.score * [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)]);
     this.state = {
@@ -216,9 +288,32 @@ export class GameRoom {
       multiplierStep: chain.length === 6 ? Math.min(this.state.multiplierStep + 1, 5) : 0,
     };
 
+    // Analytics: log chain decision (fire-and-forget)
+    const farkleRisk = estimateFarkleRisk(
+      faces.filter(f => f === 1).length,
+      faces.filter(f => f === 5).length,
+      faces.length,
+    );
+    const decision = chain.length < 6 ? 'BANK' : 'CONTINUE';
+    insertChainDecision({
+      id: nanoid(), session_id: this.sessionId, player_id: playerId,
+      chain_number: this.totalChains, faces_played: faces as number[],
+      score_result: result.score,
+      multiplier_at: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      unbanked_before: this.state.unbanked, decision,
+      was_optimal: isOptimalDecision(decision, this.state.unbanked, this.state.multiplierStep, farkleRisk),
+      timestamp: new Date().toISOString(),
+    });
+
     if (chain.length < 6) {
       this.state.banked += this.state.unbanked;
       this.state.unbanked = 0;
+      this.banksTaken++;
+      this.checkMilestones(playerId, this.state.banked);
+      if (this.state.banked >= WIN_SCORE) {
+        void this.endSession(playerId);
+        return;
+      }
     }
 
     this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
@@ -272,12 +367,16 @@ export class GameRoom {
   }
 
   private handleBank(playerId: string) {
-    void playerId;
     if (this.state.unbanked > 0) {
       this.state.banked += this.state.unbanked;
       this.state.unbanked = 0;
+      this.checkMilestones(playerId, this.state.banked);
     }
     this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
+    if (this.state.banked >= WIN_SCORE) {
+      void this.endSession(playerId);
+      return;
+    }
     this.nextTurn();
   }
 
@@ -288,6 +387,77 @@ export class GameRoom {
     this.activePlayerId = ids[(idx + 1) % ids.length] ?? null;
     this.broadcast({ type: 'TURN_CHANGE', activePlayerId: this.activePlayerId });
     this.startTurnTimer();
+  }
+
+  // C13: Rally Casino milestone payouts
+  private checkMilestones(playerId: string, banked: number) {
+    if (this.gameMode !== 'RALLY_CASINO') return;
+    if (!this.milestonesHit.has(playerId)) this.milestonesHit.set(playerId, new Set());
+    const hit = this.milestonesHit.get(playerId)!;
+    for (const m of RALLY_MILESTONES) {
+      if (banked >= m.points && !hit.has(m.tier)) {
+        hit.add(m.tier);
+        const payout = Math.round(this.settings.stakeAmount * m.multiplier);
+        this.broadcast({ type: 'MILESTONE_PAYOUT', playerId, tier: m.tier, points: m.points, payout });
+      }
+    }
+  }
+
+  // C6 / C7 / C14: session end — seed reveal + mode-appropriate payout
+  private async endSession(triggeringPlayerId: string) {
+    if (this.sessionEnded) return;
+    this.sessionEnded = true;
+    if (this.turnTimer) clearTimeout(this.turnTimer);
+
+    const serverSeed = this.csprng.getSeed();
+    const committedHash = await this.committedHash;
+
+    const isCasino = this.gameMode.endsWith('_CASINO');
+    let payout = 0;
+    let winnerId: string | null = null;
+
+    if (this.gameMode === 'VS_CASINO') {
+      // C14: highest-banked player wins totalPot × 0.92
+      const totalPot = this.settings.stakeAmount * this.players.size;
+      let topScore = -1;
+      for (const [pid, p] of this.players) {
+        if (p.profile.banked > topScore) { topScore = p.profile.banked; winnerId = pid; }
+      }
+      payout = Math.round(totalPot * 0.92);
+    } else if (this.gameMode === 'SOLO_CASINO') {
+      // C6: payout = (banked / WIN_SCORE) × stakeAmount × targetRTP(0.92)
+      const player = this.players.get(triggeringPlayerId);
+      const banked = player?.profile.banked ?? 0;
+      payout = Math.round((banked / WIN_SCORE) * this.settings.stakeAmount * 0.92);
+      winnerId = triggeringPlayerId;
+    }
+
+    this.broadcast({
+      type: 'SESSION_END',
+      winnerId,
+      payout: isCasino ? payout : 0,
+      serverSeed,
+      committedHash,
+    });
+
+    // Analytics: insert session record (fire-and-forget)
+    const finalBanked = this.state.banked;
+    void insertSession({
+      id: this.sessionId,
+      player_id: triggeringPlayerId,
+      mode: this.gameMode,
+      seed_hash: committedHash,
+      started_at: this.sessionStartedAt,
+      ended_at: new Date().toISOString(),
+      total_chains: this.totalChains,
+      scoring_chains: this.scoringChains,
+      farkle_count: this.totalChains - this.scoringChains,
+      banks_taken: this.banksTaken,
+      peak_multiplier: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      final_banked: finalBanked,
+      final_score: finalBanked,
+      avg_chain_score: this.scoringChains > 0 ? finalBanked / this.scoringChains : 0,
+    });
   }
 
   private getPublicState() {

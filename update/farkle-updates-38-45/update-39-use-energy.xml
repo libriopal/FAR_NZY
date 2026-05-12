@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-39" name="useEnergy — Prime/Frenzy Energy Meter Hook" block="B" priority="HIGH">
+
+  <context>
+    The energy system replaces the old AP/Frenzy system entirely.
+    Single meter per player, range 0-300. 0-150 = PRIME (turn-based).
+    151-300 = FRENZY (simultaneous shared board).
+    Global mode: any player crossing 151 switches ALL players to FRENZY.
+    Local energy: per-player independent value.
+    Anchor: player who first triggered FRENZY (tracked).
+    Energy tick uses requestAnimationFrame — NEVER setInterval.
+  </context>
+
+  <dependencies>
+    <dep status="complete">packages/shared/src/types.ts — GameMode type exists</dep>
+    <dep status="complete">apps/client/src/hooks/useGame.ts — will consume globalMode from this hook</dep>
+  </dependencies>
+
+  <new-files>
+
+    <file path="apps/client/src/hooks/useEnergy.ts">
+      <specification>
+        <![CDATA[
+// CONSTANTS (export these — consumed by EnergyMeter.tsx)
+export const MAX_ENERGY = 300;
+export const FRENZY_THRESHOLD = 150;
+export const CATCHUP_THRESHOLD = 75;
+
+// PRIME passive gain: +5 energy/sec
+// PRIME chain cost: -10 (len 2-5), +10 (len 6), +20 (len 6 + wild used)
+// FRENZY drain: -5/sec normal, -3/sec if energy < CATCHUP_THRESHOLD (catch-up)
+// FRENZY chain gain: +10 always, +20 with wild (+2 bonus if catchup active)
+
+export interface EnergyState {
+  energy: number;               // 0-300, current player's local value
+  globalMode: 'PRIME' | 'FRENZY';
+  isAnchor: boolean;            // did this player trigger FRENZY?
+  isCatchup: boolean;           // energy < CATCHUP_THRESHOLD during FRENZY
+  isInstability: boolean;       // anchor dropped below 150, 2s warning active
+}
+
+export interface UseEnergyReturn extends EnergyState {
+  applyChainEnergy: (chainLength: number, usedWild: boolean) => void;
+  forceToFrenzy: () => void;    // Wild Scatter trigger
+  onEnergyZero: (() => void) | null; // callback — fires once when energy hits 0
+}
+
+// Hook signature:
+// useEnergy(globalMode: 'PRIME' | 'FRENZY', onGlobalModeChange: (mode: 'PRIME' | 'FRENZY') => void, onEnergyZero: () => void): UseEnergyReturn
+
+// RAF loop implementation:
+//   useRef for animationFrameId and lastTimestamp
+//   On each frame: compute deltaSeconds from lastTimestamp
+//   Apply passive gain or drain based on globalMode and energy value
+//   Clamp energy to [0, MAX_ENERGY]
+//   If energy crosses FRENZY_THRESHOLD upward and globalMode is PRIME:
+//     call onGlobalModeChange('FRENZY'), set isAnchor = true
+//   If energy hits 0: call onEnergyZero once (use ref flag to prevent multi-fire)
+//   Cleanup: cancelAnimationFrame on unmount
+
+// Input lock: applyChainEnergy must enforce 100ms minimum between calls.
+// Use a ref timestamp for last chain time. If called within 100ms, ignore call.
+// This is the anti-macro server-side rule mirrored client-side.
+
+// Instability: when isAnchor and energy drops below FRENZY_THRESHOLD during FRENZY,
+//   set isInstability = true, start a 2000ms timer.
+//   If energy recovers above FRENZY_THRESHOLD within 2s: clear instability.
+//   If timer expires and energy still below threshold: call onGlobalModeChange('PRIME').
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>RAF loop ONLY. Never use setInterval for energy tick.</constraint>
+        <constraint>Cleanup cancelAnimationFrame on unmount — no memory leaks.</constraint>
+        <constraint>globalMode is passed as prop, not owned internally by this hook.</constraint>
+        <constraint>forceToFrenzy sets energy to FRENZY_THRESHOLD + 1 exactly.</constraint>
+        <constraint>onEnergyZero fires exactly once per depletion event — use ref flag.</constraint>
+        <constraint>No Math.random(). No game state mutations. Hook is purely energy.</constraint>
+        <constraint>TypeScript strict. Export all interfaces.</constraint>
+      </constraints>
+    </file>
+
+  </new-files>
+
+  <do-not>
+    <rule>Do not use setInterval for energy tick — RAF only.</rule>
+    <rule>Do not own globalMode inside this hook — it is passed as a prop.</rule>
+    <rule>Do not import from framer-motion — use motion/react if animation needed.</rule>
+    <rule>Do not add React.StrictMode — it is disabled project-wide.</rule>
+    <rule>Do not reference AP system, speedMeter, or old isFrenzy — those are deleted.</rule>
+  </do-not>
+
+  <verification>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+    <check>applyChainEnergy with len=6 adds +10 in PRIME mode</check>
+    <check>applyChainEnergy with len=6 and usedWild=true adds +20 in PRIME mode</check>
+    <check>energy never exceeds MAX_ENERGY or goes below 0</check>
+    <check>forceToFrenzy sets energy to 151</check>
+    <check>cancelAnimationFrame called on component unmount</check>
+  </verification>
+
+</update>

@@ -22,5 +22,7 @@ export function useMultiplayer() {
     bank: () => mpActions.bank(),
     sendDisruption: (type: DisruptionType, cols: number[]) => mpActions.sendDisruption(type as string, cols),
     leaveRoom: () => mpActions.leaveRoom(),
+    sendRallyVote: (choice: 'bank' | 'pass' | 'continue') => mpActions.sendRallyVote(choice),
+    sendRallyDecisionStart: (expiresAt: number) => mpActions.sendRallyDecisionStart(expiresAt),
   };
 }

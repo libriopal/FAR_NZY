@@ -116,4 +116,10 @@ export const mpActions = {
     _ws = null;
     useMultiplayerStore.setState({ ...INITIAL });
   },
+  sendRallyVote(choice: 'bank' | 'pass' | 'continue') {
+    _send({ type: 'RALLY_VOTE', vote: choice });
+  },
+  sendRallyDecisionStart(expiresAt: number) {
+    _send({ type: 'NOTIFY_RALLY_DECISION', expiresAt });
+  },
 };

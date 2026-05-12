@@ -7,7 +7,10 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import { useGameStore } from './store/gameStore.js';
 import { AgeGate } from './components/AgeGate.js';
+import { KYCGate } from './components/KYCGate.js';
+import { useKYCStore } from './store/kycStore.js';
 import { HomeScreen } from './components/HomeScreen.js';
+import { DebugOverlay } from './components/DebugOverlay.js';
 import { WinScreen, LoseScreen } from './components/WinLoseScreen.js';
 import { analytics } from '@match3d/analytics';
 import { blockchainQueue, rngVerifier } from '@match3d/blockchain';
@@ -31,6 +34,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
 export default function App() {
   const { activeScreen, setUserId, setActiveScreen, updateResources, setCurrentLevel } = useGameStore();
+  const kycModalOpen = useKYCStore(s => s.modalOpen);
 
   useEffect(() => {
     _bootstrap();
@@ -88,6 +92,8 @@ export default function App() {
 
   return (
     <div style={{ width: '100vw', height: '100dvh', overflow: 'hidden', userSelect: 'none' }}>
+      <DebugOverlay />
+      {kycModalOpen && <KYCGate />}
       {activeScreen === 'splash' && <SplashScreen />}
       {activeScreen === 'age_gate' && <AgeGate />}
       {activeScreen === 'home' && <HomeScreen />}

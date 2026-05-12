@@ -9,6 +9,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { sandboxRouter } from './sandbox.js';
 import { GameRoom } from './gameRoom.js';
+import { DEFAULT_SETTINGS } from '@match3d/farkle-shared';
 import { nanoid } from 'nanoid';
 
 const app = express();
@@ -28,7 +29,7 @@ const rooms = new Map<string, GameRoom>();
 function getOrCreateRoom(roomCode: string): GameRoom {
   let room = rooms.get(roomCode);
   if (!room) {
-    room = new GameRoom({ playerCount: 2, turnTimerSeconds: 30, seedPhrase: nanoid(32) });
+    room = new GameRoom({ ...DEFAULT_SETTINGS, playerCount: 2, turnTimerSeconds: 15 });
     rooms.set(roomCode, room);
   }
   return room;

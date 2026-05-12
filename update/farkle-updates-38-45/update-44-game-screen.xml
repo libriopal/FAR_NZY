@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-44" name="GameScreen.tsx — Revised Screen-Fit Layout with Ad Slots" block="D" priority="MEDIUM">
+
+  <context>
+    GameScreen.tsx needs a full revision to implement the locked zone layout.
+    100dvh, no scroll, portrait-mobile-first.
+    Zones (top to bottom): TopBar 44px | EnergyBar 48px | InfoStrip 36px | Grid flex-1 | BankBar 68px
+    HeistGameScreen adds VaultBar 56px below BankBar.
+    Permanently removed: page title, inline ThemeToggle, sidebar HUD, standalone BankButton.
+    Ad slots: interstitial shown between rounds (ROUND_END state), rewarded ad in BankBar.
+    Grid cell sizing via ResizeObserver: cellSize = floor((min(w,h) - padding) / gridDim).
+    Min cell: 28px. Max cell: 72px. Gap: 2px.
+    Visual direction: actual 3D modern.
+  </context>
+
+  <dependencies>
+    <dep status="required">update-39 — useEnergy hook exists</dep>
+    <dep status="required">update-40 — useGame with round flow exists</dep>
+    <dep status="required">update-41 — EnergyMeter and FrenzyOverlay exist</dep>
+    <dep status="required">update-43 — SettingsModal exists</dep>
+    <dep status="complete">apps/client/src/components/Grid.tsx — unchanged</dep>
+    <dep status="complete">apps/client/src/components/MultiplierLadder.tsx — unchanged</dep>
+  </dependencies>
+
+  <modified-files>
+
+    <file path="apps/client/src/components/GameScreen.tsx">
+      <specification>
+        <![CDATA[
+// ZONE LAYOUT (flex-col, height: 100dvh, overflow: hidden):
+//
+// [TopBar]    44px  — zinc-900 bg
+//   Left:  mode label (SOLO FREE / SOLO CASINO) font-mono font-bold text-amber-400
+//   Center: Round # display
+//   Right: gear button (U+2699 text, opens SettingsModal)
+//
+// [EnergyBar] 48px — EnergyMeter component (full width)
+//   Receives energy, globalMode, isInstability, isCatchup from useEnergy
+//
+// [InfoStrip] 36px — zinc-950 bg, border-b border-zinc-800
+//   Left:  multiplier badge "x1.5" in amber, font-mono font-black
+//   Center: MultiplierLadder (6 dots, compact)
+//   Right: last combo label (e.g. "THREE OF A KIND") text-xs font-mono
+//
+// [Grid]      flex-1 — position: relative, overflow: hidden
+//   Grid component fills this zone
+//   FrenzyOverlay absolutely positioned over grid (pointer-events: none)
+//   Chain preview banner: absolutely positioned top of grid zone
+//     Shows "THREE 1s + SINGLE 5 = 1050 x1.5" while dragging
+//     Shows "FARKLE" in red when chain would score 0
+//
+// [BankBar]   68px — zinc-900 bg, border-t border-zinc-800
+//   Left section:  "BANKED" label + value in green (permanent)
+//   Center section: "AT RISK" label + value in amber (pulsing when > 0)
+//   Right section: [BANK] button — amber bg, text-black, font-black
+//                  Disabled and grayed when unbanked === 0
+//                  Shows rewarded ad option: small "Watch ad +50 FD" text below button
+//                  Only shown when adsEnabled and rewarded ad available
+//
+// ROUND_END interstitial:
+//   When roundPhase === 'ROUND_END' and interstitialDue === true:
+//   Show full-screen overlay with "Round Complete" + score summary
+//   "Watch Ad for Bonus FD" button (calls onInterstitialRequest prop)
+//   "Continue" button skips ad
+//   5-second auto-continue if no interaction
+//
+// ResizeObserver on Grid container ref:
+//   On resize: cellSize = Math.floor((Math.min(w, h) - 16) / gridDim)
+//   Clamp: Math.max(28, Math.min(72, cellSize))
+//   Pass cellSize down to Grid component as prop
+//
+// SettingsModal: rendered at root of GameScreen, isOpen state managed here
+// ScorePopup: absolutely positioned, rendered via portal or absolute in Grid zone
+//
+// Props:
+//   mode: GameMode
+//   adsEnabled?: boolean
+//   onRewardedAdRequest?: () => void
+//   onInterstitialRequest?: () => void
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>100dvh height. overflow: hidden on root. No page scroll ever.</constraint>
+        <constraint>Gear is U+2699 text character only.</constraint>
+        <constraint>No page title "FARKLE FRENZY" — TopBar shows mode label only.</constraint>
+        <constraint>No standalone BankButton component — bank action is inside BankBar.</constraint>
+        <constraint>No sidebar HUD panel.</constraint>
+        <constraint>No inline ThemeToggle — it is in SettingsModal.</constraint>
+        <constraint>ResizeObserver cleanup on unmount.</constraint>
+        <constraint>motion/react for animations — not framer-motion.</constraint>
+        <constraint>Ad slots are optional props — game works without them.</constraint>
+      </constraints>
+    </file>
+
+  </modified-files>
+
+  <do-not>
+    <rule>Do not add page title or header text "FARKLE FRENZY".</rule>
+    <rule>Do not import framer-motion.</rule>
+    <rule>Do not add sidebar or left column HUD.</rule>
+    <rule>Do not add standalone BankButton component import.</rule>
+    <rule>Do not use setInterval for ResizeObserver polling — use the API directly.</rule>
+    <rule>Do not make ad slots required — they are optional props with defaults of undefined.</rule>
+  </do-not>
+
+  <verification>
+    <check>Total fixed zone height is 196px (44+48+36+68) leaving flex-1 for grid</check>
+    <check>No scroll appears on mobile portrait at 375px width</check>
+    <check>ResizeObserver fires and cellSize updates on window resize</check>
+    <check>BankBar BANK button disabled when unbanked === 0</check>
+    <check>SettingsModal opens on gear click</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+  </verification>
+
+</update>

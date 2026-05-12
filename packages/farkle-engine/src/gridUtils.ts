@@ -182,6 +182,43 @@ export function multiplayerGridSize(playerCount: number): number {
   return 10;
 }
 
+// ── Grid creation helpers ─────────────────────────────────────────────────────
+
+// Biased placement: 70% chance each subsequent stone spawns adjacent to an
+// existing stone, producing vein/chunk formations. Mutates `pool` in-place.
+function _clusterPlace(pool: GridPos[], count: number, rng: () => number): GridPos[] {
+  const placed: GridPos[] = [];
+  if (count === 0 || pool.length === 0) return placed;
+
+  const takeIdx = (idx: number) => {
+    const pos = pool[idx]!;
+    pool.splice(idx, 1);
+    return pos;
+  };
+
+  // First stone: random
+  placed.push(takeIdx(Math.floor(rng() * pool.length)));
+
+  for (let n = 1; n < count && pool.length > 0; n++) {
+    if (rng() < 0.70) {
+      // Try to find a candidate adjacent to any already-placed stone
+      const anchor = placed[Math.floor(rng() * placed.length)]!;
+      const adjIdx = pool.findIndex(p =>
+        Math.abs(p.row - anchor.row) <= 1 &&
+        Math.abs(p.col - anchor.col) <= 1 &&
+        !(p.row === anchor.row && p.col === anchor.col)
+      );
+      if (adjIdx !== -1) {
+        placed.push(takeIdx(adjIdx));
+        continue;
+      }
+    }
+    // Fallback: random from remaining pool
+    placed.push(takeIdx(Math.floor(rng() * pool.length)));
+  }
+  return placed;
+}
+
 // ── Grid creation ─────────────────────────────────────────────────────────────
 
 const BLOCKER_DENSITY_RANGES = {
@@ -214,7 +251,9 @@ export function createGrid(
   }
   shuffle(candidates, rng);
 
-  const stonePos = candidates.splice(0, stoneCount);
+  // Stone clustering: each new stone has a 70% chance to place adjacent to an
+  // existing stone, creating vein/chunk layouts. Total count is unchanged.
+  const stonePos = _clusterPlace(candidates, stoneCount, rng);
   const icePos = candidates.splice(0, iceCount);
   const lockPos = candidates.splice(0, lockCount);
 
@@ -262,10 +301,11 @@ export function stepGravity(grid: Cell[][]): { grid: Cell[][], changed: boolean 
   for (let r = rows - 2; r >= 0; r--) {
     for (let c = 0; c < cols; c++) {
       const cell = newGrid[r][c];
-      if (
+      const canFall = cell.state === 'WILD' || cell.type === 'ICE' || (
         cell.state === 'NORMAL' &&
         (isDieTile(cell) || cell.type === 'BOMB_STANDARD' || cell.type === 'BOMB_RAINBOW')
-      ) {
+      );
+      if (canFall) {
         if (newGrid[r + 1][c].state === 'EMPTY') {
           newGrid[r + 1][c] = cell;
           newGrid[r][c] = makeEmptyCell();
@@ -283,9 +323,10 @@ export function hasEmptyBelow(grid: Cell[][]): boolean {
   for (let r = 0; r < rows - 1; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = grid[r][c];
-      if (cell.state === 'NORMAL' && isDieTile(cell)) {
-        if (grid[r + 1][c].state === 'EMPTY') return true;
-      }
+      const canFall = cell.state === 'WILD' || cell.type === 'ICE' || (
+        cell.state === 'NORMAL' && isDieTile(cell)
+      );
+      if (canFall && grid[r + 1][c].state === 'EMPTY') return true;
     }
   }
   return false;
@@ -343,7 +384,7 @@ export function applyStandardBomb(
   isHeadhunter = false
 ): { grid: Cell[][], ptsEarned: number, affected: GridPos[] } {
   const newGrid = cloneGrid(grid);
-  let ptsEarned = 0;
+  let ptsEarned = 25; // bomb self-score for detonation
   const affected: GridPos[] = [];
   const rows = newGrid.length;
   const cols = newGrid[0].length;
@@ -364,9 +405,13 @@ export function applyStandardBomb(
         }
       } else if (cell.type === 'ICE' || cell.state === 'FROZEN') {
         newGrid[r][c] = makeEmptyCell();
+      } else if (cell.type === 'BOMB_STANDARD' || cell.type === 'BOMB_RAINBOW') {
+        newGrid[r][c] = makeEmptyCell();
       } else if (isDieTile(cell)) {
         newGrid[r][c] = makeEmptyCell();
-        ptsEarned += GAME_CONSTANTS.BOMB_DIE_PTS;
+        // Farkle-consistent: 1s=100pts, 5s=50pts, other faces=0pts
+        if (cell.face === 1) ptsEarned += 100;
+        else if (cell.face === 5) ptsEarned += 50;
       }
     }
   }
@@ -437,6 +482,36 @@ export function damageAdjacentBlockers(
 
 // ── Chain validation ──────────────────────────────────────────────────────────
 
+function _isChainableTile(cell: Cell): boolean {
+  return isDieTile(cell) || cell.state === 'WILD';
+}
+
+function _rawFace(cell: Cell): number {
+  return cell.state === 'WILD' ? 0 : (cell.face as DieFace);
+}
+
+function _resolveWilds(faces: number[]): DieFace[] {
+  const wildIdx = faces.reduce<number[]>((acc, f, i) => (f === 0 ? [...acc, i] : acc), []);
+  if (wildIdx.length === 0) return faces as DieFace[];
+
+  const numWilds = wildIdx.length;
+  const total = Math.pow(6, numWilds);
+  let bestScore = -1;
+  let bestFaces = faces.slice() as DieFace[];
+
+  for (let combo = 0; combo < total; combo++) {
+    const candidate = faces.slice() as DieFace[];
+    let c = combo;
+    for (let w = 0; w < numWilds; w++) {
+      candidate[wildIdx[w]] = ((c % 6) + 1) as DieFace;
+      c = Math.floor(c / 6);
+    }
+    const score = lookupScore(candidate, getScanTable());
+    if (score > bestScore) { bestScore = score; bestFaces = candidate.slice(); }
+  }
+  return bestFaces;
+}
+
 export function hasValidChain(grid: Cell[][]): boolean {
   const rows = grid.length;
   const cols = grid[0].length;
@@ -444,22 +519,22 @@ export function hasValidChain(grid: Cell[][]): boolean {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const startCell = grid[r][c];
-      if (!isDieTile(startCell)) continue;
+      if (!_isChainableTile(startCell)) continue;
 
-      const queue: { path: GridPos[], faces: DieFace[] }[] = [];
-      queue.push({ path: [{ row: r, col: c }], faces: [startCell.face as DieFace] });
+      const queue: { path: GridPos[], faces: number[] }[] = [];
+      queue.push({ path: [{ row: r, col: c }], faces: [_rawFace(startCell)] });
 
       while (queue.length > 0) {
         const { path, faces } = queue.shift()!;
-        if (lookupScore(faces, getScanTable()) > 0) return true;
+        if (lookupScore(_resolveWilds(faces), getScanTable()) > 0) return true;
         if (path.length >= GAME_CONSTANTS.MAX_CHAIN) continue;
 
         const lastPos = path[path.length - 1];
         for (const n of getNeighbors(grid, lastPos.row, lastPos.col)) {
           if (path.some(p => p.row === n.row && p.col === n.col)) continue;
           const nCell = grid[n.row][n.col];
-          if (!isDieTile(nCell)) continue;
-          queue.push({ path: [...path, n], faces: [...faces, nCell.face as DieFace] });
+          if (!_isChainableTile(nCell)) continue;
+          queue.push({ path: [...path, n], faces: [...faces, _rawFace(nCell)] });
         }
       }
     }

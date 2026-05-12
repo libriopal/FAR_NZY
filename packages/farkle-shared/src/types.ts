@@ -46,16 +46,18 @@ export interface SpawnWeights {
 export const SPAWN_WEIGHTS: Record<'NORMAL' | 'PRIME' | 'FRENZY', SpawnWeights> = {
   NORMAL: { die:62, sphere:25, ice:1,  lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:4, stone:4, multiplier_orb:3, ghost:1, catalyst:0 },
   PRIME:  { die:52, sphere:18, ice:6,  lock:3, wild:2, bomb:1, rainbow_bomb:0, mirror:6, stone:5, multiplier_orb:4, ghost:2, catalyst:1 },
-  FRENZY: { die:38, sphere:12, ice:6,  lock:4, wild:9, bomb:7, rainbow_bomb:2, mirror:7, stone:5, multiplier_orb:5, ghost:3, catalyst:2 },
+  FRENZY: { die:39, sphere:12, ice:6,  lock:4, wild:9, bomb:7, rainbow_bomb:1, mirror:7, stone:5, multiplier_orb:5, ghost:3, catalyst:2 },
 } as const;
 
 export const BOMB_CONSTANTS = {
-  STANDARD_RADIUS: 1,
-  DIE_PTS: 25,
+  STANDARD_RADIUS: 1,  // column spread for 3×3 tile pattern
+  SELF_PTS: 25,        // points for detonating the bomb itself
+  DIE_PTS_ONE: 100,    // blast reward for face=1 die (Farkle-consistent)
+  DIE_PTS_FIVE: 50,    // blast reward for face=5 die (Farkle-consistent)
   LOCK_PTS: 50,
   WILD_PTS: 75,
   MIRROR_PTS: 30,
-  STONE_PTS: 100,      // bonus for destroying stone
+  STONE_PTS: 50,       // aligned with GAME_CONSTANTS.BOMB_STONE_PTS
   CATALYST_PTS: 40,
   SPHERE_ENERGY: 20,
   MULTIPLIER_ORB_ENERGY: 15,
@@ -333,3 +335,11 @@ export const USERNAME_COLOR_HEX: Record<UsernameColor, string> = {
   red: '#f43f5e', orange: '#f97316', yellow: '#fbbf24',
   green: '#10b981', blue: '#38bdf8', purple: '#7c3aed'
 };
+
+
+export interface DecisionContext {
+  decision: 'BANK' | 'CONTINUE' | 'PASS';
+  unbanked: number;
+  multiplierStep: number;
+  chainNumber: number;
+}

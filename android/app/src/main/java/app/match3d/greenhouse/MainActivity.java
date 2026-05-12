@@ -18,29 +18,25 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         WebSettings settings = webView.getSettings();
 
-        // Performance: enable GPU rasterization for canvas/WebGL
+        // Performance: elevate renderer priority
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             webView.setRendererPriorityPolicy(
                 WebView.RENDERER_PRIORITY_IMPORTANT, true
             );
         }
 
-        // Enable safe browsing (security)
+        // Enable safe browsing
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             WebView.startSafeBrowsing(this, null);
         }
 
-        // Disable unnecessary features for performance
+        // Disable form/password saving — app handles its own auth
         settings.setSaveFormData(false);
-        settings.setSavePassword(false);
 
-        // Force dark mode off — the app has its own dark theme
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            webView.setForceDark(WebView.FORCE_DARK_OFF);
-        }
-
-        // Allow mixed content in debug only — production enforces HTTPS via network_security_config
-        if (BuildConfig.DEBUG) {
+        // Allow mixed content in debug builds only (HTTPS enforcement handled by network_security_config in release)
+        boolean isDebug = getApplicationInfo().flags != 0 &&
+                (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (isDebug) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
     }

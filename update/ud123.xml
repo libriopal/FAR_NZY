@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<farkle_frenzy_revision_prompt version="4.0">
+
+    <purpose>
+        Refine and stabilize the existing Farkle Frenzy implementation while preserving all canonical gameplay systems from the master architecture document.
+        
+        This revision focuses on:
+        - tray-based chain capacity logic
+        - delayed scoring/energy burn mechanics
+        - visual readability
+        - improved cube dice rendering
+        - refined bomb presentation
+        - dynamic lighting
+        - strategic visibility tradeoffs
+        - board layout fixes
+        - chain validation bug fixes
+        - bomb spawn balancing
+    </purpose>
+
+    <!-- ===================================================== -->
+    <!-- CORE CHAIN + TRAY SYSTEM                              -->
+    <!-- ===================================================== -->
+
+    <tray_system>
+
+        <overview>
+            Replace the current instant-resolution chain behavior with a physical tray-processing system.
+
+            The tray becomes a visible gameplay mechanic and directly controls:
+            - chain capacity
+            - scoring timing
+            - energy timing
+            - player decision-making
+            - board readability pressure
+        </overview>
+
+        <tray_behavior>
+
+            <slots>
+                <max_slots>6</max_slots>
+                <orientation>horizontal</orientation>
+                <gravity_direction>top_left_to_bottom_left</gravity_direction>
+            </slots>
+
+            <capacity_rules>
+                The player may only create a chain equal to the number of currently empty tray slots.
+
+                Example:
+                - 6 empty slots = max chain length 6
+                - 3 empty slots = max chain length 3
+                - 1 empty slot = max chain length 1
+
+                Tray occupancy dynamically limits selectable chain length.
+            </capacity_rules>
+
+            <object_flow>
+
+                <green_energy_spheres>
+                    When clicked:
+                    - smoothly fall into tray
+                    - shrink during fall
+                    - occupy tray slot
+                    - remain temporarily
+                    - burn off after delay
+                    - disappear from tray
+                    - award player energy only AFTER burn completion
+                </green_energy_spheres>
+
+                <dice_chains>
+                    Any committed chain:
+                    - scoring or non-scoring
+                    - drops physically into tray
+                    - shrinks during movement
+                    - occupies slots
+                    - waits before processing
+                    - burns off after delay
+                    - disappears from tray
+                    - awards score only AFTER burn completion
+                </dice_chains>
+
+            </object_flow>
+
+            <burn_behavior>
+
+                <delay_seconds>2-4</delay_seconds>
+
+                <effects>
+                    - gradual dissolve
+                    - ember fade
+                    - particle ash
+                    - opacity reduction
+                    - soft glow decay
+                </effects>
+
+                <completion>
+                    After burn completion:
+                    - object removed from tray
+                    - slot becomes available
+                    - remaining tray objects smoothly shift left
+                </completion>
+
+            </burn_behavior>
+
+            <strategic_goal>
+                This system intentionally creates timing-based strategic pressure.
+
+                Players must decide:
+                - collect energy spheres and wait for tray clearing
+                OR
+                - immediately commit smaller chains
+
+                Collecting too many energy spheres reduces tray space and slows future chain capacity.
+
+                Energy collection becomes both:
+                - a reward
+                - a temporary gameplay tax
+            </strategic_goal>
+
+        </tray_behavior>
+
+    </tray_system>
+
+    <!-- ===================================================== -->
+    <!-- CHAIN BUG FIXES                                       -->
+    <!-- ===================================================== -->
+
+    <chain_validation>
+
+        <critical_bug>
+            A bug currently allows players to exceed the intended six-tile chain limit by rapidly dragging across the board.
+
+            The visuals fail to display the illegal chain length properly, but the underlying logic still accepts chains longer than six.
+        </critical_bug>
+
+        <required_fix>
+            Hard-cap chain length at six tiles in BOTH:
+            - visual layer
+            - gameplay logic layer
+
+            Once six tiles are selected:
+            - all additional tiles become non-interactable
+            - further drag movement ignored
+            - no hidden overflow chains allowed
+        </required_fix>
+
+    </chain_validation>
+
+    <!-- ===================================================== -->
+    <!-- DICE VISUAL REDESIGN                                  -->
+    <!-- ===================================================== -->
+
+    <dice_visual_upgrade>
+
+        <geometry>
+            Replace current flattened rectangular prism dice with proper full cubes.
+
+            Dice must visually resemble authentic casino dice.
+        </geometry>
+
+        <faces>
+
+            <pips>
+                Every face must contain proper pip layouts.
+
+                Examples:
+                - face 1 = single center pip
+                - face 2 = diagonal pair
+                - face 3 = triangle arrangement
+                - face 4 = four corners
+                - face 5 = four corners + center
+                - face 6 = three vertical pairs
+            </pips>
+
+            <rules>
+                - pips visible on all exposed faces
+                - maintain existing color coding
+                - preserve readability during movement
+                - support lighting/reflection
+            </rules>
+
+        </faces>
+
+        <special_tiles>
+
+            <icons>
+                Replace temporary/pixelated special icons with refined high-resolution symbolic overlays inspired by lobby visuals.
+
+                Applies to:
+                - Wild
+                - Ice
+                - Stone
+                - Lock
+                - other special entities
+            </icons>
+
+            <style>
+                - smooth
+                - polished
+                - glowing
+                - vector-clean
+                - casino-grade readability
+            </style>
+
+        </special_tiles>
+
+    </dice_visual_upgrade>
+
+    <!-- ===================================================== -->
+    <!-- RAINBOW BOMB REDESIGN                                 -->
+    <!-- ===================================================== -->
+
+    <rainbow_bomb_revision>
+
+        <goal>
+            Make Rainbow Bomb detonations feel dramatic, suspenseful, magical, and visually overwhelming.
+        </goal>
+
+        <spawn_rules>
+
+            <skill_spawns>
+                Preserve canonical spawning:
+                - Straight chains spawn Rainbow Bombs
+                - Six-of-a-kind spawns Standard Bombs
+            </skill_spawns>
+
+            <random_spawns>
+                Preserve accidental/random bomb spawning behavior caused by current systems.
+
+                DO NOT remove random bomb appearances entirely.
+
+                Instead:
+                - reduce frequency substantially
+                - make random bomb spawns feel rare
+                - preserve surprise factor
+            </random_spawns>
+
+        </spawn_rules>
+
+        <detonation_sequence>
+
+            <anticipation_phase duration="2-3_seconds">
+
+                <behavior>
+                    - slow suspense buildup
+                    - rainbow cycling intensifies
+                    - audio charge-up
+                    - subtle board dimming
+                    - player anticipation moment
+                </behavior>
+
+            </anticipation_phase>
+
+            <detonation>
+
+                <screen_effects>
+                    - gray/desaturate entire board
+                    - preserve chosen target color vibrancy
+                    - selected color dominates screen
+                </screen_effects>
+
+                <tile_feedback>
+                    Matching tiles:
+                    - glow intensely
+                    - pulse brightly
+                    - become unmistakably visible
+                    - clearly communicate destruction targets
+                </tile_feedback>
+
+                <visual_style>
+                    - far more rainbow energy
+                    - magical spectrum explosions
+                    - layered rainbow particles
+                    - soft bloom
+                    - elegant rather than violent
+                </visual_style>
+
+            </detonation>
+
+        </detonation_sequence>
+
+    </rainbow_bomb_revision>
+
+    <!-- ===================================================== -->
+    <!-- BOARD LAYOUT FIXES                                    -->
+    <!-- ===================================================== -->
+
+    <board_layout_revision>
+
+        <issue>
+            On the standard 7x7 board:
+            - left and right edge columns visually clip offscreen
+            - physics and spacing currently distort presentation
+        </issue>
+
+        <required_fix>
+            DO NOT reduce cube size.
+
+            Instead:
+            - adjust spacing/alignment
+            - compress column padding slightly
+            - reposition overall board
+            - increase vertical board positioning
+            - ensure all edge columns fully visible
+        </required_fix>
+
+    </board_layout_revision>
+
+    <!-- ===================================================== -->
+    <!-- LIGHTING SYSTEM EXPANSION                             -->
+    <!-- ===================================================== -->
+
+    <lighting_revision>
+
+        <bomb_lighting>
+
+            <standard_bomb>
+                Explosion should emit actual dynamic light.
+
+                Include:
+                - radial flash
+                - environmental lighting pulse
+                - glow falloff
+                - brief board illumination
+            </standard_bomb>
+
+            <rainbow_bomb>
+                Generate:
+                - spectrum lighting
+                - layered rainbow bloom
+                - full-screen color atmosphere
+            </rainbow_bomb>
+
+        </bomb_lighting>
+
+        <energy_spheres>
+
+            <appearance>
+                Make energy spheres emit bright neon green light.
+            </appearance>
+
+            <dynamic_glow>
+                Glow should:
+                - radiate outward
+                - softly illuminate nearby tiles
+                - pulse organically
+                - react to movement physics
+                - feel alive
+            </dynamic_glow>
+
+            <strategic_visibility>
+
+                Leaving spheres on the board:
+                - improves visibility
+                - keeps board illuminated
+
+                Collecting spheres:
+                - removes local lighting
+                - darkens board sections
+                - slightly reduces readability
+
+                This intentionally creates another strategic layer:
+                visibility versus energy acquisition.
+            </strategic_visibility>
+
+        </energy_spheres>
+
+    </lighting_revision>
+
+    <!-- ===================================================== -->
+    <!-- FINAL DESIGN GOALS                                    -->
+    <!-- ===================================================== -->
+
+    <desired_player_feeling>
+
+        <gameplay>
+            - high skill ceiling
+            - meaningful timing decisions
+            - tactical board reading
+            - satisfying chain management
+        </gameplay>
+
+        <visuals>
+            - casino-grade polish
+            - rich neon atmosphere
+            - readable chaos
+            - dynamic lighting
+            - magical spectacle
+        </visuals>
+
+        <overall_identity>
+            Farkle Frenzy should feel like:
+            - a living puzzle organism
+            - a risk/reward casino strategy game
+            - a reactive neon physics playground
+            - a skill-first arcade experience
+        </overall_identity>
+
+    </desired_player_feeling>
+
+</farkle_frenzy_revision_prompt>

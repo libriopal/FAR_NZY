@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-40" name="useGame — Major Patch: Energy + Round Flow + Skill Logging" block="B" priority="HIGH">
+
+  <context>
+    useGame.ts is the central state machine for Farkle Frenzy.
+    This patch wires in: energy system round flow, skill decision logging,
+    SixPoolManager for tile spawning, Wild Blocker resolution,
+    and the new round end conditions (SHORT_CHAIN, FARKLE, ENERGY_ZERO).
+    MUST run after update-39 (useEnergy exists) and update-38 (skillMetrics exists).
+  </context>
+
+  <dependencies>
+    <dep status="required">update-39 complete — useEnergy.ts exists</dep>
+    <dep status="required">update-38 complete — skillMetrics.ts exists</dep>
+    <dep status="complete">packages/engine/src/farkleScorer.ts — scoreFarkle() exists</dep>
+    <dep status="complete">packages/engine/src/gridUtils.ts — SixPoolManager exists</dep>
+  </dependencies>
+
+  <modified-files>
+
+    <file path="apps/client/src/hooks/useGame.ts">
+      <description>Replace the entire useReducer implementation with the V3 architecture.</description>
+      <specification>
+        <![CDATA[
+// NEW ACTIONS to add to existing action union:
+// APPLY_CHAIN_ENERGY: { chainLength: number; usedWild: boolean }
+// ROUND_END: { reason: 'SHORT_CHAIN' | 'FARKLE' | 'ENERGY_ZERO' }
+// LOG_DECISION: { decision: DecisionContext }  -- passed to analytics, no state change
+// WILD_SCATTER: {} -- triggers when 3+ wilds on board simultaneously
+// ARCHIVIST_RECOVER: {} -- 15% of farkle pool recovered per chain (Rally only)
+
+// ROUND FLOW (replace old match flow):
+//   Chain len 6 → score > 0 → CONTINUE (multiplier advances, stay ROLLING)
+//   Chain len 2-5 → score > 0 → AUTO-BANK → ROUND_END reason: SHORT_CHAIN
+//   Any chain → score = 0 → ROUND_END reason: FARKLE (no bank, points lost)
+//   Energy = 0 callback → AUTO-BANK → ROUND_END reason: ENERGY_ZERO
+//
+// AUTO-BANK: unbanked transfers to banked, multiplier resets to step 0.
+// FARKLE: unbanked resets to 0, multiplier resets to step 0.
+//         In Rally/Heist: lost unbanked → farklePool (not discarded).
+
+// COMMIT_CHAIN case additions:
+//   After scoreFarkle(): dispatch LOG_DECISION with full DecisionContext
+//   Check result.isSixOfAKind → place BOMB_STANDARD cell at chain center
+//   Check result.isStraight → place BOMB_RAINBOW cell at chain center
+//   Check resolveWilds() if any chain cell has state === 'WILD'
+//   After scoring: check scanForWilds(grid) >= 3 → dispatch WILD_SCATTER
+
+// SpawnPool: SixPoolManager instance in useRef (not in state).
+//   Created once on mount: new SixPoolManager(gridSize, csprng)
+//   spawnTiles() calls pool.draw() for each empty cell
+//   Dead board check: if (!hasValidChain(grid)) → pool reshuffle then respawn
+
+// CASCADE: setTimeout recursion at CASCADE_MS (80ms). NEVER setInterval.
+//   Step 1: stepGravity()
+//   Step 2: spawnTiles() using SixPoolManager
+//   Step 3: normalizeTiles()
+//   Step 4: when stable → check dead board → REFILL_COMPLETE
+
+// CHAIN_MIN enforcement: chain.length < 2 → do not dispatch COMMIT_CHAIN.
+//   This gate is in useGame only — scoreFarkle() has no minimum.
+
+// Skill logging:
+//   On every COMMIT_CHAIN: collect DecisionContext and call analytics.insertChainDecision()
+//   Fire-and-forget. Never await. Wrapped in try/catch.
+//   On session end / ROUND_END: call analytics.insertSession() with full SessionAnalytics.
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>CASCADE uses setTimeout recursion — never setInterval.</constraint>
+        <constraint>SixPoolManager lives in useRef — not in reducer state.</constraint>
+        <constraint>Analytics calls are fire-and-forget — never block the game loop.</constraint>
+        <constraint>Chain minimum of 2 enforced here only — not in scorer.</constraint>
+        <constraint>Bombs are Cell.type values — never add activeBombs array to state.</constraint>
+        <constraint>Do not regenerate AP system, speedMeter, or old Frenzy boolean.</constraint>
+        <constraint>motion/react for animations — not framer-motion.</constraint>
+        <constraint>React.StrictMode is disabled — do not add it.</constraint>
+      </constraints>
+    </file>
+
+  </modified-files>
+
+  <do-not>
+    <rule>Do not add activeBombs array or ActiveBomb interface to GameState.</rule>
+    <rule>Do not use setInterval for cascade or energy.</rule>
+    <rule>Do not regenerate SpawnPool class — use SixPoolManager.</rule>
+    <rule>Do not add recoverDeadBoard() or ensurePlayableGrid() — deleted.</rule>
+    <rule>Do not import from framer-motion.</rule>
+    <rule>Do not use Math.random() for any game event.</rule>
+    <rule>Do not use SP_FREE or SP_CASINO mode names — use SOLO_FREE/SOLO_CASINO.</rule>
+  </do-not>
+
+  <verification>
+    <check>Chain of length 1 does not commit (minimum 2 enforced)</check>
+    <check>Chain of length 2-5 with score > 0 triggers AUTO-BANK then ROUND_END</check>
+    <check>Chain of length 6 with score > 0 does NOT end round — CONTINUE</check>
+    <check>Farkle resets unbanked to 0 and multiplier to step 0</check>
+    <check>BOMB_STANDARD placed when isSixOfAKind is true</check>
+    <check>BOMB_RAINBOW placed when isStraight is true</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+  </verification>
+
+</update>

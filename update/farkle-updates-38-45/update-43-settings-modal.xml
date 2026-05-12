@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-43" name="SettingsModal — THEME + AUDIO + SANDBOX + ACCOUNT + ADS" block="D" priority="MEDIUM">
+
+  <context>
+    SettingsModal is triggered by the gear icon (U+2699, not emoji, not image)
+    in the TopBar. It has 5 tabs: THEME | AUDIO | SANDBOX | ACCOUNT | ADS.
+    ADS tab is new — manages rewarded ad preferences and shows current
+    FD (Farkle Dust) balance earned via rewarded ads.
+    ThemeToggle has been moved from inline UI into THEME tab.
+    This is part of the screen-fit layout — modal overlays the game,
+    does not push content or scroll.
+  </context>
+
+  <dependencies>
+    <dep status="complete">apps/client/src/hooks/useTheme.ts — theme state exists</dep>
+    <dep status="complete">apps/client/src/hooks/useWallet.ts — FD/PDX balances exist</dep>
+    <dep status="pending">update-38 — analytics context available but not blocking</dep>
+  </dependencies>
+
+  <new-files>
+
+    <file path="apps/client/src/components/SettingsModal.tsx">
+      <specification>
+        <![CDATA[
+// Props:
+//   isOpen: boolean
+//   onClose: () => void
+//   initialTab?: 'THEME' | 'AUDIO' | 'SANDBOX' | 'ACCOUNT' | 'ADS'
+
+// Modal: centered overlay, max-width 480px, max-height 80dvh.
+// Backdrop: rgba(0,0,0,0.7) with blur(4px).
+// Close button: X in top-right corner (text "X", not an icon component).
+// ACCOUNT tab positioned immediately LEFT of the X close button in the tab row.
+// Gear trigger: U+2699 Unicode character (not emoji, not lucide icon).
+
+// TAB: THEME
+//   Dark/Light toggle (was ThemeToggle.tsx — absorb it here)
+//   Primary accent color picker: 6 swatches (amber/violet/emerald/sky/rose/slate)
+//   Font size: Small / Medium / Large (affects game number rendering only)
+
+// TAB: AUDIO
+//   Master volume slider 0-100
+//   Individual toggles: Chain sounds | Match sounds | Farkle sound | Bank sound | Bomb sounds
+//   All Web Audio API — no asset files
+
+// TAB: SANDBOX
+//   Placeholder: "Sandbox available in SOLO modes only"
+//   When in SOLO mode: renders SandboxTab component (already designed)
+//   Import SandboxTab lazily (React.lazy) — it is heavy
+
+// TAB: ACCOUNT
+//   Shows current UserProfile (username, color, ascii art preview)
+//   FD balance display (from useWallet)
+//   PDX balance display (from useWallet) — grayed out with "Coming Soon" if not live
+//   "Edit Profile" button → triggers profile edit flow (inline, not new screen)
+//   Skill score display: "Your Skill Rating: {score}/100" (from last 10 sessions avg)
+
+// TAB: ADS
+//   Toggle: "Rewarded Ads" on/off (persisted in localStorage)
+//   When on: show "Watch an ad to earn +50 FD" button
+//   Rewarded ad slot: placeholder callback prop onRewardedAdRequest: () => void
+//   Interstitial frequency setting: "After every 3/5/10 rounds" selector
+//   Current session FD earned from ads: display counter
+//   Privacy note: "Ads are provided by [network]. View privacy policy."
+//   Note: ADS tab is visible only when adsEnabled flag is true in app config.
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>Gear trigger is U+2699 text character — not an emoji, not a Lucide icon.</constraint>
+        <constraint>ACCOUNT tab is LEFT of the X button in tab row.</constraint>
+        <constraint>SandboxTab imported lazily — do not eager-import heavy components.</constraint>
+        <constraint>No framer-motion — use motion/react for modal open/close animation.</constraint>
+        <constraint>Modal does not scroll the page — it is self-contained with internal scroll if needed.</constraint>
+        <constraint>No non-ASCII characters in source file.</constraint>
+      </constraints>
+    </file>
+
+  </new-files>
+
+  <do-not>
+    <rule>Do not use framer-motion.</rule>
+    <rule>Do not inline ThemeToggle as a separate component — absorb its logic into THEME tab.</rule>
+    <rule>Do not use emoji for the gear trigger — U+2699 text only.</rule>
+    <rule>Do not make the ADS tab visible when adsEnabled config flag is false.</rule>
+    <rule>Do not push page content when modal opens — overlay only.</rule>
+  </do-not>
+
+  <verification>
+    <check>Gear icon renders as U+2699 text character</check>
+    <check>ACCOUNT tab is positioned left of X close button</check>
+    <check>ADS tab hidden when adsEnabled is false</check>
+    <check>Modal closes on backdrop click and X button</check>
+    <check>SandboxTab is lazy-imported</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+  </verification>
+
+</update>

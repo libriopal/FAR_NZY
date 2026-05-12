@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-45" name="Server gameRoom.ts — Final: WebSocket + Skill Logging + Provably Fair" block="E" priority="HIGH">
+
+  <context>
+    gameRoom.ts is the final server patch. It is the authoritative game state
+    for all multiplayer modes (VS, Rally, Heist). It also logs skill analytics
+    for every session including SOLO modes when played with a connected client.
+    Server is Express v5 + ws (WebSocket). Database is sql.js (NOT better-sqlite3).
+    Supabase is used for analytics inserts only — not for session game state.
+    This patch must run LAST in the E block. All prior patches must be complete.
+    The Detector/Transformer pipeline (V3 architecture) runs entirely server-side.
+  </context>
+
+  <dependencies>
+    <dep status="required">update-38 — skillMetrics.ts and analytics.ts exist</dep>
+    <dep status="required">update-39 — useEnergy constants available for server mirror</dep>
+    <dep status="required">update-40 — useGame round flow logic to mirror server-side</dep>
+    <dep status="complete">packages/engine/src/farkleScorer.ts</dep>
+    <dep status="complete">packages/engine/src/gridUtils.ts — SixPoolManager</dep>
+    <dep status="complete">packages/engine/src/skillMetrics.ts — from update-38</dep>
+  </dependencies>
+
+  <modified-files>
+
+    <file path="apps/server/src/gameRoom.ts">
+      <specification>
+        <![CDATA[
+// GameRoom class — one instance per active game session.
+
+// STATE owned by GameRoom:
+//   grid: Cell[][]                   — authoritative board
+//   players: Player[]                — connected players
+//   phase: GamePhase                 — IDLE | REFILLING | ROUND_END | HEIST_WINDOW
+//   activePlayerId: string
+//   unbanked: number
+//   banked: Record<string, number>   — per player
+//   multiplierStep: number           — 0-5
+//   farklePool: number               — Rally/Heist only
+//   vault: number                    — Heist only
+//   roundNumber: number
+//   globalMode: 'PRIME' | 'FRENZY'
+//   playerEnergies: Record<string, number>
+//   anchorPlayerId: string | null
+//   sessionId: string                — UUID for analytics
+//   chainCount: number               — increments per committed chain
+//   serverSeed: string               — CSPRNG seed
+//   combinedSeed: string | null      — set after all clientSeeds received
+//   pool: SixPoolManager             — tile spawn pool
+
+// MESSAGE HANDLERS:
+//   SUBMIT_CHAIN: validate → scoreFarkle() → updateGrid() → cascade → broadcast
+//     After scoring: call insertChainDecision() fire-and-forget
+//     Enforce 100ms input lock per player (server-side anti-macro)
+//   BANK: transfer unbanked → banked[playerId] → reset multiplier → ROUND_END
+//     Call insertChainDecision() with decision: 'BANK'
+//   PASS: (Rally) advance multiplier +1 if Conductor role → transfer to next player
+//   VOTE_REACT: broadcast vote state to all players in room
+//   INITIATE_HEIST: check dual threshold → start HEIST_WINDOW timer
+//   LEAVE_ROOM: mark player disconnected, continue if others remain
+
+// SKILL LOGGING (server-authoritative):
+//   On every SUBMIT_CHAIN:
+//     estimateFarkleRisk() from current pool state
+//     isOptimalDecision() for the implicit CONTINUE decision
+//     insertChainDecision() fire-and-forget
+//   On BANK:
+//     isOptimalDecision() for explicit BANK decision
+//     insertChainDecision() fire-and-forget
+//   On session end (all players disconnect or game over):
+//     computeSkillScore() from session totals
+//     insertSession() fire-and-forget
+
+// PROVABLY FAIR:
+//   On room creation: serverSeed = crypto.randomBytes(32).toString('hex')
+//   serverSeedHash = SHA-256(serverSeed) — broadcast to all players on JOIN
+//   On all clientSeeds received: combinedSeed = SHA-256(serverSeed + c1 + c2...)
+//   SixPoolManager uses HMAC-SHA256 CSPRNG seeded from combinedSeed
+//   On game end: broadcast SEED_REVEAL with serverSeed
+
+// ROUND RESET (VS/Rally/Heist):
+//   After all players complete a round:
+//   Clear dice, refill from fresh pool draw
+//   Rock/Lock blocker positions preserved
+//   Banked scores persist
+//   Round counter increments, unbanked resets to 0
+
+// ENERGY (server mirror of useEnergy):
+//   Server tracks playerEnergies[] and globalMode
+//   On each SUBMIT_CHAIN: applyChainEnergy() to active player
+//   Server broadcasts ENERGY_UPDATE after each chain
+//   globalMode switches when any player crosses FRENZY_THRESHOLD
+//   In FRENZY: server enforces first-write-wins on simultaneous chains
+//     (timestamp comparison, 100ms input lock)
+
+// CASCADE:
+//   Runs as async loop using setTimeout recursion at 80ms intervals
+//   Each step: stepGravity() → spawnTiles(pool) → normalizeTiles()
+//   Broadcasts BOARD_UPDATE after each step
+//   Dead board check after cascade complete: hasValidChain(grid)
+//   If dead: pool.reshuffle() → respawn → re-check
+
+// TURN TIMER:
+//   setTimeout handle stored per room
+//   On expiry: AUTO-BANK fires (protects unbanked, ends turn gracefully)
+//   Cleared on every valid SUBMIT_CHAIN, BANK, PASS from active player
+
+// DATABASE:
+//   sql.js for local room state (rooms table, players table)
+//   Supabase analytics.ts for skill data (fire-and-forget, never blocks)
+        ]]>
+      </specification>
+      <constraints>
+        <constraint>sql.js ONLY for local storage — never better-sqlite3 (arm64 incompatible).</constraint>
+        <constraint>Supabase analytics inserts are fire-and-forget — never await in message handlers.</constraint>
+        <constraint>CASCADE uses setTimeout recursion — never setInterval.</constraint>
+        <constraint>100ms input lock enforced server-side per player — reject chains within 100ms.</constraint>
+        <constraint>Bombs are Cell.type values — no activeBombs array in GameRoom state.</constraint>
+        <constraint>Import from @farkle/engine — never relative paths to packages/.</constraint>
+        <constraint>No Math.random() for any game event — HMAC-SHA256 CSPRNG only.</constraint>
+        <constraint>No better-sqlite3 import — rejected at farkle rule level.</constraint>
+      </constraints>
+    </file>
+
+  </modified-files>
+
+  <do-not>
+    <rule>Do not use better-sqlite3 — sql.js only.</rule>
+    <rule>Do not await Supabase analytics calls in the message handler path.</rule>
+    <rule>Do not add activeBombs array to GameRoom state.</rule>
+    <rule>Do not use setInterval for cascade or energy ticking.</rule>
+    <rule>Do not use Math.random() for seeds, spawns, or game events.</rule>
+    <rule>Do not use relative import paths — use @farkle/ workspace aliases.</rule>
+    <rule>Do not regenerate SpawnPool — SixPoolManager only.</rule>
+    <rule>Do not use rallyGridSize() — use multiplayerGridSize().</rule>
+  </do-not>
+
+  <verification>
+    <check>Two browser tabs can JOIN a room and receive ROOM_STATE</check>
+    <check>BANK message correctly advances turn and resets multiplier</check>
+    <check>insertChainDecision called on every SUBMIT_CHAIN without blocking response</check>
+    <check>SEED_REVEAL broadcast on game end contains valid serverSeed</check>
+    <check>SHA-256(revealedServerSeed) matches serverSeedHash from session start</check>
+    <check>CASCADE stops and BOARD_UPDATE broadcasts after each gravity step</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+    <check>No better-sqlite3 import in file</check>
+    <check>No activeBombs in GameRoom state interface</check>
+  </verification>
+
+</update>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<update id="update-42" name="Tile.tsx — Wild Blocker + Ad Banner Slot" block="C" priority="MEDIUM">
+
+  <context>
+    Tile.tsx needs a new render branch for CellState 'WILD' (Wild Blocker).
+    Wild Blockers show a large "F" character (not pips, not face number),
+    with a rainbow hue-rotate border ring animation.
+    Also adds an optional ad banner slot prop for rewarded ad integration
+    (initial monetization layer before PDX sweepstakes goes live).
+    Visual direction: actual 3D modern — dice look like physical raised cubes.
+    Pointer events delegation in Grid.tsx must remain unchanged.
+    All bomb visuals already exist in Tile.tsx — do not touch them.
+    Pure ASCII source — no emoji, no box-drawing characters.
+  </context>
+
+  <dependencies>
+    <dep status="complete">apps/client/src/components/Tile.tsx — base exists with bomb branches</dep>
+    <dep status="complete">packages/shared/src/types.ts — CellState union exists</dep>
+  </dependencies>
+
+  <modified-files>
+
+    <file path="apps/client/src/components/Tile.tsx">
+      <change type="append" anchor="// PATCH ANCHOR: tile-render">
+        <![CDATA[
+// WILD BLOCKER RENDER BRANCH
+// Condition: cell.state === 'WILD'
+//
+// Visual spec:
+//   Background: die face color (same as underlying cell.type color)
+//   Center: large "F" character — font-mono font-black, ~60% of cell size
+//   "F" color: face color darkened (e.g. amber-900 on amber-400 bg)
+//   No pips rendered. No face number rendered.
+//   Border ring: 2px white border + CSS animation hue-rotate(360deg) 2s linear infinite
+//     Achieved via: className="animate-[hue-rotate_2s_linear_infinite]"
+//     with ring-2 ring-white + filter: hue-rotate animation via inline style
+//   Subject to gravity: normal pointer-events (can be chained)
+//   Chain ring shows when isChained — same as normal die tile
+//   Scale up on chain selection: same as normal die tile
+//
+// 3D die effect (applies to ALL die tiles including WILD):
+//   box-shadow: inset -2px -3px 0px rgba(0,0,0,0.3), inset 2px 2px 0px rgba(255,255,255,0.15)
+//   This gives a raised physical cube appearance without perspective transform
+//   Selected state: box-shadow enhanced + translateY(-2px)
+//
+// AD BANNER SLOT (new optional prop):
+//   showAdSlot?: boolean
+//   onAdSlotClick?: () => void
+//   When showAdSlot is true and cell.type === 'NONE' (empty):
+//     Render a subtle "+" placeholder in the cell at 30% opacity
+//     Clicking fires onAdSlotClick (rewarded ad trigger)
+//     Only renders in SOLO modes — never in multiplayer
+        ]]>
+        </change>
+    </file>
+
+  </modified-files>
+
+  <do-not>
+    <rule>Do not modify bomb rendering branches — they are complete and locked.</rule>
+    <rule>Do not modify Grid.tsx pointer event delegation — it must remain unchanged.</rule>
+    <rule>Do not use framer-motion — use motion/react.</rule>
+    <rule>Do not add emoji to source file.</rule>
+    <rule>Do not render face number or pips for WILD state.</rule>
+    <rule>Do not make Wild Blocker non-chainable — it IS chainable unlike Stone/Ice.</rule>
+  </do-not>
+
+  <verification>
+    <check>WILD cell renders "F" not a number</check>
+    <check>WILD cell has hue-rotate animation on border</check>
+    <check>WILD cell can be added to chain (pointer-events not none)</check>
+    <check>Stone and Ice cells still cannot be chained (pointer-events: none)</check>
+    <check>Bomb cells still render correctly — no regression</check>
+    <check>npx tsc --noEmit returns 0 new errors</check>
+    <check>No framer-motion import present</check>
+  </verification>
+
+</update>
