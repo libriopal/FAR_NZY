@@ -821,6 +821,93 @@ function RallyTimerText({ expiresAt }: { expiresAt: number }) {
   );
 }
 
+// ── Chain Drag Controller ─────────────────────────────────────────────────────
+// Bypasses R3F's synthetic pointer events (unreliable in Capacitor WebView during
+// touch drag) by attaching native touchmove to the canvas DOM element.
+// Projects each touch point onto the play plane (z=0) via raycasting, then finds
+// the nearest chainable body within a snap radius. O(n) per move event; fast.
+
+function ChainDragController({
+  onChainExtend,
+  onChainEnd,
+}: {
+  onChainExtend: (id: string, face: number, col: number) => void;
+  onChainEnd: () => void;
+}) {
+  const { gl, camera } = useThree();
+  const bodiesRef     = useRef<FarkleBody[]>([]);
+  const lastIdRef     = useRef<string | null>(null);
+  const dragging      = useRef(false);
+  const raycaster     = useRef(new THREE.Raycaster());
+  const playPlane     = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
+  const hitPoint      = useRef(new THREE.Vector3());
+
+  // Mirror bodies into a ref so touchmove always sees the latest state without
+  // subscribing to React renders.
+  useEffect(() =>
+    useFarkleStore.subscribe(s => { bodiesRef.current = s.bodies; })
+  , []);
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    const nearest = (clientX: number, clientY: number): FarkleBody | null => {
+      const rect = canvas.getBoundingClientRect();
+      const nx   = ((clientX - rect.left) / rect.width)  *  2 - 1;
+      const ny   = ((clientY - rect.top)  / rect.height) * -2 + 1;
+      raycaster.current.setFromCamera(new THREE.Vector2(nx, ny), camera);
+      if (!raycaster.current.ray.intersectPlane(playPlane.current, hitPoint.current)) return null;
+      const { x: wx, y: wy } = hitPoint.current;
+      let best: FarkleBody | null = null;
+      let bestDist = 0.65; // snap radius ≈ 70 % of die width
+      for (const body of bodiesRef.current) {
+        const chainable = CHAINABLE.has(body.entityType) ||
+          (body.entityType === 'lock' && body.health === 0);
+        if (!chainable) continue;
+        const dx = body.position.x - wx;
+        const dy = body.position.y - wy;
+        const d  = Math.sqrt(dx * dx + dy * dy);
+        if (d < bestDist) { bestDist = d; best = body; }
+      }
+      return best;
+    };
+
+    const onTouchStart = () => {
+      dragging.current  = true;
+      lastIdRef.current = null;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragging.current) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const body = nearest(t.clientX, t.clientY);
+      if (!body || body.id === lastIdRef.current) return;
+      lastIdRef.current = body.id;
+      onChainExtend(body.id, body.face ?? 1, body.column);
+    };
+
+    const onTouchEnd = () => {
+      dragging.current  = false;
+      lastIdRef.current = null;
+      onChainEnd();
+    };
+
+    canvas.addEventListener('touchstart',  onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove',   onTouchMove,  { passive: true });
+    canvas.addEventListener('touchend',    onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      canvas.removeEventListener('touchstart',  onTouchStart);
+      canvas.removeEventListener('touchmove',   onTouchMove);
+      canvas.removeEventListener('touchend',    onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [gl, camera, onChainExtend, onChainEnd]);
+
+  return null;
+}
+
 // ── Scene content ─────────────────────────────────────────────────────────────
 
 interface SceneContentProps {
@@ -831,40 +918,16 @@ interface SceneContentProps {
 }
 
 function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap }: SceneContentProps) {
-  const bodies            = useFarkleStore(s => s.bodies);
-  const explosions        = useExplosionStore(s => s.explosions);
-  const removeExplosion   = useExplosionStore(s => s.removeExplosion);
-  const highlightedIds    = useExplosionStore(s => s.highlightedBodyIds);
-  const highlightedSet    = useMemo(() => new Set(highlightedIds), [highlightedIds]);
-
-  // Scene-level move fallback: fires when per-entity onPointerEnter is missed
-  // (e.g. fast drags on mobile). Walks intersections to find a chainable entity.
-  const lastMoveExtendId = useRef<string | null>(null);
-  const handleGroupPointerMove = useCallback((e: any) => {
-    if (!e.intersections?.length) return;
-    for (const hit of e.intersections as any[]) {
-      // Traverse up to find the entity group (which has userData.bodyId)
-      let obj = hit.object;
-      while (obj && !obj.userData?.bodyId) obj = obj.parent;
-      if (!obj?.userData?.chainable) continue;
-      const { bodyId, face, column } = obj.userData as { bodyId: string; face: number; column: number };
-      if (bodyId === lastMoveExtendId.current) break; // already sent this frame
-      lastMoveExtendId.current = bodyId;
-      onChainExtend(bodyId, face, column);
-      break;
-    }
-  }, [onChainExtend]);
-
-  const handlePointerUp = useCallback(() => {
-    lastMoveExtendId.current = null;
-    onChainEnd();
-  }, [onChainEnd]);
+  const bodies          = useFarkleStore(s => s.bodies);
+  const explosions      = useExplosionStore(s => s.explosions);
+  const removeExplosion = useExplosionStore(s => s.removeExplosion);
+  const highlightedIds  = useExplosionStore(s => s.highlightedBodyIds);
+  const highlightedSet  = useMemo(() => new Set(highlightedIds), [highlightedIds]);
 
   return (
     <group
-      onPointerMove={handleGroupPointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerUp={onChainEnd}
+      onPointerCancel={onChainEnd}
     >
       <CameraRig />
       <ambientLight intensity={0.65} />
@@ -877,6 +940,7 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap }: 
       <DoublerCellPanels />
       <ChainLine />
       <RallyTimerOrb />
+      <ChainDragController onChainExtend={onChainExtend} onChainEnd={onChainEnd} />
       {bodies.map(body => (
         <EntityMesh
           key={body.id}
