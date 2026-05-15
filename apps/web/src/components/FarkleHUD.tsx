@@ -10,10 +10,101 @@ import { WIN_SCORE } from '../hooks/useFarkleGame.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
 
+// ── Palette helpers ───────────────────────────────────────────────────────────
+
+const GH = {
+  void:          '#050008',
+  neural:        '#0d0018',
+  bone:          '#e8d5a3',
+  boneDim:       'rgba(232,213,163,0.35)',
+  boneFaint:     'rgba(232,213,163,0.12)',
+  gold:          '#c9a84c',
+  goldBright:    '#f0c860',
+  goldGlow:      'rgba(201,168,76,0.55)',
+  goldDim:       'rgba(201,168,76,0.22)',
+  cyan:          '#00e5ff',
+  cyanBright:    '#80f9ff',
+  cyanGlow:      'rgba(0,229,255,0.45)',
+  cyanDim:       'rgba(0,229,255,0.15)',
+  magenta:       '#ff00cc',
+  magentaGlow:   'rgba(255,0,204,0.45)',
+  magentaDim:    'rgba(255,0,204,0.15)',
+  amberHot:      '#ff7200',
+  amberGlow:     'rgba(255,114,0,0.55)',
+  purpleMid:     '#7b2fff',
+  purpleGlow:    'rgba(123,47,255,0.45)',
+  purpleDim:     'rgba(123,47,255,0.15)',
+  crystalFace:   'rgba(0,229,255,0.08)',
+  crystalBorder: 'rgba(0,229,255,0.38)',
+  panelBg:       'rgba(5,0,18,0.9)',
+  panelBorder:   'rgba(201,168,76,0.42)',
+  danger:        '#ef4444',
+  dangerGlow:    'rgba(239,68,68,0.45)',
+} as const;
+
 const FACE_COLOR: Record<number, string> = {
   1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
   4: '#10b981', 5: '#38bdf8', 6: '#7c3aed',
 };
+
+// CRT scanline + vignette overlay (reusable)
+const CRT_STYLE: React.CSSProperties = {
+  position: 'absolute', inset: 0, pointerEvents: 'none',
+  background: `
+    repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.4) 100%)
+  `,
+  zIndex: 0,
+};
+
+// Gothic corner marks rendered as inner child elements
+function GhCorners({ color = GH.gold }: { color?: string }) {
+  const s = (pos: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', width: 8, height: 8, zIndex: 3, ...pos,
+  });
+  const h: React.CSSProperties = { position: 'absolute', background: color };
+  const v: React.CSSProperties = { position: 'absolute', background: color };
+  function corner(t?: number, r?: number, b?: number, l?: number) {
+    return (
+      <div style={s({ top: t, right: r, bottom: b, left: l })}>
+        <div style={{ ...h, width: 6, height: 1.5, top: 0, left: 0 }} />
+        <div style={{ ...v, width: 1.5, height: 6, top: 0, left: 0 }} />
+      </div>
+    );
+  }
+  return (
+    <>
+      {corner(2, undefined, undefined, 2)}
+      <div style={s({ top: 2, right: 2 })}>
+        <div style={{ ...h, width: 6, height: 1.5, top: 0, right: 0 }} />
+        <div style={{ ...v, width: 1.5, height: 6, top: 0, right: 0 }} />
+      </div>
+      <div style={s({ bottom: 2, left: 2 })}>
+        <div style={{ ...h, width: 6, height: 1.5, bottom: 0, left: 0 }} />
+        <div style={{ ...v, width: 1.5, height: 6, bottom: 0, left: 0 }} />
+      </div>
+      <div style={s({ bottom: 2, right: 2 })}>
+        <div style={{ ...h, width: 6, height: 1.5, bottom: 0, right: 0 }} />
+        <div style={{ ...v, width: 1.5, height: 6, bottom: 0, right: 0 }} />
+      </div>
+    </>
+  );
+}
+
+// Filigree diamond row decoration
+function FiligreeRow({ count = 5, color = GH.goldDim }: { count?: number; color?: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} style={{
+          width: 4, height: 4, background: color,
+          transform: 'rotate(45deg)',
+          boxShadow: i === Math.floor(count / 2) ? `0 0 4px ${color}` : 'none',
+        }} />
+      ))}
+    </div>
+  );
+}
 
 // ── Score Popup ───────────────────────────────────────────────────────────────
 
@@ -30,7 +121,7 @@ function ScorePopupLayer() {
         const delta = next - prev;
         if (delta > 0) {
           const id = ++counterRef.current;
-          setPopups(p => [...p, { id, text: `+${delta.toLocaleString()}`, color: 'var(--ba-glow-amber)' }]);
+          setPopups(p => [...p, { id, text: `+${delta.toLocaleString()}`, color: GH.goldBright }]);
           setTimeout(() => setPopups(p => p.filter(x => x.id !== id)), 1200);
         }
       }
@@ -45,10 +136,10 @@ function ScorePopupLayer() {
           top: '38%', left: '50%',
           transform: 'translateX(-50%)',
           color: p.color,
-          fontSize: 20, fontWeight: 700, fontFamily: 'monospace',
-          textShadow: `0 0 8px ${p.color}`,
+          fontSize: 22, fontWeight: 700, fontFamily: 'monospace',
+          textShadow: `0 0 12px ${p.color}, 0 0 24px ${GH.goldDim}`,
           animation: 'floatUp 1.2s ease-out forwards',
-          whiteSpace: 'nowrap',
+          whiteSpace: 'nowrap', letterSpacing: 2,
         }}>
           {p.text}
         </div>
@@ -56,7 +147,7 @@ function ScorePopupLayer() {
       <style>{`
         @keyframes floatUp {
           0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
-          100% { opacity: 0; transform: translateX(-50%) translateY(-60px); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-70px); }
         }
       `}</style>
     </div>
@@ -74,7 +165,7 @@ function FarkleFlash() {
     if (farkleCount > prevCount.current) {
       prevCount.current = farkleCount;
       setVisible(true);
-      setTimeout(() => setVisible(false), 600);
+      setTimeout(() => setVisible(false), 700);
     }
   }, [farkleCount]);
 
@@ -83,15 +174,16 @@ function FarkleFlash() {
   return (
     <div style={{
       position: 'absolute', inset: 0, pointerEvents: 'none',
-      background: 'rgba(200,0,0,0.25)',
-      animation: 'farkleFlash 0.6s ease-out forwards',
+      background: 'rgba(239,68,68,0.18)',
+      animation: 'farkleFlash 0.7s ease-out forwards',
     }}>
       <div style={{
         position: 'absolute', top: '42%', left: '50%', transform: 'translateX(-50%)',
-        color: 'var(--ba-danger)', fontSize: 32, fontWeight: 900, fontFamily: 'monospace',
-        textShadow: '0 0 16px var(--ba-danger)', letterSpacing: 4,
+        color: GH.danger, fontSize: 36, fontWeight: 900, fontFamily: 'monospace',
+        textShadow: `0 0 20px ${GH.dangerGlow}, 0 0 40px ${GH.dangerGlow}`,
+        letterSpacing: 8,
       }}>
-        FARKLE!
+        ✦ FARKLE ✦
       </div>
       <style>{`
         @keyframes farkleFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -110,10 +202,10 @@ function ModePulse() {
   useEffect(() => {
     if (mode !== prevMode.current) {
       prevMode.current = mode;
-      if (mode === 'FRENZY') setPulse({ color: 'var(--ba-frenzy)', label: 'FRENZY!' });
-      else if (mode === 'PRIME') setPulse({ color: 'var(--ba-blueprint)', label: 'PRIME' });
-      else setPulse({ color: 'var(--ba-marble-500)', label: 'NORMAL' });
-      setTimeout(() => setPulse(null), 800);
+      if (mode === 'FRENZY') setPulse({ color: GH.cyan, label: '⚡ FRENZY ⚡' });
+      else if (mode === 'PRIME') setPulse({ color: GH.magenta, label: '◈ PRIME ◈' });
+      else setPulse({ color: GH.boneDim, label: 'NORMAL' });
+      setTimeout(() => setPulse(null), 900);
     }
   }, [mode]);
 
@@ -125,107 +217,537 @@ function ModePulse() {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
-        color: pulse.color, fontSize: 28, fontWeight: 900,
-        fontFamily: 'monospace', textShadow: `0 0 20px ${pulse.color}`,
-        animation: 'modePulse 0.8s ease-out forwards',
-        letterSpacing: 6,
+        color: pulse.color, fontSize: 30, fontWeight: 900,
+        fontFamily: 'monospace',
+        textShadow: `0 0 24px ${pulse.color}, 0 0 48px ${pulse.color}`,
+        animation: 'modePulse 0.9s ease-out forwards',
+        letterSpacing: 8,
       }}>
         {pulse.label}
       </div>
       <style>{`
         @keyframes modePulse {
-          0%   { opacity: 0; transform: scale(0.7); }
-          30%  { opacity: 1; transform: scale(1.1); }
-          100% { opacity: 0; transform: scale(1.3); }
+          0%   { opacity: 0; transform: scale(0.6) translateY(10px); }
+          35%  { opacity: 1; transform: scale(1.12) translateY(0); }
+          100% { opacity: 0; transform: scale(1.3) translateY(-8px); }
         }
       `}</style>
     </div>
   );
 }
 
-// ── Energy Bar ────────────────────────────────────────────────────────────────
+// ── Trick Meter (Crystal Frenzy Gauge) ───────────────────────────────────────
 
-function EnergyBar() {
+function TrickMeter() {
   const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
   const pct = (energy / MAX_ENERGY) * 100;
+  const primePct = (FRENZY_THRESHOLD / MAX_ENERGY) * 100;
 
-  const barBg =
-    mode === 'FRENZY' ? 'linear-gradient(90deg, var(--ba-vine-mid), var(--ba-glow-teal))' :
-    mode === 'PRIME'  ? 'linear-gradient(90deg, var(--ba-vine-dark), var(--ba-glow-green))' :
-    'var(--ba-marble-800)';
+  const barColor =
+    mode === 'FRENZY' ? `linear-gradient(90deg, ${GH.cyan}, ${GH.cyanBright}, ${GH.magenta})` :
+    mode === 'PRIME'  ? `linear-gradient(90deg, ${GH.magenta}, ${GH.purpleMid})` :
+    `linear-gradient(90deg, rgba(201,168,76,0.4), rgba(201,168,76,0.7))`;
 
-  const label = mode === 'FRENZY' ? 'FRENZY' : mode === 'PRIME' ? 'PRIME' : 'NORMAL';
+  const glowColor =
+    mode === 'FRENZY' ? GH.cyanGlow :
+    mode === 'PRIME'  ? GH.magentaGlow :
+    GH.goldDim;
+
+  const modeLabel =
+    mode === 'FRENZY' ? '⚡FRENZY' :
+    mode === 'PRIME'  ? '◈ PRIME' :
+    '— NORMAL';
+
   const labelColor =
-    mode === 'FRENZY' ? 'var(--ba-frenzy)' :
-    mode === 'PRIME'  ? 'var(--ba-blueprint)' :
-    'var(--ba-marble-500)';
+    mode === 'FRENZY' ? GH.cyan :
+    mode === 'PRIME'  ? GH.magenta :
+    GH.boneDim;
+
+  // 4 crystal nodes at 25%, 50%(prime), 75%, 100%
+  const nodes = [25, primePct, 75, 100];
 
   return (
     <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0,
-      height: 44,
-      background: 'var(--ba-glass-bg)',
-      backdropFilter: 'var(--ba-glass-blur)',
-      WebkitBackdropFilter: 'var(--ba-glass-blur)',
-      borderBottom: '1px solid var(--ba-glass-border)',
-      display: 'flex', alignItems: 'center', paddingLeft: 10, paddingRight: 10, gap: 8,
+      position: 'absolute', top: 0, left: 0, right: 0, height: 48,
+      background: GH.panelBg,
+      borderBottom: `1px solid ${GH.panelBorder}`,
+      display: 'flex', alignItems: 'center', padding: '0 10px', gap: 8,
+      zIndex: 10,
     }}>
-      <span style={{ color: labelColor, fontSize: 11, fontFamily: 'monospace', fontWeight: 700, minWidth: 52 }}>
-        {label}
-      </span>
-      <div style={{ flex: 1, height: 8, background: 'var(--ba-marble-950)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+      <div style={CRT_STYLE} />
+      <GhCorners />
+
+      {/* Mode label */}
+      <div style={{
+        color: labelColor, fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
+        minWidth: 62, letterSpacing: 1,
+        textShadow: `0 0 8px ${labelColor}`,
+        animation: mode === 'FRENZY' ? 'gh-frenzy-flicker 3.5s ease-in-out infinite' : 'none',
+      }}>
+        {modeLabel}
+      </div>
+
+      {/* Crystal gauge track */}
+      <div style={{ flex: 1, position: 'relative', height: 12 }}>
+        {/* Track bg — neural groove */}
         <div style={{
-          position: 'absolute', left: `${(FRENZY_THRESHOLD / MAX_ENERGY) * 100}%`,
-          top: 0, bottom: 0, width: 1, background: 'rgba(34,211,238,0.4)',
-        }} />
+          position: 'absolute', inset: 0,
+          background: 'rgba(5,0,18,0.8)',
+          border: `1px solid ${GH.goldDim}`,
+          borderRadius: 3,
+          overflow: 'hidden',
+        }}>
+          {/* Fill */}
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0,
+            width: `${pct}%`,
+            background: barColor,
+            borderRadius: 2,
+            transition: 'width 0.12s linear',
+            boxShadow: mode !== 'NORMAL' ? `0 0 10px ${glowColor}` : 'none',
+          }} />
+        </div>
+
+        {/* Crystal node markers */}
+        {nodes.map((p, i) => (
+          <div key={i} style={{
+            position: 'absolute', top: '50%', left: `${p}%`,
+            transform: 'translate(-50%, -50%) rotate(45deg)',
+            width: 7, height: 7,
+            background: pct >= p ? (mode === 'FRENZY' ? GH.cyanBright : mode === 'PRIME' ? GH.magenta : GH.gold) : GH.boneFaint,
+            border: `1px solid ${pct >= p ? GH.gold : GH.boneFaint}`,
+            boxShadow: pct >= p ? `0 0 6px ${glowColor}` : 'none',
+            transition: 'all 0.2s ease',
+            zIndex: 2,
+          }} />
+        ))}
+
+        {/* Prime threshold line */}
         <div style={{
-          height: '100%', width: `${pct}%`,
-          background: barBg,
-          transition: 'width 0.1s linear',
-          borderRadius: 4,
-          ...(mode === 'FRENZY' ? { boxShadow: '0 0 8px var(--ba-glow-teal)' } :
-             mode === 'PRIME'  ? { boxShadow: '0 0 6px var(--ba-glow-green)' } : {}),
+          position: 'absolute', top: 0, bottom: 0, left: `${primePct}%`,
+          width: 1,
+          background: mode === 'PRIME' || mode === 'FRENZY' ? GH.magenta : 'rgba(255,0,204,0.25)',
+          boxShadow: mode !== 'NORMAL' ? `0 0 4px ${GH.magentaGlow}` : 'none',
+          zIndex: 1,
         }} />
       </div>
-      <span style={{ color: 'var(--ba-marble-500)', fontSize: 10, fontFamily: 'monospace', minWidth: 32, textAlign: 'right' }}>
-        {Math.floor(energy)}/{MAX_ENERGY}
-      </span>
+
+      {/* Energy readout */}
+      <div style={{
+        color: GH.boneDim, fontSize: 9, fontFamily: 'monospace',
+        minWidth: 38, textAlign: 'right',
+        letterSpacing: 0.5,
+      }}>
+        {Math.floor(energy)}<span style={{ color: GH.goldDim }}>/{MAX_ENERGY}</span>
+      </div>
     </div>
   );
 }
 
-// ── Score Display ─────────────────────────────────────────────────────────────
+// ── NeonOscilloscope ──────────────────────────────────────────────────────────
+
+function NeonOscilloscope() {
+  const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
+  const amplitude = 4 + (energy / MAX_ENERGY) * 10;
+  const waveColor =
+    mode === 'FRENZY' ? GH.cyan :
+    mode === 'PRIME'  ? GH.magenta :
+    GH.gold;
+  const glowColor =
+    mode === 'FRENZY' ? GH.cyanGlow :
+    mode === 'PRIME'  ? GH.magentaGlow :
+    GH.goldDim;
+  const speed = mode === 'FRENZY' ? '0.45s' : mode === 'PRIME' ? '0.8s' : '1.6s';
+
+  // Build SVG wave path
+  const W = 240; const H = 24; const mid = H / 2;
+  const segs = 10;
+  const step = W / segs;
+  let d = `M0 ${mid}`;
+  for (let i = 0; i < segs; i++) {
+    const x1 = i * step + step * 0.25;
+    const x2 = i * step + step * 0.75;
+    const x3 = (i + 1) * step;
+    const sign = i % 2 === 0 ? -1 : 1;
+    d += ` Q${x1} ${mid + sign * amplitude} ${i * step + step * 0.5} ${mid + sign * amplitude}`;
+    d += ` Q${x2} ${mid + sign * amplitude} ${x3} ${mid}`;
+  }
+
+  return (
+    <div style={{
+      position: 'absolute', top: 48, left: 0, right: 0, height: 28,
+      background: 'rgba(5,0,18,0.7)',
+      borderBottom: `1px solid ${GH.goldDim}`,
+      overflow: 'hidden', display: 'flex', alignItems: 'center', zIndex: 9,
+    }}>
+      {/* Label */}
+      <div style={{
+        position: 'absolute', left: 6,
+        fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1,
+      }}>
+        OSC
+      </div>
+
+      {/* Animated waveform strip — doubled width, animates via translateX */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0,
+        width: '200%',
+        animation: `oscScroll ${speed} linear infinite`,
+        display: 'flex',
+      }}>
+        {[0, 1].map(k => (
+          <svg key={k} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
+            preserveAspectRatio="none" style={{ flex: '0 0 50%' }}>
+            <path d={d} fill="none" stroke={waveColor}
+              strokeWidth={mode === 'FRENZY' ? 1.5 : 1}
+              style={{ filter: `drop-shadow(0 0 3px ${glowColor})` }}
+            />
+            {/* Heartbeat spike every 60px */}
+            <line x1="60" y1={mid - amplitude - 6} x2="60" y2={mid + amplitude + 6}
+              stroke={waveColor} strokeWidth={0.8} opacity={0.4} />
+            <line x1="180" y1={mid - amplitude - 6} x2="180" y2={mid + amplitude + 6}
+              stroke={waveColor} strokeWidth={0.8} opacity={0.4} />
+          </svg>
+        ))}
+      </div>
+      <style>{`
+        @keyframes oscScroll {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Score Display (Gothic Panel) ──────────────────────────────────────────────
 
 function ScoreDisplay() {
   const { banked, unbanked, multiplierStep } = useFarkleStore(s => ({
     banked: s.banked, unbanked: s.unbanked, multiplierStep: s.multiplierStep,
   }));
-
   const total = banked + unbanked;
   const mult = MULTIPLIER_LADDER[Math.min(multiplierStep, 5)] ?? 1;
   const progressPct = Math.min(100, (total / WIN_SCORE) * 100);
+  const hasMult = mult > 1;
 
   return (
     <div style={{
-      position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', top: 82, left: '50%', transform: 'translateX(-50%)',
       textAlign: 'center', pointerEvents: 'none',
     }}>
-      <div style={{ color: 'var(--ba-accent)', fontSize: 22, fontWeight: 700, fontFamily: 'monospace', textShadow: '0 0 8px var(--ba-accent-glow)' }}>
-        {total.toLocaleString()}
-      </div>
-      <div style={{ width: 120, height: 3, background: 'var(--ba-marble-950)', borderRadius: 2, margin: '3px auto 0' }}>
+      {/* Gothic score panel */}
+      <div style={{
+        background: GH.panelBg,
+        border: `1px solid ${GH.panelBorder}`,
+        borderRadius: 4, padding: '5px 16px',
+        position: 'relative', minWidth: 120,
+      }}>
+        <div style={CRT_STYLE} />
+        <GhCorners />
+        <FiligreeRow count={5} color={GH.goldDim} />
         <div style={{
-          height: '100%', width: `${progressPct}%`,
-          background: 'var(--ba-glow-amber)', borderRadius: 2,
-          transition: 'width 0.3s ease',
-        }} />
+          color: GH.goldBright, fontSize: 24, fontWeight: 900, fontFamily: 'monospace',
+          textShadow: `0 0 10px ${GH.goldGlow}, 0 0 20px ${GH.goldDim}`,
+          letterSpacing: 1, lineHeight: 1.1, marginTop: 2,
+        }}>
+          {total.toLocaleString()}
+        </div>
+        {hasMult && (
+          <div style={{
+            color: GH.cyan, fontSize: 11, fontFamily: 'monospace', fontWeight: 700,
+            textShadow: `0 0 8px ${GH.cyanGlow}`, letterSpacing: 1,
+          }}>
+            ×{mult} MULTIPLIER
+          </div>
+        )}
+        {/* Progress bar toward win */}
+        <div style={{ width: 100, height: 3, background: 'rgba(201,168,76,0.12)', borderRadius: 2, margin: '4px auto 0', position: 'relative', overflow: 'hidden' }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: `${progressPct}%`,
+            background: `linear-gradient(90deg, ${GH.gold}, ${GH.goldBright})`,
+            boxShadow: `0 0 6px ${GH.goldGlow}`,
+            transition: 'width 0.3s ease', borderRadius: 2,
+          }} />
+        </div>
+        <div style={{ color: GH.goldDim, fontSize: 8, fontFamily: 'monospace', marginTop: 1 }}>
+          {total.toLocaleString()}/{WIN_SCORE.toLocaleString()}
+        </div>
+        <FiligreeRow count={3} color={GH.goldDim} />
       </div>
-      <div style={{ color: 'var(--ba-marble-500)', fontSize: 9, fontFamily: 'monospace' }}>
-        {total.toLocaleString()} / {WIN_SCORE.toLocaleString()}
+    </div>
+  );
+}
+
+// ── Shard Tracker (Build-a-Die) ───────────────────────────────────────────────
+
+const SHARD_MAX = 6;
+
+function ShardTracker() {
+  const chainLen = useFarkleStore(s => s.chain.length);
+  const mode = useFarkleStore(s => s.mode);
+
+  const activeColor = mode === 'FRENZY' ? GH.cyan : mode === 'PRIME' ? GH.magenta : GH.gold;
+  const activeGlow  = mode === 'FRENZY' ? GH.cyanGlow : mode === 'PRIME' ? GH.magentaGlow : GH.goldGlow;
+
+  return (
+    <div style={{
+      position: 'absolute', top: 82, right: 8,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+      pointerEvents: 'none',
+    }}>
+      {/* Label */}
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1 }}>SHARDS</div>
+      {/* 6 diamonds in a 2×3 grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 12px)', gap: 3 }}>
+        {Array.from({ length: SHARD_MAX }).map((_, i) => {
+          const active = i < chainLen;
+          return (
+            <div key={i} style={{
+              width: 10, height: 10,
+              transform: 'rotate(45deg)',
+              background: active ? activeColor : 'transparent',
+              border: `1px solid ${active ? activeColor : GH.boneFaint}`,
+              boxShadow: active ? `0 0 6px ${activeGlow}` : 'none',
+              transition: 'all 0.15s ease',
+            }} />
+          );
+        })}
       </div>
-      {mult > 1 && (
-        <div style={{ color: 'var(--ba-blueprint)', fontSize: 12, fontFamily: 'monospace' }}>×{mult} multiplier</div>
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.boneDim }}>
+        {chainLen}<span style={{ color: GH.goldDim }}>/{SHARD_MAX}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Class Selector (Paladin / Bard / Rogue) ───────────────────────────────────
+
+const CLASS_DEFS = [
+  { id: 'paladin', label: 'PAL', icon: '⚔', color: GH.gold,    glow: GH.goldGlow,    desc: 'Sacred' },
+  { id: 'bard',    label: 'BRD', icon: '♪', color: GH.magenta, glow: GH.magentaGlow, desc: 'Rhythm' },
+  { id: 'rogue',   label: 'RGE', icon: '◆', color: GH.cyan,    glow: GH.cyanGlow,    desc: 'Stealth' },
+] as const;
+
+type DiceClass = typeof CLASS_DEFS[number]['id'];
+
+interface ClassSelectorProps { selected: DiceClass; onSelect: (c: DiceClass) => void; }
+
+function ClassSelector({ selected, onSelect }: ClassSelectorProps) {
+  return (
+    <div style={{
+      position: 'absolute', top: 82, left: 8,
+      display: 'flex', flexDirection: 'column', gap: 3, pointerEvents: 'auto',
+    }}>
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1, textAlign: 'center' }}>CLASS</div>
+      {CLASS_DEFS.map(c => {
+        const isActive = selected === c.id;
+        return (
+          <button key={c.id} onClick={() => onSelect(c.id)} style={{
+            background: isActive ? `rgba(${hexToRgb(c.color)},0.18)` : GH.panelBg,
+            border: `1px solid ${isActive ? c.color : GH.goldDim}`,
+            color: isActive ? c.color : GH.boneDim,
+            borderRadius: 4, padding: '3px 6px',
+            fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
+            cursor: 'pointer', letterSpacing: 0.5,
+            boxShadow: isActive ? `0 0 8px ${c.glow}` : 'none',
+            textShadow: isActive ? `0 0 6px ${c.glow}` : 'none',
+            transition: 'all 0.15s ease',
+            display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+          }}>
+            <span>{c.icon}</span>
+            <span>{c.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function hexToRgb(hex: string): string {
+  const m = hex.replace('#', '').match(/.{2}/g);
+  if (!m) return '255,255,255';
+  return m.map(h => parseInt(h, 16)).join(',');
+}
+
+// ── Hidden Pocket ─────────────────────────────────────────────────────────────
+
+function HiddenPocket() {
+  const [open, setOpen] = useState(false);
+  const [heldFace, setHeldFace] = useState<number | null>(null);
+  const chainFaces = useFarkleStore(s => s.chainFaces);
+  const lastFace = chainFaces[chainFaces.length - 1] ?? null;
+
+  function stashFace() {
+    if (lastFace !== null) setHeldFace(lastFace);
+  }
+  function releaseFace() { setHeldFace(null); }
+
+  const faceColor = heldFace ? FACE_COLOR[heldFace] ?? GH.purpleMid : GH.boneFaint;
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 110, left: 8, pointerEvents: 'auto',
+      display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+    }}>
+      {/* Latch toggle */}
+      <button onClick={() => setOpen(o => !o)} style={{
+        background: open ? `rgba(201,168,76,0.16)` : GH.panelBg,
+        border: `1px solid ${open ? GH.gold : GH.goldDim}`,
+        color: open ? GH.gold : GH.goldDim,
+        borderRadius: 4, padding: '3px 7px', fontSize: 8, fontFamily: 'monospace',
+        cursor: 'pointer', letterSpacing: 1,
+        boxShadow: open ? `0 0 8px ${GH.goldGlow}` : 'none',
+        textShadow: open ? `0 0 6px ${GH.goldGlow}` : 'none',
+        transition: 'all 0.15s ease',
+        display: 'flex', alignItems: 'center', gap: 4,
+      }}>
+        <span>{open ? '▲' : '▼'}</span> POCKET
+      </button>
+
+      {/* Deployable pocket panel */}
+      {open && (
+        <div style={{
+          background: GH.panelBg,
+          border: `1px solid ${GH.panelBorder}`,
+          borderRadius: 4, padding: '6px 8px',
+          display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center',
+          animation: 'pocketOpen 0.2s ease-out',
+          position: 'relative', minWidth: 60,
+        }}>
+          <div style={CRT_STYLE} />
+          <GhCorners />
+          <div style={{ fontSize: 7, color: GH.goldDim, fontFamily: 'monospace', letterSpacing: 1 }}>HELD</div>
+          {/* Held die slot */}
+          <div style={{
+            width: 36, height: 36, borderRadius: 6,
+            background: heldFace ? `${faceColor}22` : 'rgba(5,0,18,0.7)',
+            border: `1px solid ${heldFace ? faceColor : GH.boneFaint}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, fontWeight: 700, color: heldFace ? faceColor : GH.boneFaint,
+            fontFamily: 'monospace',
+            boxShadow: heldFace ? `0 0 10px ${faceColor}88` : 'none',
+          }}>
+            {heldFace ?? '—'}
+          </div>
+          <div style={{ display: 'flex', gap: 3 }}>
+            {lastFace !== null && !heldFace && (
+              <button onClick={stashFace} style={{
+                background: `rgba(201,168,76,0.1)`, border: `1px solid ${GH.goldDim}`,
+                color: GH.gold, borderRadius: 3, padding: '2px 5px', fontSize: 7,
+                cursor: 'pointer', fontFamily: 'monospace',
+              }}>STASH</button>
+            )}
+            {heldFace !== null && (
+              <button onClick={releaseFace} style={{
+                background: `rgba(239,68,68,0.1)`, border: `1px solid ${GH.dangerGlow}`,
+                color: GH.danger, borderRadius: 3, padding: '2px 5px', fontSize: 7,
+                cursor: 'pointer', fontFamily: 'monospace',
+              }}>PURGE</button>
+            )}
+          </div>
+        </div>
       )}
+      <style>{`@keyframes pocketOpen { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }`}</style>
+    </div>
+  );
+}
+
+// ── Beat Window ───────────────────────────────────────────────────────────────
+
+const BEAT_MARKERS = 8;
+
+function BeatWindow() {
+  const mode = useFarkleStore(s => s.mode);
+  const energy = useFarkleStore(s => s.energy);
+  const [beatPhase, setBeatPhase] = useState(0);
+
+  // Beat tempo tied to energy level
+  const bpm = 60 + (energy / MAX_ENERGY) * 120; // 60–180 BPM
+  const beatMs = Math.round((60 / bpm) * 1000);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBeatPhase(p => (p + 1) % BEAT_MARKERS);
+    }, beatMs);
+    return () => clearInterval(interval);
+  }, [beatMs]);
+
+  const trackColor =
+    mode === 'FRENZY' ? GH.cyan :
+    mode === 'PRIME'  ? GH.magenta :
+    GH.gold;
+
+  const perfectZone = Math.floor(BEAT_MARKERS / 2); // center marker is "perfect"
+
+  return (
+    <div style={{
+      height: 42,
+      background: GH.panelBg,
+      borderTop: `1px solid ${GH.panelBorder}`,
+      display: 'flex', alignItems: 'center',
+      padding: '0 8px', gap: 6, flexShrink: 0, position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={CRT_STYLE} />
+      <GhCorners />
+
+      {/* Label */}
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1, flexShrink: 0 }}>
+        BEAT
+      </div>
+
+      {/* Beat marker track */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 0, height: 30, position: 'relative' }}>
+        {/* Perfect zone highlight */}
+        <div style={{
+          position: 'absolute',
+          left: `${(perfectZone / BEAT_MARKERS) * 100}%`,
+          width: `${100 / BEAT_MARKERS}%`,
+          top: 2, bottom: 2,
+          background: mode === 'FRENZY' ? `rgba(0,229,255,0.15)` : mode === 'PRIME' ? `rgba(255,0,204,0.12)` : `rgba(201,168,76,0.1)`,
+          border: `1px solid ${mode === 'FRENZY' ? GH.crystalBorder : mode === 'PRIME' ? GH.magenta : GH.gold}`,
+          borderRadius: 2,
+          boxShadow: mode !== 'NORMAL' ? `0 0 8px ${mode === 'FRENZY' ? GH.cyanGlow : GH.magentaGlow}` : 'none',
+          zIndex: 0,
+        }} />
+        <div style={{
+          position: 'absolute',
+          left: `${(perfectZone / BEAT_MARKERS) * 100 + (100 / BEAT_MARKERS) / 2}%`,
+          top: -2, transform: 'translateX(-50%)',
+          fontSize: 6, fontFamily: 'monospace', color: trackColor,
+          textShadow: `0 0 6px ${trackColor}`, letterSpacing: 1,
+          zIndex: 2,
+        }}>PERFECT</div>
+
+        {Array.from({ length: BEAT_MARKERS }).map((_, i) => {
+          const isActive = i === beatPhase;
+          const isPerfect = i === perfectZone && isActive;
+          return (
+            <div key={i} style={{
+              flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative', zIndex: 1,
+            }}>
+              <div style={{
+                width: i % 2 === 0 ? 2 : 1,
+                height: i % 2 === 0 ? '65%' : '40%',
+                background: isActive
+                  ? (isPerfect ? GH.cyanBright : trackColor)
+                  : GH.boneFaint,
+                borderRadius: 1,
+                boxShadow: isActive ? `0 0 8px ${isPerfect ? GH.cyanGlow : trackColor}` : 'none',
+                transition: 'all 0.06s ease',
+              }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* BPM readout */}
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, flexShrink: 0, textAlign: 'right', minWidth: 32 }}>
+        {Math.round(bpm)}<br />BPM
+      </div>
     </div>
   );
 }
@@ -245,68 +767,86 @@ function ChainPreview() {
 
   return (
     <div style={{
-      position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', bottom: 110, left: '50%', transform: 'translateX(-50%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       pointerEvents: 'none',
     }}>
-      <div style={{ display: 'flex', gap: 5 }}>
-        {chainFaces.map((face, i) => (
-          <div key={i} style={{
-            width: 32, height: 32, borderRadius: 6,
-            background: FACE_COLOR[face] ?? 'var(--ba-blueprint)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
-            boxShadow: `0 0 8px ${FACE_COLOR[face] ?? 'var(--ba-blueprint-glow)'}`,
-          }}>
-            {face}
-          </div>
-        ))}
-      </div>
       <div style={{
-        color: isFarkle ? 'var(--ba-danger)' : 'var(--ba-glow-amber)',
-        fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
+        background: GH.panelBg, border: `1px solid ${GH.panelBorder}`,
+        borderRadius: 6, padding: '6px 10px', position: 'relative',
       }}>
-        {isFarkle ? 'FARKLE' : `+${preview.toLocaleString()}`}
+        <div style={CRT_STYLE} />
+        <GhCorners />
+        <div style={{ display: 'flex', gap: 5, marginBottom: 4, position: 'relative', zIndex: 1 }}>
+          {chainFaces.map((face, i) => (
+            <div key={i} style={{
+              width: 30, height: 30, borderRadius: 5,
+              background: `${FACE_COLOR[face] ?? GH.purpleMid}22`,
+              border: `1px solid ${FACE_COLOR[face] ?? GH.purpleMid}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: FACE_COLOR[face] ?? GH.purpleMid,
+              fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
+              boxShadow: `0 0 8px ${FACE_COLOR[face] ?? GH.purpleMid}88`,
+              textShadow: `0 0 6px ${FACE_COLOR[face] ?? GH.purpleMid}`,
+            }}>
+              {face}
+            </div>
+          ))}
+        </div>
+        <div style={{
+          color: isFarkle ? GH.danger : GH.goldBright,
+          fontSize: 13, fontFamily: 'monospace', fontWeight: 700, textAlign: 'center',
+          textShadow: isFarkle ? `0 0 10px ${GH.dangerGlow}` : `0 0 8px ${GH.goldGlow}`,
+          position: 'relative', zIndex: 1,
+        }}>
+          {isFarkle ? '✦ FARKLE ✦' : `+${preview.toLocaleString()}`}
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Bank Button ───────────────────────────────────────────────────────────────
+// ── Bank Button (Gothic) ──────────────────────────────────────────────────────
 
 function BankButton({ onBank, onBack, onPass }: { onBank: () => void; onBack: () => void; onPass?: () => void }) {
   const { unbanked, rallyRole } = useFarkleStore(s => ({ unbanked: s.unbanked, rallyRole: s.rallyRole }));
 
   return (
-    <div style={{ position: 'absolute', top: 50, right: 12, display: 'flex', flexDirection: 'column', gap: 6, pointerEvents: 'auto' }}>
+    <div style={{ position: 'absolute', top: 82, right: 8, display: 'flex', flexDirection: 'column', gap: 5, pointerEvents: 'auto' }}>
       {unbanked > 0 && (
         <button onClick={onBank} style={{
-          background: 'var(--ba-accent)', border: 'none', color: '#fff',
-          borderRadius: 8, padding: '6px 12px',
-          fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
-          boxShadow: '0 0 12px var(--ba-accent-glow)',
+          background: `rgba(201,168,76,0.16)`,
+          border: `1px solid ${GH.gold}`,
+          color: GH.goldBright,
+          borderRadius: 5, padding: '6px 12px',
+          fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
+          boxShadow: `0 0 14px ${GH.goldGlow}`,
+          textShadow: `0 0 8px ${GH.goldGlow}`,
+          letterSpacing: 1,
         }}>
-          BANK {unbanked.toLocaleString()}
+          ⚑ BANK {unbanked.toLocaleString()}
         </button>
       )}
       {onPass && unbanked > 0 && (
         <button onClick={onPass} style={{
-          background: rallyRole === 'CONDUCTOR' ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)',
-          border: `1px solid ${rallyRole === 'CONDUCTOR' ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.15)'}`,
-          color: rallyRole === 'CONDUCTOR' ? '#818cf8' : 'var(--ba-marble-400)',
-          borderRadius: 8, padding: '4px 10px',
-          fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
+          background: rallyRole === 'CONDUCTOR' ? 'rgba(123,47,255,0.16)' : GH.panelBg,
+          border: `1px solid ${rallyRole === 'CONDUCTOR' ? GH.purpleMid : GH.goldDim}`,
+          color: rallyRole === 'CONDUCTOR' ? '#a78bfa' : GH.boneDim,
+          borderRadius: 5, padding: '4px 10px',
+          fontSize: 10, cursor: 'pointer', fontFamily: 'monospace',
         }}>
           PASS{rallyRole === 'CONDUCTOR' ? ' +STEP' : ''}
         </button>
       )}
       <button onClick={onBack} style={{
-        background: 'var(--ba-card-bg)', border: '1px solid var(--ba-card-border)',
-        color: 'var(--ba-marble-500)',
-        borderRadius: 8, padding: '4px 10px',
-        fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
+        background: GH.panelBg,
+        border: `1px solid ${GH.goldDim}`,
+        color: GH.boneDim,
+        borderRadius: 5, padding: '4px 10px',
+        fontSize: 10, cursor: 'pointer', fontFamily: 'monospace',
+        letterSpacing: 0.5,
       }}>
-        ← Exit
+        ← EXIT
       </button>
     </div>
   );
@@ -321,12 +861,13 @@ function TimerDisplay() {
   const isLow = secs <= 30;
   return (
     <div style={{
-      position: 'absolute', top: 50, left: 12,
-      color: isLow ? 'var(--ba-danger)' : 'var(--ba-marble-200)',
-      fontSize: isLow ? 17 : 14, fontFamily: 'monospace', fontWeight: 700,
-      textShadow: isLow ? '0 0 10px var(--ba-danger)' : 'none',
+      position: 'absolute', top: 82, left: 8,
+      color: isLow ? GH.danger : GH.bone,
+      fontSize: isLow ? 18 : 14, fontFamily: 'monospace', fontWeight: 700,
+      textShadow: isLow ? `0 0 12px ${GH.dangerGlow}` : `0 0 6px ${GH.boneDim}`,
       pointerEvents: 'none',
       animation: isLow && secs % 2 === 0 ? 'timerPulse 1s ease infinite' : 'none',
+      letterSpacing: 1,
     }}>
       {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
       <style>{`@keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
@@ -337,32 +878,34 @@ function TimerDisplay() {
 // ── Role Badge ────────────────────────────────────────────────────────────────
 
 const ROLE_COLORS: Record<string, string> = {
-  RAINMAKER: '#fbbf24', HEADHUNTER: '#ef4444',
-  ARCHIVIST: '#10b981', CONDUCTOR: '#7c3aed',
+  RAINMAKER: GH.goldBright, HEADHUNTER: GH.danger,
+  ARCHIVIST: '#10b981',     CONDUCTOR: GH.purpleMid,
 };
 
 function RoleBadge() {
   const rallyRole = useFarkleStore(s => s.rallyRole);
   if (!rallyRole) return null;
-  const c = ROLE_COLORS[rallyRole] ?? '#fff';
+  const c = ROLE_COLORS[rallyRole] ?? GH.bone;
   return (
     <div style={{
-      position: 'absolute', top: 72, left: 12,
-      color: c, fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
-      letterSpacing: 1, pointerEvents: 'none',
-      textShadow: `0 0 6px ${c}`,
+      position: 'absolute', top: 108, left: 8,
+      color: c, fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
+      letterSpacing: 2, pointerEvents: 'none',
+      textShadow: `0 0 8px ${c}`,
+      background: `${c}18`, border: `1px solid ${c}55`,
+      borderRadius: 3, padding: '2px 6px',
     }}>
       ◈ {rallyRole}
     </div>
   );
 }
 
-// ── Disruption Panel (VS / Heist modes only) ─────────────────────────────────
+// ── Disruption Panel ──────────────────────────────────────────────────────────
 
-const DISRUPTION_DEFS: { type: DisruptionType; label: string; emoji: string }[] = [
-  { type: 'ice_send',  label: 'ICE',     emoji: '❄️' },
-  { type: 'lock_send', label: 'LOCK',    emoji: '🔒' },
-  { type: 'scramble',  label: 'SCRAMBLE',emoji: '🌀' },
+const DISRUPTION_DEFS: { type: DisruptionType; label: string; icon: string }[] = [
+  { type: 'ice_send',  label: 'ICE',      icon: '❄' },
+  { type: 'lock_send', label: 'LOCK',     icon: '⧖' },
+  { type: 'scramble',  label: 'SCRAMBLE', icon: '⟳' },
 ];
 
 const MODE_LABEL: Partial<Record<GameMode, string>> = {
@@ -382,7 +925,6 @@ function DisruptionPanel({ onDisrupt, gameMode }: { onDisrupt: (type: Disruption
   const isFrenzy = mode === 'FRENZY';
 
   function fireDisrupt(type: DisruptionType) {
-    // HEIST: free disrupts while in FRENZY
     if (isHeist && isFrenzy) { onDisrupt(type); return; }
     if (disruptCharges <= 0) return;
     if (!spendDisruptCharge()) return;
@@ -393,56 +935,52 @@ function DisruptionPanel({ onDisrupt, gameMode }: { onDisrupt: (type: Disruption
 
   return (
     <div style={{
-      position: 'absolute', bottom: 80, right: 12,
-      display: 'flex', flexDirection: 'column', gap: 5, pointerEvents: 'auto',
-      alignItems: 'flex-end',
+      position: 'absolute', bottom: 110, right: 8,
+      display: 'flex', flexDirection: 'column', gap: 4,
+      pointerEvents: 'auto', alignItems: 'flex-end',
     }}>
       {/* Mode badge */}
       <div style={{
-        fontSize: 9, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2,
-        color: 'rgba(167,139,250,0.7)', marginBottom: 2,
+        fontSize: 8, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2,
+        color: GH.purpleMid, textShadow: `0 0 6px ${GH.purpleGlow}`,
+        background: GH.panelBg, border: `1px solid ${GH.purpleDim}`,
+        borderRadius: 3, padding: '1px 5px',
       }}>
         {MODE_LABEL[gameMode]} MODE
       </div>
-
       {/* Charge meter */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
         {[0, 1, 2].map(i => (
           <div key={i} style={{
-            width: 10, height: 10, borderRadius: '50%',
+            width: 9, height: 9, borderRadius: '50%',
             background: i < disruptCharges
-              ? '#a78bfa'
+              ? GH.purpleMid
               : i === disruptCharges
-                ? `linear-gradient(90deg, #a78bfa ${disruptChargeProgress}%, rgba(124,58,237,0.2) ${disruptChargeProgress}%)`
-                : 'rgba(124,58,237,0.15)',
-            border: '1px solid rgba(124,58,237,0.4)',
-            boxShadow: i < disruptCharges ? '0 0 5px rgba(167,139,250,0.7)' : 'none',
-            transition: 'background 0.1s',
+                ? `conic-gradient(${GH.purpleMid} ${disruptChargeProgress}%, ${GH.purpleDim} ${disruptChargeProgress}%)`
+                : GH.purpleDim,
+            border: `1px solid ${GH.purpleMid}55`,
+            boxShadow: i < disruptCharges ? `0 0 5px ${GH.purpleGlow}` : 'none',
           }} />
         ))}
         <span style={{
-          fontSize: 9,
-          color: isHeist && isFrenzy ? '#22c55e' : isFrenzy ? '#a78bfa' : 'var(--ba-marble-800)',
-          fontFamily: 'monospace',
+          fontSize: 8, fontFamily: 'monospace',
+          color: isHeist && isFrenzy ? '#22c55e' : isFrenzy ? GH.purpleMid : GH.boneFaint,
         }}>
-          {isHeist ? (isFrenzy ? '🔥 FREE NOW' : 'FREE IN FRENZY') : (isFrenzy ? 'CHARGING' : 'FRENZY TO CHARGE')}
+          {isHeist ? (isFrenzy ? 'FREE' : '?FRENZY') : (isFrenzy ? 'CHARGE' : 'NEED FRENZY')}
         </span>
       </div>
-
-      {/* Disruption buttons */}
-      {DISRUPTION_DEFS.map(({ type, label, emoji }) => (
+      {DISRUPTION_DEFS.map(({ type, label, icon }) => (
         <button key={type} onClick={() => fireDisrupt(type)} disabled={!hasCharge} style={{
-          background: hasCharge ? 'rgba(124,58,237,0.35)' : 'var(--ba-card-bg)',
-          border: `1px solid ${hasCharge ? 'rgba(167,139,250,0.7)' : 'var(--ba-card-border)'}`,
-          color: hasCharge ? '#e9d5ff' : 'var(--ba-marble-800)',
-          borderRadius: 8, padding: '5px 10px',
-          fontSize: 11, fontWeight: 700,
-          cursor: hasCharge ? 'pointer' : 'default',
+          background: hasCharge ? `rgba(123,47,255,0.2)` : GH.panelBg,
+          border: `1px solid ${hasCharge ? GH.purpleMid : GH.purpleDim}`,
+          color: hasCharge ? '#e9d5ff' : GH.boneFaint,
+          borderRadius: 5, padding: '4px 8px',
+          fontSize: 10, fontWeight: 700, cursor: hasCharge ? 'pointer' : 'default',
           fontFamily: 'monospace', whiteSpace: 'nowrap',
-          boxShadow: hasCharge ? '0 0 8px rgba(124,58,237,0.4)' : 'none',
-          transition: 'all 0.15s ease',
+          boxShadow: hasCharge ? `0 0 8px ${GH.purpleGlow}` : 'none',
+          transition: 'all 0.15s ease', letterSpacing: 0.5,
         }}>
-          {emoji} {label}
+          {icon} {label}
         </button>
       ))}
     </div>
@@ -458,25 +996,26 @@ function DisruptionToast() {
   if (!pendingDisruption) return null;
 
   const labels: Record<string, string> = {
-    ice_send: '❄️ ICE incoming!',
-    lock_send: '🔒 LOCK incoming!',
-    scramble: '🌀 Scramble incoming!',
+    ice_send:  '❄ ICE incoming!',
+    lock_send: '⧖ LOCK incoming!',
+    scramble:  '⟳ Scramble incoming!',
   };
 
   return (
     <div style={{
-      position: 'absolute', top: 52, left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(30,0,60,0.92)', border: '1px solid rgba(200,50,255,0.6)',
-      borderRadius: 10, padding: '8px 20px',
-      color: '#e879f9', fontSize: 14, fontFamily: 'monospace', fontWeight: 700,
-      boxShadow: '0 0 16px rgba(200,50,255,0.4)',
+      position: 'absolute', top: 82, left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(30,0,60,0.95)', border: `1px solid ${GH.magenta}`,
+      borderRadius: 8, padding: '7px 18px',
+      color: GH.magenta, fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
+      boxShadow: `0 0 18px ${GH.magentaGlow}`,
+      textShadow: `0 0 8px ${GH.magentaGlow}`,
       animation: 'disruptIn 0.3s ease-out',
       pointerEvents: 'auto', zIndex: 10,
-      display: 'flex', gap: 12, alignItems: 'center',
+      display: 'flex', gap: 12, alignItems: 'center', letterSpacing: 1,
     }}>
       {labels[pendingDisruption.type] ?? 'Disruption incoming!'}
       <button onClick={dismissDisruption} style={{
-        background: 'transparent', border: 'none', color: 'rgba(200,50,255,0.7)',
+        background: 'transparent', border: 'none', color: GH.magentaDim,
         cursor: 'pointer', fontFamily: 'monospace', fontSize: 12,
       }}>✕</button>
       <style>{`
@@ -489,7 +1028,7 @@ function DisruptionToast() {
   );
 }
 
-// ── Frenzy Instability Warning (B19) ─────────────────────────────────────────
+// ── Frenzy Instability Warning ────────────────────────────────────────────────
 
 function FrenzyInstabilityWarning() {
   const { mode, energy } = useFarkleStore(s => ({ mode: s.mode, energy: s.energy }));
@@ -497,19 +1036,20 @@ function FrenzyInstabilityWarning() {
   const critical = energy < 30;
   return (
     <div style={{
-      position: 'absolute', bottom: 120, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', bottom: 160, left: '50%', transform: 'translateX(-50%)',
       display: 'flex', alignItems: 'center', gap: 6,
       background: critical ? 'rgba(200,0,0,0.22)' : 'rgba(200,100,0,0.16)',
-      border: `1px solid ${critical ? 'rgba(239,68,68,0.7)' : 'rgba(251,146,60,0.55)'}`,
-      borderRadius: 8, padding: '4px 12px',
+      border: `1px solid ${critical ? GH.danger : GH.amberHot}`,
+      borderRadius: 6, padding: '4px 14px',
       pointerEvents: 'none',
       animation: 'instabilityPulse 0.9s ease-in-out infinite',
+      zIndex: 5,
     }}>
-      <span style={{ fontSize: 13 }}>⚡</span>
+      <span style={{ fontSize: 12 }}>⚡</span>
       <span style={{
-        color: critical ? '#ef4444' : '#fb923c',
-        fontSize: 11, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 1,
-        textShadow: `0 0 8px ${critical ? '#ef4444' : '#fb923c'}`,
+        color: critical ? GH.danger : GH.amberHot,
+        fontSize: 10, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2,
+        textShadow: `0 0 10px ${critical ? GH.dangerGlow : GH.amberGlow}`,
       }}>
         {critical ? 'ANCHOR CRITICAL' : 'ANCHOR UNSTABLE'}
       </span>
@@ -523,7 +1063,7 @@ function FrenzyInstabilityWarning() {
   );
 }
 
-// ── RAINMAKER Bomb Face Picker (B7) ──────────────────────────────────────────
+// ── RAINMAKER Face Picker ─────────────────────────────────────────────────────
 
 interface RainmakerFacePickerProps { onSelect: (face: number) => void; }
 
@@ -533,36 +1073,43 @@ function RainmakerFacePicker({ onSelect }: RainmakerFacePickerProps) {
   return (
     <div style={{
       position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', pointerEvents: 'auto', zIndex: 20,
+      background: 'rgba(5,0,18,0.72)', pointerEvents: 'auto', zIndex: 20,
     }}>
       <div style={{
-        background: '#1a1a2e', border: '1px solid rgba(251,191,36,0.5)', borderRadius: 14,
-        padding: '18px 22px', textAlign: 'center',
+        background: GH.panelBg, border: `1px solid ${GH.gold}`,
+        borderRadius: 10, padding: '20px 24px', textAlign: 'center',
+        boxShadow: `0 0 30px ${GH.goldGlow}`, position: 'relative',
       }}>
-        <div style={{ color: '#fbbf24', fontFamily: 'monospace', fontSize: 12, letterSpacing: 1, marginBottom: 12 }}>
-          RAINMAKER — SELECT TARGET FACE
+        <div style={CRT_STYLE} />
+        <GhCorners color={GH.goldBright} />
+        <div style={{ color: GH.gold, fontFamily: 'monospace', fontSize: 11, letterSpacing: 2, marginBottom: 4, position: 'relative', zIndex: 1 }}>
+          ⚡ RAINMAKER
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ color: GH.boneDim, fontFamily: 'monospace', fontSize: 9, letterSpacing: 1, marginBottom: 14, position: 'relative', zIndex: 1 }}>
+          SELECT TARGET FACE
+        </div>
+        <div style={{ display: 'flex', gap: 8, position: 'relative', zIndex: 1 }}>
           {[1, 2, 3, 4, 5, 6].map(f => (
             <button key={f} onClick={() => onSelect(f)} style={{
-              width: 44, height: 44, borderRadius: 8,
-              background: FACE_COLOR[f] ?? '#888',
-              border: '2px solid rgba(255,255,255,0.2)',
-              color: '#fff', fontWeight: 700, fontSize: 18,
-              cursor: 'pointer',
+              width: 42, height: 42, borderRadius: 6,
+              background: `${FACE_COLOR[f] ?? '#888'}22`,
+              border: `2px solid ${FACE_COLOR[f] ?? '#888'}`,
+              color: FACE_COLOR[f] ?? '#fff', fontWeight: 700, fontSize: 18,
+              cursor: 'pointer', fontFamily: 'monospace',
+              boxShadow: `0 0 10px ${FACE_COLOR[f] ?? '#888'}66`,
+              textShadow: `0 0 6px ${FACE_COLOR[f] ?? '#888'}`,
+              transition: 'all 0.15s ease',
             }}>{f}</button>
           ))}
         </div>
+        <FiligreeRow count={7} color={GH.goldDim} />
       </div>
     </div>
   );
 }
 
-// ── Main HUD ──────────────────────────────────────────────────────────────────
+// ── Heist Panel ───────────────────────────────────────────────────────────────
 
-const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
-
-// C1: Heist vault meter + initiate/block buttons
 function HeistPanel({ onInitiate, onBlock }: { onInitiate: () => void; onBlock: () => void }) {
   const vaultPts     = useFarkleStore(s => s.vaultPts);
   const heistActive  = useFarkleStore(s => s.heistActive);
@@ -583,28 +1130,35 @@ function HeistPanel({ onInitiate, onBlock }: { onInitiate: () => void; onBlock: 
   const canInitiate = !heistActive && vaultPts >= HEIST_CONSTANTS.VAULT_THRESHOLD && energy >= HEIST_CONSTANTS.HEIST_ENERGY_COST;
 
   return (
-    <div style={{ position: 'absolute', bottom: 120, left: 12, pointerEvents: 'auto', minWidth: 130 }}>
-      {/* Vault meter */}
-      <div style={{ fontSize: 10, color: '#a78bfa', marginBottom: 4, letterSpacing: 1 }}>VAULT</div>
-      <div style={{ background: '#1e1b4b', borderRadius: 4, height: 8, width: 120, overflow: 'hidden', border: '1px solid #4c1d95' }}>
-        <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? '#7c3aed' : '#4f46e5', transition: 'width 0.3s' }} />
+    <div style={{ position: 'absolute', bottom: 160, left: 8, pointerEvents: 'auto', minWidth: 130 }}>
+      <div style={{
+        background: GH.panelBg, border: `1px solid ${GH.purpleMid}55`,
+        borderRadius: 5, padding: '6px 8px', position: 'relative',
+      }}>
+        <div style={CRT_STYLE} />
+        <GhCorners color={GH.purpleMid} />
+        <div style={{ fontSize: 8, color: GH.purpleMid, marginBottom: 4, letterSpacing: 2, textShadow: `0 0 6px ${GH.purpleGlow}`, position: 'relative', zIndex: 1 }}>⬡ VAULT</div>
+        <div style={{ background: 'rgba(13,0,24,0.8)', borderRadius: 3, height: 8, width: '100%', overflow: 'hidden', border: `1px solid ${GH.purpleDim}`, position: 'relative', zIndex: 1 }}>
+          <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? GH.purpleMid : '#4f46e5', transition: 'width 0.3s', boxShadow: pct >= 1 ? `0 0 8px ${GH.purpleGlow}` : 'none' }} />
+        </div>
+        <div style={{ fontSize: 8, color: GH.purpleMid, marginTop: 2, position: 'relative', zIndex: 1 }}>{vaultPts.toLocaleString()} / {HEIST_CONSTANTS.VAULT_THRESHOLD.toLocaleString()}</div>
+        {canInitiate && (
+          <button onClick={onInitiate} style={{ marginTop: 5, padding: '3px 8px', background: `rgba(123,47,255,0.25)`, color: '#c4b5fd', border: `1px solid ${GH.purpleMid}`, borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace', letterSpacing: 1, boxShadow: `0 0 8px ${GH.purpleGlow}` }}>
+            HEIST (−{HEIST_CONSTANTS.HEIST_ENERGY_COST}⚡)
+          </button>
+        )}
+        {heistActive && (
+          <button onClick={onBlock} style={{ marginTop: 5, padding: '3px 8px', background: 'rgba(239,68,68,0.22)', color: '#fca5a5', border: `1px solid ${GH.danger}`, borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace', animation: 'pulse 0.5s infinite alternate' }}>
+            BLOCK ({countdown}s)
+          </button>
+        )}
       </div>
-      <div style={{ fontSize: 9, color: '#7c3aed', marginTop: 2 }}>{vaultPts.toLocaleString()} / {HEIST_CONSTANTS.VAULT_THRESHOLD.toLocaleString()}</div>
-      {canInitiate && (
-        <button onClick={onInitiate} style={{ marginTop: 6, padding: '4px 8px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-          HEIST (−{HEIST_CONSTANTS.HEIST_ENERGY_COST}⚡)
-        </button>
-      )}
-      {heistActive && (
-        <button onClick={onBlock} style={{ marginTop: 6, padding: '4px 8px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', animation: 'pulse 0.5s infinite alternate' }}>
-          BLOCK ({countdown}s)
-        </button>
-      )}
     </div>
   );
 }
 
-// C15: Rally Continue/Bank/Pass decision panel with vote tally
+// ── Rally Decision Panel ──────────────────────────────────────────────────────
+
 function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onRallyBank: () => void; onRallyPass: () => void; onRallyContinue: () => void }) {
   const active  = useFarkleStore(s => s.rallyDecisionActive);
   const expires = useFarkleStore(s => s.rallyDecisionExpiresAt);
@@ -624,9 +1178,7 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
   if (!active) return null;
 
   const voteEntries = Object.entries(rallyVotes);
-  const hasOtherVoters = voteEntries.length > 0;
-
-  const voteColor: Record<string, string> = { bank: '#059669', pass: '#7c3aed', continue: '#1d4ed8' };
+  const voteColor: Record<string, string> = { bank: '#059669', pass: GH.purpleMid, continue: '#1d4ed8' };
 
   function handleVote(choice: 'bank' | 'pass' | 'continue', fn: () => void) {
     if (myVote) return;
@@ -635,29 +1187,48 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
   }
 
   return (
-    <div style={{ position: 'absolute', bottom: '28%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'rgba(10,6,35,0.88)', border: '1px solid #4f46e5', borderRadius: 10, padding: '12px 20px' }}>
-      <div style={{ color: '#a78bfa', fontSize: 11, letterSpacing: 2 }}>RALLY DECISION — {countdown}s</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          onClick={() => handleVote('bank', onRallyBank)}
-          disabled={!!myVote}
-          style={{ padding: '6px 14px', background: myVote === 'bank' ? '#059669' : myVote ? '#374151' : '#059669', color: '#fff', border: myVote === 'bank' ? '2px solid #6ee7b7' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'bank' ? 0.45 : 1 }}
-        >BANK</button>
-        <button
-          onClick={() => handleVote('pass', onRallyPass)}
-          disabled={!!myVote}
-          style={{ padding: '6px 14px', background: myVote === 'pass' ? '#7c3aed' : myVote ? '#374151' : '#7c3aed', color: '#fff', border: myVote === 'pass' ? '2px solid #c4b5fd' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'pass' ? 0.45 : 1 }}
-        >PASS</button>
-        <button
-          onClick={() => handleVote('continue', onRallyContinue)}
-          disabled={!!myVote}
-          style={{ padding: '6px 14px', background: myVote === 'continue' ? '#1d4ed8' : myVote ? '#374151' : '#1d4ed8', color: '#fff', border: myVote === 'continue' ? '2px solid #93c5fd' : '2px solid transparent', borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: myVote ? 'default' : 'pointer', opacity: myVote && myVote !== 'continue' ? 0.45 : 1 }}
-        >CONTINUE</button>
+    <div style={{
+      position: 'absolute', bottom: '28%', left: '50%', transform: 'translateX(-50%)',
+      pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+      background: GH.panelBg, border: `1px solid ${GH.purpleMid}88`,
+      borderRadius: 10, padding: '12px 20px', position: 'relative',
+      boxShadow: `0 0 20px ${GH.purpleGlow}`,
+    }}>
+      <div style={CRT_STYLE} />
+      <GhCorners color={GH.purpleMid} />
+      <div style={{ color: GH.purpleMid, fontSize: 10, letterSpacing: 2, textShadow: `0 0 8px ${GH.purpleGlow}`, position: 'relative', zIndex: 1 }}>
+        ◈ RALLY DECISION — {countdown}s
       </div>
-      {hasOtherVoters && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+      <div style={{ display: 'flex', gap: 8, position: 'relative', zIndex: 1 }}>
+        {(['bank', 'pass', 'continue'] as const).map((choice, idx) => {
+          const colors = ['#059669', GH.purpleMid, '#1d4ed8'];
+          const labels = ['BANK', 'PASS', 'CONTINUE'];
+          const fn = [onRallyBank, onRallyPass, onRallyContinue][idx];
+          const c = colors[idx];
+          const isVoted = myVote === choice;
+          return (
+            <button key={choice}
+              onClick={() => handleVote(choice, fn)}
+              disabled={!!myVote}
+              style={{
+                padding: '5px 12px',
+                background: isVoted ? `${c}33` : myVote ? GH.panelBg : `${c}22`,
+                color: isVoted ? '#fff' : myVote && !isVoted ? GH.boneFaint : '#fff',
+                border: `1px solid ${isVoted ? c : myVote ? GH.goldDim : c}88`,
+                borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: myVote ? 'default' : 'pointer',
+                fontFamily: 'monospace', letterSpacing: 1,
+                opacity: myVote && !isVoted ? 0.45 : 1,
+                boxShadow: isVoted ? `0 0 10px ${c}88` : 'none',
+              }}>
+              {labels[idx]}
+            </button>
+          );
+        })}
+      </div>
+      {voteEntries.length > 0 && (
+        <div style={{ display: 'flex', gap: 5, marginTop: 2, position: 'relative', zIndex: 1 }}>
           {voteEntries.map(([pid, v]) => (
-            <div key={pid} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: voteColor[v] ?? '#374151', color: '#fff', letterSpacing: 1, fontWeight: 700 }}>
+            <div key={pid} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 3, background: voteColor[v] ?? GH.panelBg, color: '#fff', letterSpacing: 1, fontWeight: 700, fontFamily: 'monospace' }}>
               {v.toUpperCase()}
             </div>
           ))}
@@ -666,6 +1237,10 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
     </div>
   );
 }
+
+// ── Main HUD ──────────────────────────────────────────────────────────────────
+
+const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
 
 interface FarkleHUDProps {
   onBank: () => void;
@@ -681,24 +1256,39 @@ interface FarkleHUDProps {
   gameMode?: GameMode;
 }
 
-export function FarkleHUD({ onBank, onBack, onPass, onDisrupt, onRainmakerSelect, onInitiateHeist, onBlockHeist, onRallyBank, onRallyPass, onRallyContinue, gameMode }: FarkleHUDProps) {
+export function FarkleHUD({
+  onBank, onBack, onPass, onDisrupt, onRainmakerSelect,
+  onInitiateHeist, onBlockHeist,
+  onRallyBank, onRallyPass, onRallyContinue,
+  gameMode,
+}: FarkleHUDProps) {
+  const [diceClass, setDiceClass] = useState<DiceClass>('rogue');
   const showDisruptions = onDisrupt && gameMode && DISRUPTION_MODES.has(gameMode);
   const isHeist = gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isRally = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';
+  const hasTimer = useFarkleStore(s => s.timeRemaining !== null);
+
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      <EnergyBar />
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {/* ── Top chrome ── */}
+      <TrickMeter />
+      <NeonOscilloscope />
+
+      {/* ── Mid-field overlays ── */}
       <ScoreDisplay />
-      <BankButton onBank={onBank} onBack={onBack} {...(onPass ? { onPass } : {})} />
-      <TimerDisplay />
+      <ShardTracker />
+      {!hasTimer && <ClassSelector selected={diceClass} onSelect={setDiceClass} />}
+      {hasTimer && <TimerDisplay />}
       <RoleBadge />
+      <BankButton onBank={onBank} onBack={onBack} {...(onPass ? { onPass } : {})} />
+      <HiddenPocket />
       <ChainPreview />
-      <FarkleFlash />
-      <ModePulse />
-      <FrenzyInstabilityWarning />
-      <ScorePopupLayer />
+
+      {/* ── Disruption overlays ── */}
       <DisruptionToast />
       {showDisruptions && <DisruptionPanel onDisrupt={onDisrupt} gameMode={gameMode} />}
+
+      {/* ── Mode-specific panels ── */}
       {onRainmakerSelect && <RainmakerFacePicker onSelect={onRainmakerSelect} />}
       {isHeist && onInitiateHeist && onBlockHeist && (
         <HeistPanel onInitiate={onInitiateHeist} onBlock={onBlockHeist} />
@@ -706,6 +1296,15 @@ export function FarkleHUD({ onBank, onBack, onPass, onDisrupt, onRainmakerSelect
       {isRally && onRallyBank && onRallyPass && onRallyContinue && (
         <RallyDecisionPanel onRallyBank={onRallyBank} onRallyPass={onRallyPass} onRallyContinue={onRallyContinue} />
       )}
+
+      {/* ── Transient effects ── */}
+      <FrenzyInstabilityWarning />
+      <FarkleFlash />
+      <ModePulse />
+      <ScorePopupLayer />
     </div>
   );
 }
+
+// ── Beat Window (exported for GameScreen layout) ──────────────────────────────
+export { BeatWindow };

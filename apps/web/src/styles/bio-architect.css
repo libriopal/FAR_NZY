@@ -1,4 +1,5 @@
 /* Bio-Architect Design System — MATCH3D The Living Blueprint */
+/* Extended: Gothic Hacker Neon fusion layer */
 
 :root {
   /* Glass surfaces */
@@ -49,6 +50,37 @@
   --ba-card-border: rgba(59, 130, 246, 0.20);
   --ba-accent:      #3b82f6;
   --ba-accent-glow: rgba(59, 130, 246, 0.35);
+
+  /* ── Gothic Hacker Neon fusion palette ───────────────────────────────────── */
+  --gh-void:            #050008;
+  --gh-neural:          #0d0018;
+  --gh-neural-mid:      #160028;
+  --gh-bone:            #e8d5a3;
+  --gh-bone-dim:        rgba(232, 213, 163, 0.35);
+  --gh-bone-faint:      rgba(232, 213, 163, 0.12);
+  --gh-gold:            #c9a84c;
+  --gh-gold-bright:     #f0c860;
+  --gh-gold-glow:       rgba(201, 168, 76, 0.55);
+  --gh-gold-dim:        rgba(201, 168, 76, 0.22);
+  --gh-cyan:            #00e5ff;
+  --gh-cyan-bright:     #80f9ff;
+  --gh-cyan-glow:       rgba(0, 229, 255, 0.45);
+  --gh-cyan-dim:        rgba(0, 229, 255, 0.15);
+  --gh-magenta:         #ff00cc;
+  --gh-magenta-bright:  #ff80e8;
+  --gh-magenta-glow:    rgba(255, 0, 204, 0.45);
+  --gh-magenta-dim:     rgba(255, 0, 204, 0.15);
+  --gh-amber-hot:       #ff7200;
+  --gh-amber-glow:      rgba(255, 114, 0, 0.55);
+  --gh-purple-deep:     #3d0066;
+  --gh-purple-mid:      #7b2fff;
+  --gh-purple-glow:     rgba(123, 47, 255, 0.45);
+  --gh-crystal-face:    rgba(0, 229, 255, 0.08);
+  --gh-crystal-border:  rgba(0, 229, 255, 0.38);
+  --gh-filigree:        rgba(201, 168, 76, 0.28);
+  --gh-filigree-bright: rgba(240, 200, 96, 0.55);
+  --gh-panel-bg:        rgba(5, 0, 18, 0.88);
+  --gh-panel-border:    rgba(201, 168, 76, 0.42);
 }
 
 /* ── Variants ──────────────────────────────────────────────────────────────── */
@@ -140,3 +172,176 @@
 
 .ba-dissolve { animation: ba-dissolve var(--ba-dissolve-ms) ease-out forwards; }
 .ba-frenzy-border { animation: ba-frenzy-pulse var(--ba-frenzy-ms) ease-in-out infinite; }
+
+/* ── Gothic Hacker Neon keyframes ──────────────────────────────────────────── */
+
+@keyframes gh-crystal-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--gh-cyan-glow), inset 0 0 4px var(--gh-cyan-dim); }
+  50%       { box-shadow: 0 0 18px var(--gh-cyan-glow), inset 0 0 8px var(--gh-cyan-dim); }
+}
+
+@keyframes gh-gold-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gh-frenzy-flicker {
+  0%, 92%, 100% { opacity: 1; }
+  94%            { opacity: 0.7; }
+  96%            { opacity: 1; }
+  98%            { opacity: 0.85; }
+}
+
+@keyframes gh-beat-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes gh-perfect-flash {
+  0%, 100% { background: rgba(0,229,255,0.12); border-color: var(--gh-cyan); }
+  50%       { background: rgba(0,229,255,0.28); border-color: var(--gh-cyan-bright); }
+}
+
+@keyframes gh-osc-wave {
+  0%   { d: path("M0 20 Q12 5 24 20 Q36 35 48 20 Q60 5 72 20 Q84 35 96 20 Q108 5 120 20 Q132 35 144 20 Q156 5 168 20 Q180 35 192 20 Q204 5 216 20 Q228 35 240 20"); }
+  25%  { d: path("M0 20 Q12 32 24 20 Q36 8 48 20 Q60 32 72 20 Q84 8 96 20 Q108 32 120 20 Q132 8 144 20 Q156 32 168 20 Q180 8 192 20 Q204 32 216 20 Q228 8 240 20"); }
+  50%  { d: path("M0 20 Q12 5 24 20 Q36 35 48 20 Q60 5 72 20 Q84 35 96 20 Q108 5 120 20 Q132 35 144 20 Q156 5 168 20 Q180 35 192 20 Q204 5 216 20 Q228 35 240 20"); }
+  75%  { d: path("M0 20 Q12 32 24 20 Q36 8 48 20 Q60 32 72 20 Q84 8 96 20 Q108 32 120 20 Q132 8 144 20 Q156 32 168 20 Q180 8 192 20 Q204 32 216 20 Q228 8 240 20"); }
+  100% { d: path("M0 20 Q12 5 24 20 Q36 35 48 20 Q60 5 72 20 Q84 35 96 20 Q108 5 120 20 Q132 35 144 20 Q156 5 168 20 Q180 35 192 20 Q204 5 216 20 Q228 35 240 20"); }
+}
+
+@keyframes gh-pocket-open {
+  from { transform: scaleY(0); opacity: 0; transform-origin: top; }
+  to   { transform: scaleY(1); opacity: 1; transform-origin: top; }
+}
+
+@keyframes gh-shard-activate {
+  0%   { transform: rotate(45deg) scale(0.8); opacity: 0.3; }
+  60%  { transform: rotate(45deg) scale(1.2); }
+  100% { transform: rotate(45deg) scale(1); opacity: 1; }
+}
+
+@keyframes gh-scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes gh-mode-brand-in {
+  0%   { letter-spacing: 12px; opacity: 0; }
+  60%  { letter-spacing: 3px; opacity: 1; }
+  100% { letter-spacing: 3px; opacity: 1; }
+}
+
+@keyframes gh-instability {
+  0%, 100% { opacity: 1; filter: hue-rotate(0deg); }
+  50%       { opacity: 0.5; filter: hue-rotate(30deg); }
+}
+
+/* ── Gothic Hacker Neon utility classes ────────────────────────────────────── */
+
+.gh-panel {
+  background: var(--gh-panel-bg);
+  border: 1px solid var(--gh-panel-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.gh-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.06) 3px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gh-panel > * { position: relative; z-index: 1; }
+
+.gh-panel-cyan {
+  border-color: var(--gh-crystal-border);
+  box-shadow: 0 0 12px var(--gh-cyan-dim), inset 0 0 8px rgba(0,229,255,0.04);
+}
+
+.gh-panel-gold {
+  border-color: var(--gh-gold);
+  box-shadow: 0 0 10px var(--gh-gold-dim), inset 0 0 6px rgba(201,168,76,0.04);
+}
+
+.gh-panel-magenta {
+  border-color: var(--gh-magenta);
+  box-shadow: 0 0 12px var(--gh-magenta-dim), inset 0 0 6px rgba(255,0,204,0.04);
+}
+
+.gh-crystal-btn {
+  background: var(--gh-crystal-face);
+  border: 1px solid var(--gh-crystal-border);
+  color: var(--gh-cyan);
+  font-family: monospace;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-shadow: 0 0 8px var(--gh-cyan-glow);
+}
+
+.gh-crystal-btn:hover {
+  background: rgba(0,229,255,0.16);
+  box-shadow: 0 0 14px var(--gh-cyan-glow);
+}
+
+.gh-crystal-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  text-shadow: none;
+}
+
+.gh-gold-text {
+  color: var(--gh-gold);
+  text-shadow: 0 0 8px var(--gh-gold-glow);
+  font-family: monospace;
+}
+
+.gh-bone-text {
+  color: var(--gh-bone);
+  font-family: monospace;
+}
+
+.gh-neon-cyan {
+  color: var(--gh-cyan);
+  text-shadow: 0 0 10px var(--gh-cyan-glow), 0 0 20px var(--gh-cyan-dim);
+}
+
+.gh-neon-magenta {
+  color: var(--gh-magenta);
+  text-shadow: 0 0 10px var(--gh-magenta-glow), 0 0 20px var(--gh-magenta-dim);
+}
+
+.gh-corner-tl,
+.gh-corner-tr,
+.gh-corner-bl,
+.gh-corner-br {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--gh-gold);
+  border-style: solid;
+  border-width: 0;
+  z-index: 2;
+}
+.gh-corner-tl { top: 2px; left: 2px; border-top-width: 2px; border-left-width: 2px; }
+.gh-corner-tr { top: 2px; right: 2px; border-top-width: 2px; border-right-width: 2px; }
+.gh-corner-bl { bottom: 2px; left: 2px; border-bottom-width: 2px; border-left-width: 2px; }
+.gh-corner-br { bottom: 2px; right: 2px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.gh-frenzy-active {
+  animation: gh-frenzy-flicker 3.5s ease-in-out infinite;
+}
+
+.gh-crystal-pulse {
+  animation: gh-crystal-pulse 1.8s ease-in-out infinite;
+}

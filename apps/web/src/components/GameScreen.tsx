@@ -10,7 +10,7 @@ import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
-import { FarkleHUD } from './FarkleHUD.js';
+import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
 import type { AudioSettings } from './SettingsModal.js';
@@ -241,12 +241,19 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const modeName = gameMode ? gameMode.replace('_', ' ') : 'SOLO';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#0a1628' }}>
-      {/* TopBar — 44px */}
-      <div style={{ height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', flexShrink: 0, borderBottom: '1px solid #1e1b4b' }}>
-        <button onClick={() => setActiveScreen('home')} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 4 }}>&#8592;</button>
-        <div style={{ color: '#7c3aed', fontSize: 11, fontWeight: 700, letterSpacing: 2, fontFamily: 'monospace' }}>{modeName}</div>
-        <button onClick={() => setSettingsOpen(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer', padding: 4 }}>&#9881;</button>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100dvh', overflow: 'hidden', background: 'var(--gh-void, #050008)' }}>
+      {/* TopBar — 44px — Gothic Neon */}
+      <div style={{
+        height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 12px', flexShrink: 0,
+        background: 'rgba(5,0,18,0.95)',
+        borderBottom: '1px solid rgba(201,168,76,0.3)',
+      }}>
+        <button onClick={() => setActiveScreen('home')} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#8592;</button>
+        <div style={{ color: '#c9a84c', fontSize: 10, fontWeight: 700, letterSpacing: 4, fontFamily: 'monospace', textShadow: '0 0 10px rgba(201,168,76,0.6)' }}>
+          ✦ {modeName} ✦
+        </div>
+        <button onClick={() => setSettingsOpen(true)} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#9881;</button>
       </div>
 
       {/* Game canvas — flex-1 */}
@@ -267,6 +274,9 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...((gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') ? { onInitiateHeist: initiateHeist, onBlockHeist: blockHeist } : {})}
         />
       </div>
+
+      {/* Beat Window — Gothic rhythm bar */}
+      <BeatWindow />
 
       <SettingsModal
         isOpen={settingsOpen}
