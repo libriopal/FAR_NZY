@@ -6,6 +6,12 @@
 
 import type { LevelDef } from '@match3d/farkle-shared';
 
+// TITAN v1.0 — "VERY RARELY" BALANCE
+// Bomb/Blocker entities (bomb, rainbow_bomb, ice, lock, stone) are reduced to
+// weight ≤1 across all levels — they should feel like sudden "Infection" events,
+// not standard obstacles. Score multiplier unlocks concentrate in later levels.
+// Redistributed weight goes to die + wild + catalyst for richer chain play.
+
 export const LEVELS: LevelDef[] = [
   {
     id: 'level_01',
@@ -18,7 +24,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_02',
     name: 'Glass Frame',
-    spawnWeights: { die:66, sphere:25, ice:2, lock:0, wild:1, bomb:0, rainbow_bomb:0, mirror:3, stone:1, multiplier_orb:2, ghost:0, catalyst:0 },
+    spawnWeights: { die:67, sphere:25, ice:1, lock:0, wild:1, bomb:0, rainbow_bomb:0, mirror:3, stone:0, multiplier_orb:2, ghost:1, catalyst:0 },
     winScore: 40_000,
     timeLimitSec: null,
     energyMultiplier: 1.0,
@@ -26,7 +32,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_03',
     name: 'Vine Trellis',
-    spawnWeights: { die:62, sphere:22, ice:3, lock:1, wild:2, bomb:1, rainbow_bomb:0, mirror:4, stone:2, multiplier_orb:2, ghost:1, catalyst:0 },
+    spawnWeights: { die:66, sphere:22, ice:1, lock:0, wild:3, bomb:0, rainbow_bomb:0, mirror:4, stone:1, multiplier_orb:2, ghost:1, catalyst:0 },
     winScore: 55_000,
     timeLimitSec: null,
     energyMultiplier: 1.0,
@@ -34,7 +40,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_04',
     name: 'Bioluminescent Bay',
-    spawnWeights: { die:58, sphere:20, ice:4, lock:2, wild:3, bomb:2, rainbow_bomb:0, mirror:5, stone:2, multiplier_orb:3, ghost:1, catalyst:0 },
+    spawnWeights: { die:62, sphere:20, ice:1, lock:1, wild:4, bomb:0, rainbow_bomb:0, mirror:5, stone:1, multiplier_orb:4, ghost:2, catalyst:0 },
     winScore: 65_000,
     timeLimitSec: 300,
     energyMultiplier: 1.1,
@@ -42,7 +48,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_05',
     name: 'Aero Scaffold',
-    spawnWeights: { die:55, sphere:18, ice:5, lock:2, wild:4, bomb:2, rainbow_bomb:1, mirror:5, stone:3, multiplier_orb:3, ghost:1, catalyst:1 },
+    spawnWeights: { die:59, sphere:18, ice:1, lock:1, wild:5, bomb:1, rainbow_bomb:0, mirror:6, stone:1, multiplier_orb:4, ghost:2, catalyst:2 },
     winScore: 75_000,
     timeLimitSec: 270,
     energyMultiplier: 1.1,
@@ -50,7 +56,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_06',
     name: 'Steel Canopy',
-    spawnWeights: { die:52, sphere:16, ice:6, lock:3, wild:5, bomb:3, rainbow_bomb:1, mirror:6, stone:3, multiplier_orb:3, ghost:1, catalyst:1 },
+    spawnWeights: { die:57, sphere:16, ice:1, lock:1, wild:7, bomb:1, rainbow_bomb:0, mirror:6, stone:1, multiplier_orb:4, ghost:2, catalyst:4 },
     winScore: 80_000,
     timeLimitSec: 240,
     energyMultiplier: 1.2,
@@ -58,7 +64,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_07',
     name: 'Hydro Core',
-    spawnWeights: { die:48, sphere:14, ice:7, lock:4, wild:6, bomb:4, rainbow_bomb:1, mirror:6, stone:4, multiplier_orb:4, ghost:1, catalyst:1 },
+    spawnWeights: { die:52, sphere:15, ice:1, lock:1, wild:9, bomb:1, rainbow_bomb:0, mirror:7, stone:1, multiplier_orb:5, ghost:3, catalyst:5 },
     winScore: 85_000,
     timeLimitSec: 210,
     energyMultiplier: 1.2,
@@ -66,7 +72,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_08',
     name: 'Overgrowth Dome',
-    spawnWeights: { die:44, sphere:13, ice:7, lock:4, wild:7, bomb:5, rainbow_bomb:2, mirror:7, stone:4, multiplier_orb:4, ghost:2, catalyst:1 },
+    spawnWeights: { die:48, sphere:13, ice:1, lock:1, wild:11, bomb:1, rainbow_bomb:1, mirror:7, stone:1, multiplier_orb:5, ghost:4, catalyst:7 },
     winScore: 90_000,
     timeLimitSec: 180,
     energyMultiplier: 1.3,
@@ -74,7 +80,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_09',
     name: 'Root Network',
-    spawnWeights: { die:41, sphere:12, ice:7, lock:5, wild:8, bomb:6, rainbow_bomb:2, mirror:7, stone:5, multiplier_orb:4, ghost:2, catalyst:1 },
+    spawnWeights: { die:45, sphere:12, ice:1, lock:1, wild:13, bomb:1, rainbow_bomb:1, mirror:8, stone:1, multiplier_orb:5, ghost:5, catalyst:7 },
     winScore: 95_000,
     timeLimitSec: 180,
     energyMultiplier: 1.3,
@@ -82,7 +88,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 'level_10',
     name: 'Grand Blueprint',
-    spawnWeights: { die:38, sphere:12, ice:6, lock:4, wild:9, bomb:7, rainbow_bomb:2, mirror:7, stone:5, multiplier_orb:5, ghost:3, catalyst:2 },
+    spawnWeights: { die:43, sphere:12, ice:1, lock:1, wild:15, bomb:1, rainbow_bomb:1, mirror:8, stone:1, multiplier_orb:6, ghost:5, catalyst:6 },
     winScore: 100_000,
     timeLimitSec: null,
     energyMultiplier: 1.5,

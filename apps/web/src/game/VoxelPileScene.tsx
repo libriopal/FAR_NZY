@@ -4,7 +4,7 @@
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
 
-import React, { useCallback, useRef, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useMemo, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -458,9 +458,11 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
   const chainHandlers = isChainable ? {
     onPointerDown: (e: any) => {
       e.stopPropagation();
+      // Release capture so subsequent pointermove events reach other dice for chain extend.
       (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
       onChainStart(body.id, body.face ?? 1, body.column);
     },
+    // onPointerEnter retained as fast-path; group-level onPointerMove is fallback.
     onPointerEnter: (e: any) => {
       e.stopPropagation();
       onChainExtend(body.id, body.face ?? 1, body.column);
@@ -472,10 +474,13 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
     },
   } : {};
 
+  // userData exposes entity metadata to the scene-level onPointerMove fallback picker
+  const entityUserData = { bodyId: body.id, face: body.face ?? 1, column: body.column, chainable: isChainable };
+
   if (vis.shape === 'sphere') {
     const rimColor = isBomb ? '#ff2200' : (isRainbow ? '#ffffff' : vis.emissive);
     return (
-      <group ref={groupRef} {...chainHandlers}>
+      <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
         {/* Core sphere */}
         <mesh castShadow>
           <sphereGeometry args={[0.43, 16, 16]} />
@@ -528,7 +533,7 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
 
   if (vis.shape === 'ghost') {
     return (
-      <group ref={groupRef} {...chainHandlers}>
+      <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
         <mesh castShadow>
           <boxGeometry args={[0.88, 0.88, 0.48]} />
           <meshStandardMaterial
@@ -560,7 +565,7 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
   const maxPips = body.entityType === 'stone' ? 3 : 3;
 
   return (
-    <group ref={groupRef} {...chainHandlers}>
+    <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
       <mesh castShadow>
         <boxGeometry args={[0.92, 0.92, 0.5]} />
         <meshStandardMaterial
@@ -832,10 +837,34 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap }: 
   const highlightedIds    = useExplosionStore(s => s.highlightedBodyIds);
   const highlightedSet    = useMemo(() => new Set(highlightedIds), [highlightedIds]);
 
+  // Scene-level move fallback: fires when per-entity onPointerEnter is missed
+  // (e.g. fast drags on mobile). Walks intersections to find a chainable entity.
+  const lastMoveExtendId = useRef<string | null>(null);
+  const handleGroupPointerMove = useCallback((e: any) => {
+    if (!e.intersections?.length) return;
+    for (const hit of e.intersections as any[]) {
+      // Traverse up to find the entity group (which has userData.bodyId)
+      let obj = hit.object;
+      while (obj && !obj.userData?.bodyId) obj = obj.parent;
+      if (!obj?.userData?.chainable) continue;
+      const { bodyId, face, column } = obj.userData as { bodyId: string; face: number; column: number };
+      if (bodyId === lastMoveExtendId.current) break; // already sent this frame
+      lastMoveExtendId.current = bodyId;
+      onChainExtend(bodyId, face, column);
+      break;
+    }
+  }, [onChainExtend]);
+
+  const handlePointerUp = useCallback(() => {
+    lastMoveExtendId.current = null;
+    onChainEnd();
+  }, [onChainEnd]);
+
   return (
     <group
-      onPointerUp={() => onChainEnd()}
-      onPointerCancel={() => onChainEnd()}
+      onPointerMove={handleGroupPointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       <CameraRig />
       <ambientLight intensity={0.65} />

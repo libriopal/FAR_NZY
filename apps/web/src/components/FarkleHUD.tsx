@@ -1191,7 +1191,7 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
       position: 'absolute', bottom: '28%', left: '50%', transform: 'translateX(-50%)',
       pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
       background: GH.panelBg, border: `1px solid ${GH.purpleMid}88`,
-      borderRadius: 10, padding: '12px 20px', position: 'relative',
+      borderRadius: 10, padding: '12px 20px',
       boxShadow: `0 0 20px ${GH.purpleGlow}`,
     }}>
       <div style={CRT_STYLE} />
@@ -1203,7 +1203,7 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
         {(['bank', 'pass', 'continue'] as const).map((choice, idx) => {
           const colors = ['#059669', GH.purpleMid, '#1d4ed8'];
           const labels = ['BANK', 'PASS', 'CONTINUE'];
-          const fn = [onRallyBank, onRallyPass, onRallyContinue][idx];
+          const fn = ([onRallyBank, onRallyPass, onRallyContinue] as const)[idx as 0|1|2];
           const c = colors[idx];
           const isVoted = myVote === choice;
           return (
@@ -1234,6 +1234,174 @@ function RallyDecisionPanel({ onRallyBank, onRallyPass, onRallyContinue }: { onR
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Vitality Drip (Life-Force Regen) ─────────────────────────────────────────
+// Shows real-time energy drain/regen rate with an animated drip vial.
+// PRIME mode drips fill the vial; FRENZY mode drains it with a bleed effect.
+
+function VitalityDripPanel() {
+  const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
+  const [dripIds, setDripIds] = useState<number[]>([]);
+  const dripCounter = useRef(0);
+
+  const drainRate = mode === 'FRENZY' ? (energy < 75 ? -3 : -5) : mode === 'PRIME' ? 5 : 0;
+  const isRegen = drainRate > 0;
+  const isDrain = drainRate < 0;
+
+  useEffect(() => {
+    if (!isRegen) return;
+    const id = setInterval(() => {
+      const did = ++dripCounter.current;
+      setDripIds(d => [...d.slice(-4), did]);
+      setTimeout(() => setDripIds(d => d.filter(x => x !== did)), 1500);
+    }, 380);
+    return () => clearInterval(id);
+  }, [isRegen]);
+
+  const vialColor = isDrain
+    ? `linear-gradient(0deg, ${GH.danger}, rgba(239,68,68,0.35))`
+    : isRegen
+      ? `linear-gradient(0deg, ${GH.cyan}, rgba(0,229,255,0.3))`
+      : `linear-gradient(0deg, ${GH.gold}55, ${GH.gold}22)`;
+  const borderClr = isDrain ? GH.danger : isRegen ? GH.cyan : GH.goldDim;
+  const glowClr   = isDrain ? GH.dangerGlow : isRegen ? GH.cyanGlow : GH.goldDim;
+  const rateLabel = isDrain ? `${drainRate}/s` : isRegen ? `+${drainRate}/s` : 'IDLE';
+  const statusLabel = isDrain ? 'DRAIN' : isRegen ? 'REGEN' : 'STABLE';
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 200, left: 8,
+      pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    }}>
+      <div style={{
+        background: GH.panelBg,
+        border: `1px solid ${borderClr}44`,
+        borderRadius: 4, padding: '4px 7px',
+        position: 'relative', minWidth: 52, textAlign: 'center',
+        boxShadow: `0 0 10px ${glowClr}`,
+        overflow: 'hidden',
+      }}>
+        <div style={CRT_STYLE} />
+        <GhCorners color={borderClr} />
+        <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1, marginBottom: 3, position: 'relative', zIndex: 1 }}>
+          VITALITY
+        </div>
+        {/* Vial */}
+        <div style={{
+          width: 18, height: 38, background: 'rgba(5,0,18,0.85)',
+          border: `1px solid ${borderClr}66`,
+          borderRadius: '1px 1px 6px 6px',
+          margin: '0 auto 3px', position: 'relative', overflow: 'hidden', zIndex: 1,
+        }}>
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            height: `${(energy / MAX_ENERGY) * 100}%`,
+            background: vialColor,
+            transition: 'height 0.25s linear',
+            boxShadow: `0 0 8px ${glowClr}`,
+          }} />
+          {/* Animated drip drops during regen */}
+          {dripIds.map(did => (
+            <div key={did} style={{
+              position: 'absolute', top: 0,
+              left: `${18 + (did % 4) * 14}%`,
+              width: 3, height: 5,
+              borderRadius: '50% 50% 50% 50% / 30% 30% 70% 70%',
+              background: GH.cyan,
+              boxShadow: `0 0 3px ${GH.cyanGlow}`,
+              animation: 'vDrip 1.5s ease-in forwards',
+            }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 7, fontFamily: 'monospace', color: borderClr, position: 'relative', zIndex: 1, textShadow: `0 0 5px ${glowClr}` }}>
+          {statusLabel}
+        </div>
+        <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.boneDim, position: 'relative', zIndex: 1 }}>
+          {rateLabel}
+        </div>
+      </div>
+      <style>{`
+        @keyframes vDrip {
+          0%   { transform: translateY(0);   opacity: 0.9; }
+          100% { transform: translateY(38px); opacity: 0;   }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Shard Faucet ──────────────────────────────────────────────────────────────
+// Tracks "Soul Shards" accumulated from banked score milestones (every 20k pts).
+// A partial-fill bar shows progress toward the next shard.
+// Visual style: textured Gothic panel with mode-reactive glow — non-minimalist.
+
+function ShardFaucetPanel() {
+  const { banked, mode } = useFarkleStore(s => ({ banked: s.banked, mode: s.mode }));
+
+  const MILESTONE = 20_000;
+  const MAX_SHARDS = 5;
+  const earnedShards = Math.min(MAX_SHARDS, Math.floor(banked / MILESTONE));
+  const partial = (banked % MILESTONE) / MILESTONE;
+
+  const activeColor = mode === 'FRENZY' ? GH.magenta : mode === 'PRIME' ? GH.cyan : GH.gold;
+  const activeGlow  = mode === 'FRENZY' ? GH.magentaGlow : mode === 'PRIME' ? GH.cyanGlow : GH.goldGlow;
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 200, right: 8,
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        background: GH.panelBg,
+        border: `1px solid ${GH.goldDim}`,
+        borderRadius: 4, padding: '4px 7px',
+        position: 'relative', textAlign: 'center',
+        boxShadow: `0 0 8px ${activeGlow}`,
+      }}>
+        <div style={CRT_STYLE} />
+        <GhCorners />
+        <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1, marginBottom: 3, position: 'relative', zIndex: 1 }}>
+          SOUL FAUCET
+        </div>
+        {/* 5 shard diamonds */}
+        <div style={{ display: 'flex', gap: 3, justifyContent: 'center', position: 'relative', zIndex: 1, marginBottom: 3 }}>
+          {Array.from({ length: MAX_SHARDS }).map((_, i) => {
+            const filled = i < earnedShards;
+            const isNext = i === earnedShards && earnedShards < MAX_SHARDS;
+            const partialOpacity = isNext ? Math.floor(partial * 255).toString(16).padStart(2, '0') : '00';
+            return (
+              <div key={i} style={{
+                width: 9, height: 9,
+                transform: 'rotate(45deg)',
+                background: filled ? activeColor : isNext ? `${activeColor}${partialOpacity}` : 'transparent',
+                border: `1px solid ${filled || isNext ? activeColor : GH.boneFaint}`,
+                boxShadow: filled ? `0 0 6px ${activeGlow}` : 'none',
+                transition: 'all 0.25s ease',
+              }} />
+            );
+          })}
+        </div>
+        {/* Fill bar toward next shard */}
+        <div style={{
+          width: '100%', height: 2, background: GH.boneFaint,
+          borderRadius: 1, overflow: 'hidden', position: 'relative', zIndex: 1,
+        }}>
+          <div style={{
+            height: '100%',
+            width: `${earnedShards >= MAX_SHARDS ? 100 : partial * 100}%`,
+            background: `linear-gradient(90deg, ${activeColor}, ${activeColor}88)`,
+            boxShadow: `0 0 4px ${activeGlow}`,
+            transition: 'width 0.3s ease', borderRadius: 1,
+          }} />
+        </div>
+        <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.goldDim, marginTop: 2, position: 'relative', zIndex: 1 }}>
+          {earnedShards}/{MAX_SHARDS} SHARDS
+        </div>
+        <FiligreeRow count={3} color={GH.goldDim} />
+      </div>
     </div>
   );
 }
@@ -1283,6 +1451,10 @@ export function FarkleHUD({
       <BankButton onBank={onBank} onBack={onBack} {...(onPass ? { onPass } : {})} />
       <HiddenPocket />
       <ChainPreview />
+
+      {/* ── Faucet Economy HUD ── */}
+      <VitalityDripPanel />
+      <ShardFaucetPanel />
 
       {/* ── Disruption overlays ── */}
       <DisruptionToast />
