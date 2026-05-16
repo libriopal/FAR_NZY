@@ -14,9 +14,14 @@ import type { FarkleBody } from '../store/farkleStore.js';
 import { useExplosionStore } from '../store/explosionStore.js';
 import type { ExplosionEvent } from '../store/explosionStore.js';
 
+// Organic Vegas 1.0 — neon pip colors on dark obsidian body
 const FACE_COLOR: Record<number, string> = {
-  1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
-  4: '#10b981', 5: '#38bdf8', 6: '#7c3aed',
+  1: '#ff2244',
+  2: '#ff7700',
+  3: '#ffe000',
+  4: '#00ff66',
+  5: '#00aaff',
+  6: '#cc44ff',
 };
 
 // Standard Western die: when face F is on front (+z), these are the top and right faces.
@@ -30,67 +35,77 @@ const FACE_SIDES: Record<number, { top: number; right: number }> = {
   6: { top: 2, right: 4 },
 };
 
-// Pre-baked canvas textures for each die face (1-6). Created once, never GC'd.
-// Colored background (FACE_COLOR) with white pip circles.
+// Organic Vegas 1.0 — obsidian body + neon glowing pip textures.
+// Dark body with neon pip glow matching the face's identity color.
 const _dieFaceTexCache = new Map<number, THREE.CanvasTexture>();
 
 function getDieFaceTex(face: number): THREE.CanvasTexture {
   if (_dieFaceTexCache.has(face)) return _dieFaceTexCache.get(face)!;
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
-  const ctx2d = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d')!;
+  const pipColor = FACE_COLOR[face] ?? '#00e5ff';
 
-  // Colored background
-  ctx2d.fillStyle = FACE_COLOR[face] ?? '#7ecfff';
-  ctx2d.fillRect(0, 0, size, size);
+  // Obsidian base — void-black with subtle cool-dark gradient
+  const bg = ctx.createRadialGradient(size * 0.42, size * 0.38, 0, size / 2, size / 2, size * 0.78);
+  bg.addColorStop(0, '#16121f');
+  bg.addColorStop(0.6, '#0e0b16');
+  bg.addColorStop(1, '#07050c');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
 
-  // Subtle warm inner bevel border
-  ctx2d.strokeStyle = 'rgba(255,200,100,0.18)';
-  ctx2d.lineWidth = 8;
-  ctx2d.strokeRect(4, 4, size - 8, size - 8);
-  ctx2d.strokeStyle = 'rgba(0,0,0,0.30)';
-  ctx2d.lineWidth = 4;
-  ctx2d.strokeRect(8, 8, size - 16, size - 16);
+  // Subtle corner vignette — deep black at edges
+  const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.3, size / 2, size / 2, size * 0.85);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, size, size);
 
-  // Black inset (caved) pips — stamped into the die
+  // Neon edge catch — very faint color tint on border (light source)
+  ctx.strokeStyle = pipColor + '28';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, size - 10, size - 10);
+
+  // Neon glowing pips
   const pips = PIP_POS[face] ?? [];
-  const pipR = 22;
+  const pipR = 30;
   pips.forEach(([px, py]) => {
-    const x = size / 2 + px * 330;
-    const y = size / 2 - py * 330;
+    const x = size / 2 + px * 660;
+    const y = size / 2 - py * 660;
 
-    // Outer shadow ring — depth illusion
-    const shadow = ctx2d.createRadialGradient(x + 3, y + 3, pipR * 0.4, x, y, pipR * 1.35);
-    shadow.addColorStop(0, 'rgba(0,0,0,0)');
-    shadow.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx2d.beginPath();
-    ctx2d.arc(x, y, pipR * 1.35, 0, Math.PI * 2);
-    ctx2d.fillStyle = shadow;
-    ctx2d.fill();
+    // Wide outer bloom halo
+    const bloom = ctx.createRadialGradient(x, y, 0, x, y, pipR * 3.5);
+    bloom.addColorStop(0, pipColor + '50');
+    bloom.addColorStop(0.4, pipColor + '22');
+    bloom.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(x, y, pipR * 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = bloom;
+    ctx.fill();
 
-    // Deep black pit
-    const pit = ctx2d.createRadialGradient(x - 5, y - 5, 1, x, y, pipR);
-    pit.addColorStop(0, '#1a0500');
-    pit.addColorStop(0.6, '#0a0200');
-    pit.addColorStop(1, '#000000');
-    ctx2d.beginPath();
-    ctx2d.arc(x, y, pipR, 0, Math.PI * 2);
-    ctx2d.fillStyle = pit;
-    ctx2d.fill();
+    // Mid glow ring
+    const mid = ctx.createRadialGradient(x, y, pipR * 0.5, x, y, pipR * 1.8);
+    mid.addColorStop(0, pipColor + 'aa');
+    mid.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(x, y, pipR * 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = mid;
+    ctx.fill();
 
-    // Top-left rim highlight — candle light catching the carved edge
-    const highlight = ctx2d.createRadialGradient(x - pipR * 0.5, y - pipR * 0.5, 0, x, y, pipR);
-    highlight.addColorStop(0, 'rgba(255,200,80,0.28)');
-    highlight.addColorStop(0.5, 'rgba(255,160,40,0.10)');
-    highlight.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx2d.beginPath();
-    ctx2d.arc(x, y, pipR, 0, Math.PI * 2);
-    ctx2d.fillStyle = highlight;
-    ctx2d.fill();
+    // Hot white-to-color pip core
+    const core = ctx.createRadialGradient(x - pipR * 0.22, y - pipR * 0.22, 0, x, y, pipR);
+    core.addColorStop(0, '#ffffff');
+    core.addColorStop(0.25, pipColor);
+    core.addColorStop(1, pipColor + 'cc');
+    ctx.beginPath();
+    ctx.arc(x, y, pipR, 0, Math.PI * 2);
+    ctx.fillStyle = core;
+    ctx.fill();
   });
 
   const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
   _dieFaceTexCache.set(face, tex);
   return tex;
 }
@@ -496,9 +511,9 @@ const WildDiceShader = {
   uniforms: {
     uTime:              { value: 0 },
     uPulseSpeed:        { value: 1.8 },
-    uRockColor:         { value: new THREE.Color('#1a0530') },
-    uCrackingIntensity: { value: 0.60 },
-    uMobile:            { value: _isMobile ? 1.0 : 0.0 },
+    uRockColor:         { value: new THREE.Color('#110f0e') },
+    uCrackingIntensity: { value: 0.65 },
+    uAudioIntensity:    { value: 0 },
   },
   vertexShader: LavaDiceShader.vertexShader,
   fragmentShader: `
@@ -506,74 +521,46 @@ const WildDiceShader = {
     uniform float uPulseSpeed;
     uniform vec3  uRockColor;
     uniform float uCrackingIntensity;
-    uniform float uMobile;
+    uniform float uAudioIntensity;
     varying vec3 vNormal;
     varying vec3 vModelPosition;
 
-    vec3 rainbow(float h) {
-      vec3 c = mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0);
-      return clamp(abs(c - 3.0) - 1.0, 0.0, 1.0);
-    }
-    float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-    }
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
     float noise(vec2 p) {
       vec2 i = floor(p); vec2 f = fract(p);
       vec2 u = f * f * (3.0 - 2.0 * f);
       return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
                  mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
     }
-    float sdCircle(vec2 p, vec2 center, float radius) {
-      return length(p - center) - radius;
-    }
-    float getDicePipsMask(int faceNum, vec2 p, float radius) {
-      float d = 1e5;
-      vec2 c = vec2(0.0), tl = vec2(-0.23, 0.23), tr = vec2(0.23, 0.23);
-      vec2 ml = vec2(-0.23, 0.0), mr = vec2(0.23, 0.0);
-      vec2 bl = vec2(-0.23,-0.23), br = vec2(0.23,-0.23);
-      if      (faceNum == 1) d = sdCircle(p, c, radius);
-      else if (faceNum == 2) d = min(sdCircle(p, tl, radius), sdCircle(p, br, radius));
-      else if (faceNum == 3) d = min(sdCircle(p, tl, radius), min(sdCircle(p, c, radius), sdCircle(p, br, radius)));
-      else if (faceNum == 4) d = min(min(sdCircle(p, tl, radius), sdCircle(p, tr, radius)), min(sdCircle(p, bl, radius), sdCircle(p, br, radius)));
-      else if (faceNum == 5) d = min(min(min(sdCircle(p, tl, radius), sdCircle(p, tr, radius)), min(sdCircle(p, bl, radius), sdCircle(p, br, radius))), sdCircle(p, c, radius));
-      else if (faceNum == 6) d = min(min(min(sdCircle(p, tl, radius), sdCircle(p, tr, radius)), min(sdCircle(p, bl, radius), sdCircle(p, br, radius))), min(sdCircle(p, ml, radius), sdCircle(p, mr, radius)));
-      return smoothstep(0.02, -0.01, d);
+    vec3 rainbow(float h) {
+      vec3 c = mod(h * 6.0 + vec4(0.0, 4.0, 2.0, 0.0).rgb, 6.0);
+      return clamp(abs(c - 3.0) - 1.0, 0.0, 1.0);
     }
     void main() {
       vec3 absPos = abs(vModelPosition);
-      vec2 faceUV = vec2(0.0);
-      int faceNum = 1;
-      if (absPos.x > absPos.y && absPos.x > absPos.z) {
-        faceUV = vModelPosition.zy;
-        faceNum = (vModelPosition.x > 0.0) ? 1 : 6;
-      } else if (absPos.y > absPos.x && absPos.y > absPos.z) {
-        faceUV = vModelPosition.xz;
-        faceNum = (vModelPosition.y > 0.0) ? 2 : 5;
-      } else {
-        faceUV = vModelPosition.xy;
-        faceNum = (vModelPosition.z > 0.0) ? 3 : 4;
-      }
+      vec2 faceUV = (absPos.x > absPos.y && absPos.x > absPos.z) ? vModelPosition.zy :
+                    (absPos.y > absPos.x && absPos.y > absPos.z) ? vModelPosition.xz : vModelPosition.xy;
 
-      // Primary noise octave always runs; second octave skipped on mobile via uMobile
-      float n1 = noise(faceUV * 14.0 + uTime * 0.1) * 0.5;
-      float n2 = noise(faceUV * 28.0 - uTime * 0.05) * 0.25;
-      float n  = n1 + n2 * (1.0 - uMobile);
+      float n = noise(faceUV * 12.0 + uTime * 0.1) * 0.5
+              + noise(faceUV * 24.0 - uTime * 0.05) * 0.25;
 
-      float pipMask      = getDicePipsMask(faceNum, faceUV + vec2(n * 0.04), 0.065);
-      float ambientCracks = smoothstep(uCrackingIntensity, uCrackingIntensity - 0.04, noise(faceUV * 9.0 + n));
-      float totalCrackMask = max(pipMask, ambientCracks * 0.3);
+      // Crack network reacts to pulse speed (chain/preDestroy state)
+      float pulse = sin(uTime * uPulseSpeed) * 0.04 + 1.0;
+      float dynamicThreshold = uCrackingIntensity - (uAudioIntensity * 0.08);
+      float ambientCracks = smoothstep(dynamicThreshold, dynamicThreshold - 0.03,
+                                       noise(faceUV * 8.0 + n)) * pulse;
 
-      // Spectral shift: noise drives hue flow so colours move organically through cracks
-      float hueBase  = mod(uTime * 0.2 + length(vModelPosition) * 0.5 + n * 0.8, 1.0);
-      float hueCrack = mod(hueBase + noise(faceUV * 5.0 + uTime * 0.05) * 0.3, 1.0);
-      vec3 wildColor = mix(rainbow(hueBase), rainbow(hueCrack), totalCrackMask);
+      float hue = mod(uTime * 0.15 + length(vModelPosition) * 0.4 + uAudioIntensity * 0.1, 1.0);
+      vec3 wildColor = rainbow(hue);
 
-      float pulse    = sin(uTime * uPulseSpeed) * 0.06 + 1.0;
-      float coreGlow = smoothstep(0.85, 0.15, length(vModelPosition)) * pulse;
+      // HDR white core — values > 1.0 feed bloom if post-processing is active
+      vec3 whiteCore = vec3(2.5, 2.5, 2.5);
+      float distFromCenter = length(vModelPosition);
+      float coreGlow = smoothstep(0.8, 0.1, distFromCenter) * (1.0 + uAudioIntensity * 0.5) * pulse;
 
-      vec3 emissiveColor = mix(wildColor, vec3(1.0), coreGlow * 0.5);
-      vec3 finalColor    = mix(uRockColor, emissiveColor, totalCrackMask);
-      finalColor += wildColor * (1.0 - totalCrackMask) * 0.15 * coreGlow;
+      vec3 emissiveColor = mix(wildColor, whiteCore, coreGlow * 0.4);
+      vec3 finalColor    = mix(uRockColor, emissiveColor, ambientCracks);
+      finalColor += wildColor * (1.0 - ambientCracks) * 0.15 * coreGlow;
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `,
@@ -619,7 +606,7 @@ function WildBlock({ inChain, preDestroyGlow }: { inChain: boolean; preDestroyGl
     if (matRef.current) {
       matRef.current.uniforms['uTime']!.value             += delta;
       matRef.current.uniforms['uPulseSpeed']!.value        = preDestroyGlow ? 7.0 : inChain ? 4.0 : 1.8;
-      matRef.current.uniforms['uCrackingIntensity']!.value = preDestroyGlow ? 0.15 : inChain ? 0.35 : 0.60;
+      matRef.current.uniforms['uCrackingIntensity']!.value = preDestroyGlow ? 0.15 : inChain ? 0.35 : 0.65;
     }
     if (fresnelRef.current) {
       fresnelRef.current.uniforms['uTime']!.value += delta;
@@ -654,14 +641,368 @@ function WildBlock({ inChain, preDestroyGlow }: { inChain: boolean; preDestroyGl
   );
 }
 
+// ── Ice Stone Shader — crystalline SSS blue-grey depth with internal crack glow ─
+const IceStoneShader = {
+  uniforms: {
+    uTime:     { value: 0 },
+    uSSS:      { value: new THREE.Color('#7ad8f8') },
+    uBase:     { value: new THREE.Color('#0d1a26') },
+    uMid:      { value: new THREE.Color('#1e3a52') },
+    uRim:      { value: new THREE.Color('#c0f0ff') },
+    uInChain:  { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+    void main() {
+      vNormal       = normalize(normalMatrix * normal);
+      vModelPosition = position;
+      vec4 mv       = modelViewMatrix * vec4(position, 1.0);
+      vViewDir      = normalize(-mv.xyz);
+      gl_Position   = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform vec3  uSSS;
+    uniform vec3  uBase;
+    uniform vec3  uMid;
+    uniform vec3  uRim;
+    uniform float uInChain;
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p); vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i),         hash(i + vec2(1.0, 0.0)), u.x),
+                 mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    void main() {
+      vec3 absPos = abs(vModelPosition);
+      vec2 faceUV = (absPos.x > absPos.y && absPos.x > absPos.z) ? vModelPosition.zy :
+                    (absPos.y > absPos.x && absPos.y > absPos.z) ? vModelPosition.xz : vModelPosition.xy;
+
+      // Layered noise for crystal grain and crack channels
+      float n1 = noise(faceUV * 8.0  + uTime * 0.04);
+      float n2 = noise(faceUV * 16.0 - uTime * 0.02);
+      float n3 = noise(faceUV * 32.0 + uTime * 0.01);
+      float grain = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+      // Internal crack glow — SSS light bleeds through fine fracture planes
+      float crackThreshold = 0.58;
+      float crack = smoothstep(crackThreshold, crackThreshold - 0.06, grain);
+
+      // SSS depth gradient — warmer blue near center
+      float depth = smoothstep(0.6, 0.0, length(vModelPosition));
+      vec3 bodyColor = mix(uBase, uMid, grain);
+      vec3 sssGlow   = uSSS * (depth * 0.65 + crack * 0.8);
+
+      // Fresnel rim — ice-white catch light at silhouette
+      float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDir))), 2.8);
+      vec3 rimColor = uRim * fresnel * (0.7 + uInChain * 0.9);
+
+      vec3 finalColor = bodyColor + sssGlow + rimColor;
+      // Chain: boost SSS brightness
+      finalColor += uSSS * uInChain * 0.45;
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `,
+};
+
+// ── IceStoneBlock — crystalline ice specimen with SSS blue/grey depth ─────────
+function IceStoneBlock({ inChain, preDestroyGlow }: { inChain: boolean; preDestroyGlow: boolean }) {
+  const matRef   = useRef<THREE.ShaderMaterial>(null);
+  const uniforms = useMemo(() => THREE.UniformsUtils.clone(IceStoneShader.uniforms), []);
+
+  useFrame((_, delta) => {
+    if (!matRef.current) return;
+    matRef.current.uniforms['uTime']!.value    += delta;
+    matRef.current.uniforms['uInChain']!.value  = inChain ? 1.0 : 0.0;
+    if (preDestroyGlow) {
+      matRef.current.uniforms['uSSS']!.value.setStyle('#ff4466');
+      matRef.current.uniforms['uRim']!.value.setStyle('#ff0044');
+    }
+  });
+
+  return (
+    <group>
+      <mesh castShadow geometry={_roundedDieGeom}>
+        <shaderMaterial
+          ref={matRef}
+          uniforms={uniforms}
+          vertexShader={IceStoneShader.vertexShader}
+          fragmentShader={IceStoneShader.fragmentShader}
+        />
+      </mesh>
+      {/* Ice SSS back-scatter shell */}
+      <mesh scale={1.08} geometry={_roundedDieGeom}>
+        <meshBasicMaterial
+          color={preDestroyGlow ? '#ff2244' : '#7ad8f8'}
+          transparent
+          opacity={inChain ? 0.18 : 0.07}
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// ── Stone Blocker Shader — dark granite with Fresnel neon-rim (Void Glow) ──────
+const StoneBlockerShader = {
+  uniforms: {
+    uTime:    { value: 0 },
+    uBase:    { value: new THREE.Color('#0f0c09') },
+    uMid:     { value: new THREE.Color('#1e1810') },
+    uGrain:   { value: new THREE.Color('#060503') },
+    uInChain: { value: 0.0 },
+    uHealth:  { value: 1.0 },
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+    void main() {
+      vNormal        = normalize(normalMatrix * normal);
+      vModelPosition = position;
+      vec4 mv        = modelViewMatrix * vec4(position, 1.0);
+      vViewDir       = normalize(-mv.xyz);
+      gl_Position    = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform vec3  uBase;
+    uniform vec3  uMid;
+    uniform vec3  uGrain;
+    uniform float uInChain;
+    uniform float uHealth;
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p); vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i),         hash(i + vec2(1.0, 0.0)), u.x),
+                 mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    void main() {
+      vec3 absPos = abs(vModelPosition);
+      vec2 faceUV = (absPos.x > absPos.y && absPos.x > absPos.z) ? vModelPosition.zy :
+                    (absPos.y > absPos.x && absPos.y > absPos.z) ? vModelPosition.xz : vModelPosition.xy;
+
+      float n1 = noise(faceUV * 10.0);
+      float n2 = noise(faceUV * 22.0 + 1.7);
+      float grain = n1 * 0.6 + n2 * 0.4;
+
+      // Rock body — obsidian to mid granite, grain darkens it
+      vec3 bodyColor = mix(uBase, uMid, grain);
+      bodyColor = mix(bodyColor, uGrain, noise(faceUV * 40.0) * 0.3);
+
+      // Fresnel rim — neon cyan (chained) or muted slate (idle)
+      float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDir))), 3.2);
+      float chainPulse = sin(uTime * 3.0) * 0.15 + 0.85;
+      vec3 rimCyan    = vec3(0.0, 0.898, 1.000) * fresnel * uInChain * chainPulse * 1.6;
+      vec3 rimIdle    = vec3(0.35, 0.30, 0.40)  * fresnel * (1.0 - uInChain) * 0.4;
+      // Health crack glow — cracks illuminate with magenta at low health
+      float healthCrack = smoothstep(0.55, 0.45, grain) * (1.0 - uHealth);
+      vec3 crackGlow  = vec3(1.0, 0.0, 0.8) * healthCrack * 0.7;
+
+      vec3 finalColor = bodyColor + rimCyan + rimIdle + crackGlow;
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `,
+};
+
+// ── StoneBlocker — dark granite void-glow with health cracks ──────────────────
+function StoneBlocker({ inChain, preDestroyGlow, health, maxHealth }: {
+  inChain: boolean; preDestroyGlow: boolean; health: number; maxHealth: number;
+}) {
+  const matRef   = useRef<THREE.ShaderMaterial>(null);
+  const uniforms = useMemo(() => THREE.UniformsUtils.clone(StoneBlockerShader.uniforms), []);
+
+  useFrame((_, delta) => {
+    if (!matRef.current) return;
+    matRef.current.uniforms['uTime']!.value    += delta;
+    matRef.current.uniforms['uInChain']!.value  = inChain ? 1.0 : 0.0;
+    matRef.current.uniforms['uHealth']!.value   = maxHealth > 0 ? health / maxHealth : 1.0;
+  });
+
+  return (
+    <group>
+      <mesh castShadow geometry={_roundedDieGeom}>
+        <shaderMaterial
+          ref={matRef}
+          uniforms={uniforms}
+          vertexShader={StoneBlockerShader.vertexShader}
+          fragmentShader={StoneBlockerShader.fragmentShader}
+        />
+      </mesh>
+      {preDestroyGlow && (
+        <mesh scale={1.12} geometry={_roundedDieGeom}>
+          <meshBasicMaterial color="#ff0044" transparent opacity={0.35} depthWrite={false} side={THREE.BackSide} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// ── Bio-Bomb Shader — obsidian-dark with pulsing neon-red organic veins ────────
+const BioBombShader = {
+  uniforms: {
+    uTime:        { value: 0 },
+    uPulseSpeed:  { value: 2.2 },
+    uBase:        { value: new THREE.Color('#080508') },
+    uVein:        { value: new THREE.Color('#ff0030') },
+    uVeinBright:  { value: new THREE.Color('#ff6080') },
+    uPreDestroy:  { value: 0.0 },
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+    void main() {
+      vNormal        = normalize(normalMatrix * normal);
+      vModelPosition = position;
+      vec4 mv        = modelViewMatrix * vec4(position, 1.0);
+      vViewDir       = normalize(-mv.xyz);
+      gl_Position    = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform float uPulseSpeed;
+    uniform vec3  uBase;
+    uniform vec3  uVein;
+    uniform vec3  uVeinBright;
+    uniform float uPreDestroy;
+    varying vec3 vNormal;
+    varying vec3 vViewDir;
+    varying vec3 vModelPosition;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p); vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i),         hash(i + vec2(1.0, 0.0)), u.x),
+                 mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    void main() {
+      vec3 absPos = abs(vModelPosition);
+      vec2 faceUV = (absPos.x > absPos.y && absPos.x > absPos.z) ? vModelPosition.zy :
+                    (absPos.y > absPos.x && absPos.y > absPos.z) ? vModelPosition.xz : vModelPosition.xy;
+
+      // Layered organic vein network — slow drift for living tissue feel
+      float n1 = noise(faceUV * 6.0  + uTime * 0.07);
+      float n2 = noise(faceUV * 13.0 - uTime * 0.04 + n1 * 0.3);
+      float n3 = noise(faceUV * 26.0 + uTime * 0.02);
+      float veinMap = n1 * 0.5 + n2 * 0.35 + n3 * 0.15;
+
+      // Vein channel — thin bright lines at threshold edges
+      float veinThresh = 0.52;
+      float veinEdge   = smoothstep(veinThresh + 0.04, veinThresh, veinMap)
+                       * smoothstep(veinThresh - 0.10, veinThresh, veinMap);
+      // Pulse heartbeat
+      float pulse = sin(uTime * uPulseSpeed) * 0.35 + 0.65;
+      float prePulse = sin(uTime * uPulseSpeed * 2.5) * 0.45 + 0.55;
+      float pulseFactor = mix(pulse, prePulse, uPreDestroy);
+
+      vec3 veinColor = mix(uVein, uVeinBright, veinEdge * pulseFactor);
+      vec3 baseColor = uBase * (1.0 - veinEdge * 0.6);
+
+      // Subsurface red bleed in base near veins
+      float sss = smoothstep(veinThresh + 0.12, veinThresh, veinMap);
+      baseColor += uVein * sss * 0.18 * pulseFactor;
+
+      // Fresnel rim — red-orange bio-energy corona at edges
+      float fresnel = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewDir))), 2.5);
+      vec3 rimColor = mix(uVein, uVeinBright, 0.5) * fresnel * pulseFactor * (0.8 + uPreDestroy * 1.2);
+
+      vec3 finalColor = baseColor + veinColor * veinEdge + rimColor;
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `,
+};
+
+// ── BioBombMesh — living obsidian with pulsing neon-red veins ────────────────
+function BioBombMesh({ preDestroyGlow }: { preDestroyGlow: boolean }) {
+  const matRef   = useRef<THREE.ShaderMaterial>(null);
+  const uniforms = useMemo(() => THREE.UniformsUtils.clone(BioBombShader.uniforms), []);
+
+  useFrame((_, delta) => {
+    if (!matRef.current) return;
+    matRef.current.uniforms['uTime']!.value       += delta;
+    matRef.current.uniforms['uPulseSpeed']!.value  = preDestroyGlow ? 6.5 : 2.2;
+    matRef.current.uniforms['uPreDestroy']!.value  = preDestroyGlow ? 1.0 : 0.0;
+  });
+
+  return (
+    <group>
+      <mesh castShadow geometry={_roundedDieGeom}>
+        <shaderMaterial
+          ref={matRef}
+          uniforms={uniforms}
+          vertexShader={BioBombShader.vertexShader}
+          fragmentShader={BioBombShader.fragmentShader}
+        />
+      </mesh>
+      {/* Red bio-aura halo */}
+      <mesh scale={1.15} geometry={_roundedDieGeom}>
+        <meshBasicMaterial
+          color="#ff0030"
+          transparent
+          opacity={preDestroyGlow ? 0.28 : 0.09}
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 // ── DieCube — rounded 6-face cube die ────────────────────────────────────────
 // BoxGeometry material slot order: [+x(right), -x(left), +y(top), -y(bottom), +z(front), -z(back)]
+// Returns which face number (1–6) is pointing up in world space.
+// Used by the single-mesh face-tracking system for score/identity display.
+function getUpwardFace(face: number, rotation: { x: number; y: number; z: number; w: number }): number {
+  const { top, right } = FACE_SIDES[face] ?? { top: 2, right: 3 };
+  const bottom = 7 - top;
+  const back   = 7 - face;
+  const left   = 7 - right;
+
+  const dirToFace: Array<[THREE.Vector3, number]> = [
+    [new THREE.Vector3( 1, 0, 0), right],
+    [new THREE.Vector3(-1, 0, 0), left],
+    [new THREE.Vector3( 0, 1, 0), top],
+    [new THREE.Vector3( 0,-1, 0), bottom],
+    [new THREE.Vector3( 0, 0, 1), face],
+    [new THREE.Vector3( 0, 0,-1), back],
+  ];
+
+  const quat = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  let bestFace = top;
+  let bestDot  = -Infinity;
+  for (const [dir, f] of dirToFace) {
+    const dot = dir.clone().applyQuaternion(quat).dot(worldUp);
+    if (dot > bestDot) { bestDot = dot; bestFace = f; }
+  }
+  return bestFace;
+}
+
 function DieCube({ face, inChain }: { face: number; inChain: boolean }) {
   const { top, right } = FACE_SIDES[face] ?? { top: 2, right: 3 };
   const bottom = 7 - top;
   const back   = 7 - face;
   const left   = 7 - right;
   const slots  = [right, left, top, bottom, face, back];
+  const pipColor = FACE_COLOR[face] ?? '#00e5ff';
 
   return (
     <group>
@@ -671,20 +1012,21 @@ function DieCube({ face, inChain }: { face: number; inChain: boolean }) {
             key={i}
             attach={`material-${i}`}
             map={getDieFaceTex(fv)}
-            roughness={0.42}
-            metalness={0.06}
+            roughness={0.12}
+            metalness={0.78}
+            envMapIntensity={1.4}
             emissive={inChain ? (FACE_COLOR[fv] ?? '#ffffff') : '#000000'}
-            emissiveIntensity={inChain ? 0.5 : 0}
+            emissiveIntensity={inChain ? 0.9 : 0}
           />
         ))}
       </mesh>
-      {/* Glow rim shell */}
+      {/* Neon glow rim — front face color bleeds outward when chained */}
       {inChain && (
-        <mesh scale={[1.08, 1.08, 1.08]} geometry={_roundedDieGeom}>
+        <mesh scale={[1.10, 1.10, 1.10]} geometry={_roundedDieGeom}>
           <meshBasicMaterial
-            color={FACE_COLOR[face] ?? '#7ecfff'}
+            color={pipColor}
             transparent
-            opacity={0.20}
+            opacity={0.18}
             depthWrite={false}
             side={THREE.BackSide}
           />
@@ -1033,6 +1375,76 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
     );
   }
 
+  if (body.entityType === 'ice') {
+    return (
+      <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
+        <IceStoneBlock inChain={body.inChain} preDestroyGlow={preDestroyGlow} />
+      </group>
+    );
+  }
+
+  if (body.entityType === 'stone') {
+    return (
+      <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
+        <StoneBlocker
+          inChain={body.inChain}
+          preDestroyGlow={preDestroyGlow}
+          health={body.health}
+          maxHealth={3}
+        />
+        {body.health > 0 && (
+          <Text position={[0, 0, 0.46]} fontSize={0.36} color="#d6cfc8"
+            anchorX="center" anchorY="middle" renderOrder={1} depthOffset={-1}>
+            {String(body.health)}
+          </Text>
+        )}
+        <HealthPips health={body.health} max={3} />
+      </group>
+    );
+  }
+
+  if (body.entityType === 'bomb' || body.entityType === 'rainbow_bomb') {
+    const isRainbow = body.entityType === 'rainbow_bomb';
+    return (
+      <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
+        {isRainbow ? (
+          // Rainbow bomb keeps the existing sphere + smoke look
+          <>
+            <mesh castShadow>
+              <sphereGeometry args={[0.43, 16, 16]} />
+              <meshStandardMaterial
+                ref={matRef as React.Ref<THREE.MeshStandardMaterial>}
+                color="#f0ede0"
+                emissive="#ffffff"
+                emissiveIntensity={0.4}
+                roughness={0.2}
+                metalness={0.25}
+              />
+            </mesh>
+            <mesh scale={1.18}>
+              <sphereGeometry args={[0.43, 12, 12]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.12} depthWrite={false} side={THREE.BackSide} />
+            </mesh>
+          </>
+        ) : (
+          <BioBombMesh preDestroyGlow={preDestroyGlow} />
+        )}
+        {preDestroyGlow && (
+          <mesh scale={1.25}>
+            <sphereGeometry args={[0.43, 10, 10]} />
+            <meshBasicMaterial color="#ff0000" transparent opacity={0.55} depthWrite={false} />
+          </mesh>
+        )}
+        <SmokeParticles rainbow={isRainbow} />
+        <BombFuseRing
+          spawnedAt={body.spawnedAt}
+          fuseMs={3000}
+          onExpired={() => onEntityTap(body.id)}
+        />
+      </group>
+    );
+  }
+
   if (vis.shape === 'sphere') {
     const rimColor = isBomb ? '#ff2200' : (isRainbow ? '#ffffff' : vis.emissive);
     return (
@@ -1114,11 +1526,8 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
     );
   }
 
-  // Box (die, wild, ice, lock, mirror, stone, bomb, rainbow_bomb, catalyst)
-  const needsHealthPips =
-    (body.entityType === 'lock' && body.health > 0) ||
-    body.entityType === 'stone';
-  const maxPips = body.entityType === 'stone' ? 3 : 3;
+  // Box (die, lock, mirror, catalyst — ice/stone/bomb/wild/sphere handled above)
+  const needsHealthPips = body.entityType === 'lock' && body.health > 0;
 
   // ── Die: full 6-face cube ──────────────────────────────────────────────────
   if (body.entityType === 'die' && body.face != null) {
@@ -1129,11 +1538,10 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
     );
   }
 
-  // ── All other box entities (wild, ice, lock, mirror, stone, catalyst) ──────
-  // Shiny metallic feel for blockers; pick material properties per type
-  const isShinyBlocker = body.entityType === 'stone' || body.entityType === 'ice' || body.entityType === 'lock';
-  const blockerRoughness = body.entityType === 'ice' ? 0.04 : body.entityType === 'stone' ? 0.10 : 0.08;
-  const blockerMetal     = body.entityType === 'ice' ? 0.55 : body.entityType === 'stone' ? 0.82 : 0.78;
+  // ── All other box entities (lock, mirror, catalyst) ──────────────────────
+  const isShinyBlocker = body.entityType === 'lock';
+  const blockerRoughness = 0.08;
+  const blockerMetal     = 0.78;
 
   return (
     <group ref={groupRef} userData={entityUserData} {...chainHandlers}>
@@ -1157,7 +1565,7 @@ function EntityMesh({ body, preDestroyGlow, onChainStart, onChainExtend, onEntit
           {vis.label}
         </Text>
       )}
-      {needsHealthPips && <HealthPips health={body.health} max={maxPips} />}
+      {needsHealthPips && <HealthPips health={body.health} max={3} />}
     </group>
   );
 }
