@@ -43,10 +43,24 @@ const GH = {
   dangerGlow:    'rgba(239,68,68,0.45)',
 } as const;
 
+// OV1 neon pip palette — matches VoxelPileScene exactly
 const FACE_COLOR: Record<number, string> = {
-  1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
-  4: '#10b981', 5: '#38bdf8', 6: '#7c3aed',
+  1: '#ff2244', 2: '#ff7700', 3: '#ffe000',
+  4: '#00ff66', 5: '#00aaff', 6: '#cc44ff',
 };
+
+// Global keyframes injected once at module level
+const _GLOBAL_STYLES = `
+  @keyframes gh-frenzy-flicker {
+    0%, 100% { opacity: 1; }
+    8%        { opacity: 0.82; }
+    16%       { opacity: 1; }
+    32%       { opacity: 0.91; }
+    48%       { opacity: 1; }
+    64%       { opacity: 0.78; }
+    80%       { opacity: 1; }
+  }
+`;
 
 // CRT scanline + vignette overlay (reusable)
 const CRT_STYLE: React.CSSProperties = {
@@ -58,51 +72,77 @@ const CRT_STYLE: React.CSSProperties = {
   zIndex: 0,
 };
 
-// Gothic corner marks rendered as inner child elements
+// Gothic corner marks — cathedral arch-keystone style with serif tips and center pip
 function GhCorners({ color = GH.gold }: { color?: string }) {
   const s = (pos: React.CSSProperties): React.CSSProperties => ({
-    position: 'absolute', width: 8, height: 8, zIndex: 3, ...pos,
+    position: 'absolute', width: 12, height: 12, zIndex: 3, ...pos,
   });
+  const pip: React.CSSProperties = {
+    position: 'absolute', width: 2.5, height: 2.5,
+    background: color, transform: 'rotate(45deg)',
+  };
   const h: React.CSSProperties = { position: 'absolute', background: color };
   const v: React.CSSProperties = { position: 'absolute', background: color };
-  function corner(t?: number, r?: number, b?: number, l?: number) {
+
+  function corner(
+    t?: number, r?: number, b?: number, l?: number,
+    hAnchor: 'left' | 'right' = 'left',
+    vAnchor: 'top' | 'bottom' = 'top',
+  ) {
+    const hStyle: React.CSSProperties = { ...h, width: 10, height: 1.5, [vAnchor]: 0, [hAnchor]: 0 };
+    const vStyle: React.CSSProperties = { ...v, width: 1.5, height: 10, [vAnchor]: 0, [hAnchor]: 0 };
+    const pipStyle: React.CSSProperties = { ...pip, [vAnchor]: 4.5, [hAnchor]: 4.5 };
     return (
       <div style={s({ top: t, right: r, bottom: b, left: l })}>
-        <div style={{ ...h, width: 6, height: 1.5, top: 0, left: 0 }} />
-        <div style={{ ...v, width: 1.5, height: 6, top: 0, left: 0 }} />
+        <div style={hStyle} />
+        <div style={vStyle} />
+        <div style={pipStyle} />
       </div>
     );
   }
+
   return (
     <>
-      {corner(2, undefined, undefined, 2)}
-      <div style={s({ top: 2, right: 2 })}>
-        <div style={{ ...h, width: 6, height: 1.5, top: 0, right: 0 }} />
-        <div style={{ ...v, width: 1.5, height: 6, top: 0, right: 0 }} />
-      </div>
-      <div style={s({ bottom: 2, left: 2 })}>
-        <div style={{ ...h, width: 6, height: 1.5, bottom: 0, left: 0 }} />
-        <div style={{ ...v, width: 1.5, height: 6, bottom: 0, left: 0 }} />
-      </div>
-      <div style={s({ bottom: 2, right: 2 })}>
-        <div style={{ ...h, width: 6, height: 1.5, bottom: 0, right: 0 }} />
-        <div style={{ ...v, width: 1.5, height: 6, bottom: 0, right: 0 }} />
-      </div>
+      {corner(2, undefined, undefined, 2, 'left',  'top')}
+      {corner(2, 2, undefined, undefined, 'right', 'top')}
+      {corner(undefined, undefined, 2, 2, 'left',  'bottom')}
+      {corner(undefined, 2, 2, undefined, 'right', 'bottom')}
     </>
   );
 }
 
-// Filigree diamond row decoration
+// Filigree diamond row — cathedral tracery pattern with alternating sizes and center cross-gem
 function FiligreeRow({ count = 5, color = GH.goldDim }: { count?: number; color?: string }) {
+  const mid = Math.floor(count / 2);
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={{
-          width: 4, height: 4, background: color,
-          transform: 'rotate(45deg)',
-          boxShadow: i === Math.floor(count / 2) ? `0 0 4px ${color}` : 'none',
-        }} />
-      ))}
+    <div style={{ display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'center' }}>
+      {Array.from({ length: count }).map((_, i) => {
+        const isCenter = i === mid;
+        const isLarge  = i % 2 === 0;
+        if (isCenter) {
+          // Cross-gem at center: rotated diamond with hair-line crosshairs
+          return (
+            <div key={i} style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: color, transform: 'rotate(45deg)',
+                boxShadow: `0 0 5px ${color}, 0 0 10px ${color}`,
+              }} />
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: GH.void, transform: 'translateY(-50%)', opacity: 0.7 }} />
+              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: GH.void, transform: 'translateX(-50%)', opacity: 0.7 }} />
+            </div>
+          );
+        }
+        const size = isLarge ? 5 : 3;
+        return (
+          <div key={i} style={{
+            width: size, height: size, background: color,
+            transform: 'rotate(45deg)', flexShrink: 0,
+            boxShadow: isLarge ? `0 0 3px ${color}` : 'none',
+            opacity: isLarge ? 1 : 0.6,
+          }} />
+        );
+      })}
     </div>
   );
 }
@@ -430,8 +470,8 @@ function NeonOscilloscope() {
 // ── Score Display (Gothic Panel) ──────────────────────────────────────────────
 
 function ScoreDisplay() {
-  const { banked, unbanked, multiplierStep } = useFarkleStore(s => ({
-    banked: s.banked, unbanked: s.unbanked, multiplierStep: s.multiplierStep,
+  const { banked, unbanked, multiplierStep, mode } = useFarkleStore(s => ({
+    banked: s.banked, unbanked: s.unbanked, multiplierStep: s.multiplierStep, mode: s.mode,
   }));
   const total = banked + unbanked;
   const mult = MULTIPLIER_LADDER[Math.min(multiplierStep, 5)] ?? 1;
@@ -453,6 +493,18 @@ function ScoreDisplay() {
         <div style={CRT_STYLE} />
         <GhCorners />
         <FiligreeRow count={5} color={GH.goldDim} />
+        {/* Mode-reactive separator rule */}
+        <div style={{
+          height: 1, margin: '3px 0 2px',
+          background: mode === 'FRENZY'
+            ? `linear-gradient(90deg, transparent, ${GH.cyan}, transparent)`
+            : mode === 'PRIME'
+              ? `linear-gradient(90deg, transparent, ${GH.magenta}, transparent)`
+              : `linear-gradient(90deg, transparent, ${GH.gold}, transparent)`,
+          boxShadow: mode === 'FRENZY' ? `0 0 6px ${GH.cyanGlow}`
+            : mode === 'PRIME' ? `0 0 6px ${GH.magentaGlow}` : `0 0 4px ${GH.goldDim}`,
+          opacity: 0.7,
+        }} />
         <div style={{
           color: GH.goldBright, fontSize: 24, fontWeight: 900, fontFamily: 'monospace',
           textShadow: `0 0 10px ${GH.goldGlow}, 0 0 20px ${GH.goldDim}`,
@@ -793,8 +845,8 @@ function ChainPreview() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: FACE_COLOR[face] ?? GH.purpleMid,
               fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
-              boxShadow: `0 0 8px ${FACE_COLOR[face] ?? GH.purpleMid}88`,
-              textShadow: `0 0 6px ${FACE_COLOR[face] ?? GH.purpleMid}`,
+              boxShadow: `0 0 10px ${FACE_COLOR[face] ?? GH.purpleMid}bb, 0 0 4px ${FACE_COLOR[face] ?? GH.purpleMid}66`,
+              textShadow: `0 0 8px ${FACE_COLOR[face] ?? GH.purpleMid}`,
             }}>
               {face}
             </div>
@@ -1445,6 +1497,7 @@ export function FarkleHUD({
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      <style>{_GLOBAL_STYLES}</style>
       {/* ── Top chrome ── */}
       <TrickMeter />
       <NeonOscilloscope />
