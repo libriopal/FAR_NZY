@@ -13,13 +13,30 @@ import {
   playBombBlast, playBombCollapse,
   startAmbientDrone, stopAmbientDrone,
   startHeroJourneyTheme, stopHeroJourneyTheme,
+  setMusicState,
 } from '../audio/gameAudio.js';
+import type { EmotionalState } from '../audio/gameAudio.js';
+
+function resolveEmotionalState(
+  chainLen: number,
+  gamePhase: string,
+  unbanked: number,
+): EmotionalState {
+  if (gamePhase === 'win') return 'euphoric';
+  if (gamePhase === 'lose') return 'melancholic';
+  if (gamePhase !== 'playing') return 'calm';
+  if (chainLen >= 5) return 'euphoric';
+  if (chainLen >= 3) return 'tense';
+  if (unbanked > 50_000) return 'euphoric';
+  return 'calm';
+}
 
 export function useGameAudio(audioSettings: AudioSettings) {
-  const prevChainLen     = useRef(0);
-  const prevUnbanked     = useRef(0);
-  const prevGamePhase    = useRef('idle');
+  const prevChainLen       = useRef(0);
+  const prevUnbanked       = useRef(0);
+  const prevGamePhase      = useRef('idle');
   const prevExplosionCount = useRef(0);
+  const prevEmotional      = useRef<EmotionalState>('calm');
 
   useEffect(() => {
     setMasterVolume(audioSettings.masterVolume);
@@ -32,6 +49,7 @@ export function useGameAudio(audioSettings: AudioSettings) {
     const unsub = useFarkleStore.subscribe(state => {
       const chainLen  = state.chain.length;
       const gamePhase = state.gamePhase;
+      const unbanked  = state.unbanked;
 
       // Chain grow
       if (chainLen > prevChainLen.current) {
@@ -41,7 +59,6 @@ export function useGameAudio(audioSettings: AudioSettings) {
 
       // Chain commit — chain cleared; check if score increased or farkled
       if (chainLen === 0 && prevChainLen.current > 0) {
-        const unbanked = state.unbanked;
         if (unbanked > prevUnbanked.current) {
           playChainCommit(unbanked - prevUnbanked.current);
         } else {
@@ -50,19 +67,24 @@ export function useGameAudio(audioSettings: AudioSettings) {
         prevUnbanked.current = unbanked;
       }
 
-      // Phase transitions
-      if (gamePhase !== prevGamePhase.current) {
-        if (gamePhase === 'playing' && prevGamePhase.current === 'idle') {
-          if (audioSettings.ambientEnabled) {
-            startAmbientDrone();
-            startHeroJourneyTheme();
-          }
+      // Music control
+      if (gamePhase === 'playing') {
+        if (audioSettings.ambientEnabled) {
+          startAmbientDrone();
+          startHeroJourneyTheme();
         }
-        if (gamePhase === 'win' || gamePhase === 'lose') {
-          stopAmbientDrone();
-          stopHeroJourneyTheme();
-        }
-        prevGamePhase.current = gamePhase;
+      } else if (gamePhase !== prevGamePhase.current &&
+                 (gamePhase === 'win' || gamePhase === 'lose' || gamePhase === 'idle')) {
+        stopAmbientDrone();
+        stopHeroJourneyTheme();
+      }
+      prevGamePhase.current = gamePhase;
+
+      // Emotional conductor — update music profile based on game tension
+      const emotional = resolveEmotionalState(chainLen, gamePhase, unbanked);
+      if (emotional !== prevEmotional.current) {
+        setMusicState(emotional);
+        prevEmotional.current = emotional;
       }
 
       prevChainLen.current = chainLen;

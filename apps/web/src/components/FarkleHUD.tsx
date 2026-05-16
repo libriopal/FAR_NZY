@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────
 
 import React, { useEffect, useRef, useState } from 'react';
+import { getAnalyserNode } from '../audio/gameAudio.js';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
@@ -347,75 +348,81 @@ function TrickMeter() {
 // ── NeonOscilloscope ──────────────────────────────────────────────────────────
 
 function NeonOscilloscope() {
-  const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
-  const amplitude = 4 + (energy / MAX_ENERGY) * 10;
-  const waveColor =
-    mode === 'FRENZY' ? GH.cyan :
-    mode === 'PRIME'  ? GH.magenta :
-    GH.gold;
-  const glowColor =
-    mode === 'FRENZY' ? GH.cyanGlow :
-    mode === 'PRIME'  ? GH.magentaGlow :
-    GH.goldDim;
-  const speed = mode === 'FRENZY' ? '0.45s' : mode === 'PRIME' ? '0.8s' : '1.6s';
+  const { mode } = useFarkleStore(s => ({ mode: s.mode }));
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef    = useRef<number>(0);
 
-  // Build SVG wave path
-  const W = 240; const H = 24; const mid = H / 2;
-  const segs = 10;
-  const step = W / segs;
-  let d = `M0 ${mid}`;
-  for (let i = 0; i < segs; i++) {
-    const x1 = i * step + step * 0.25;
-    const x2 = i * step + step * 0.75;
-    const x3 = (i + 1) * step;
-    const sign = i % 2 === 0 ? -1 : 1;
-    d += ` Q${x1} ${mid + sign * amplitude} ${i * step + step * 0.5} ${mid + sign * amplitude}`;
-    d += ` Q${x2} ${mid + sign * amplitude} ${x3} ${mid}`;
-  }
+  const waveColor  = mode === 'FRENZY' ? GH.cyan    : mode === 'PRIME' ? GH.magenta : GH.gold;
+  const glowColor  = mode === 'FRENZY' ? GH.cyanGlow : mode === 'PRIME' ? GH.magentaGlow : GH.goldDim;
+  const lineWidth  = mode === 'FRENZY' ? 2 : 1.5;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx2d = canvas.getContext('2d');
+    if (!ctx2d) return;
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
+      const W = canvas.width;
+      const H = canvas.height;
+      const mid = H / 2;
+
+      ctx2d.clearRect(0, 0, W, H);
+
+      const analyser = getAnalyserNode();
+      if (!analyser) {
+        // Flat line fallback until audio starts
+        ctx2d.beginPath();
+        ctx2d.moveTo(0, mid);
+        ctx2d.lineTo(W, mid);
+        ctx2d.strokeStyle = waveColor;
+        ctx2d.lineWidth = 1;
+        ctx2d.stroke();
+        return;
+      }
+
+      const bufLen = analyser.frequencyBinCount; // fftSize/2
+      const data   = new Uint8Array(bufLen);
+      analyser.getByteTimeDomainData(data);
+
+      ctx2d.beginPath();
+      const sliceW = W / bufLen;
+      for (let i = 0; i < bufLen; i++) {
+        const v = (data[i]! / 128.0) - 1;   // -1 … +1
+        const y = mid + v * mid * 0.9;
+        if (i === 0) ctx2d.moveTo(0, y);
+        else ctx2d.lineTo(i * sliceW, y);
+      }
+      ctx2d.strokeStyle = waveColor;
+      ctx2d.lineWidth   = lineWidth;
+      ctx2d.shadowColor = glowColor;
+      ctx2d.shadowBlur  = 5;
+      ctx2d.stroke();
+      ctx2d.shadowBlur  = 0;
+    };
+
+    draw();
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [waveColor, glowColor, lineWidth]);
 
   return (
     <div style={{
       position: 'absolute', top: 48, left: 0, right: 0, height: 28,
       background: 'rgba(5,0,18,0.7)',
       borderBottom: `1px solid ${GH.goldDim}`,
-      overflow: 'hidden', display: 'flex', alignItems: 'center', zIndex: 9,
+      overflow: 'hidden', zIndex: 9,
     }}>
-      {/* Label */}
       <div style={{
-        position: 'absolute', left: 6,
-        fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1,
-      }}>
-        OSC
-      </div>
-
-      {/* Animated waveform strip — doubled width, animates via translateX */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: '200%',
-        animation: `oscScroll ${speed} linear infinite`,
-        display: 'flex',
-      }}>
-        {[0, 1].map(k => (
-          <svg key={k} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="none" style={{ flex: '0 0 50%' }}>
-            <path d={d} fill="none" stroke={waveColor}
-              strokeWidth={mode === 'FRENZY' ? 1.5 : 1}
-              style={{ filter: `drop-shadow(0 0 3px ${glowColor})` }}
-            />
-            {/* Heartbeat spike every 60px */}
-            <line x1="60" y1={mid - amplitude - 6} x2="60" y2={mid + amplitude + 6}
-              stroke={waveColor} strokeWidth={0.8} opacity={0.4} />
-            <line x1="180" y1={mid - amplitude - 6} x2="180" y2={mid + amplitude + 6}
-              stroke={waveColor} strokeWidth={0.8} opacity={0.4} />
-          </svg>
-        ))}
-      </div>
-      <style>{`
-        @keyframes oscScroll {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
-      `}</style>
+        position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)',
+        fontSize: 7, fontFamily: 'monospace', color: GH.goldDim, letterSpacing: 1, zIndex: 1,
+      }}>OSC</div>
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={28}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
     </div>
   );
 }

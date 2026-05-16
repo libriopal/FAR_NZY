@@ -54,6 +54,8 @@ export function useFarkleGame(
   const bankCountRef = useRef(0);
   const frenzyDoublerSpawnedRef = useRef(false);
   const wildScatterCooldownRef = useRef(false);
+  const casinoModeRef = useRef<number | null>(null);
+  const casinoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const effectiveWinScore = levelDef?.winScore ?? WIN_SCORE;
   const effectiveEnergyMult = levelDef?.energyMultiplier ?? 1.0;
 
@@ -107,17 +109,19 @@ export function useFarkleGame(
   }, []);
 
   // ── Sync spawn weights to physics when mode changes ─────────────────────────
+  // Use levelDef weights as the base so sphere/wild stay low even in FRENZY.
+  // Fall back to sacred SPAWN_WEIGHTS only when no level is loaded.
   useEffect(() => {
     return store.subscribe(
       s => s.mode,
       (mode) => {
         const physics = physicsRef.current;
         if (!physics) return;
-        const base = SPAWN_WEIGHTS[mode];
+        const base = levelDef?.spawnWeights ?? SPAWN_WEIGHTS[mode];
         physics.setSpawnWeights(base);
       },
     );
-  }, [physicsRef]);
+  }, [physicsRef, levelDef]);
 
   // ── Doubler cell: spawn 2 random columns on first FRENZY entry ───────────────
   useEffect(() => {
@@ -147,31 +151,7 @@ export function useFarkleGame(
     );
   }, []);
 
-  // ── C4: Wild Scatter — 3+ wilds on board → FRENZY + face-targeted board clear ─
-  useEffect(() => {
-    return store.subscribe(
-      s => s.bodies,
-      (bodies) => {
-        if (store.getState().gamePhase !== 'playing') return;
-        if (wildScatterCooldownRef.current) return;
-        const wilds = bodies.filter(b => b.entityType === 'wild');
-        if (wilds.length < 3) return;
-        const physics = physicsRef.current;
-        if (!physics) return;
-        wildScatterCooldownRef.current = true;
-        // Each wild picks a random face 1-6 via session RNG
-        const scatterFaces = wilds.map(() => Math.ceil(_sessionRng() * 6));
-        const destroyed = physics.destroyBodiesByFace(scatterFaces);
-        if (destroyed.length > 0) {
-          store.setState(prev => ({ bodies: prev.bodies.filter(b => !destroyed.includes(b.id)) }));
-        }
-        // Force FRENZY (energy to threshold)
-        store.getState().addEnergy(150 + 10);
-        // 10-second cooldown to prevent re-firing while wilds still on board
-        setTimeout(() => { wildScatterCooldownRef.current = false; }, 10_000);
-      },
-    );
-  }, [physicsRef]);
+  // C4: Wild Scatter disabled — caused dice to vanish without player input.
 
   // ── Chain integrity: auto-commit if a chained tile leaves its column OR row ──
   // Only fires when a tile has physically moved out of its grid slot — NOT on
@@ -234,10 +214,7 @@ export function useFarkleGame(
     const { chain, bodies, mode } = s;
     // NORMAL mode: no chain extension — single die only
     if (mode === 'NORMAL') return;
-    // Cap at tray empty slots (dynamic) or MAX_CHAIN, whichever is smaller (FRENZY: MAX_CHAIN cap still applies)
-    const trayLimit = useTrayStore.getState().getEmptySlotCount();
-    const cap = mode === 'FRENZY' ? Math.min(MAX_CHAIN, trayLimit) : Math.min(MAX_CHAIN, trayLimit);
-    if (chain.length >= cap) return;
+    if (chain.length >= MAX_CHAIN) return;
     // Backtrack
     if (chain.length >= 2 && chain[chain.length - 2] === bodyId) {
       store.getState().removeLastFromChain();
@@ -245,15 +222,19 @@ export function useFarkleGame(
     }
     if (chain.includes(bodyId)) return;
 
-    // Adjacency check
+    // Proximity check: both X and Y must be within 1.0 world unit (~1 die face) of the last die.
     const lastId = chain[chain.length - 1];
     if (lastId) {
       const lastBody = bodies.find(b => b.id === lastId);
       const thisBody = bodies.find(b => b.id === bodyId);
       if (!lastBody || !thisBody) return;
-      const colDiff = Math.abs(lastBody.column - column);
-      if (colDiff > 1) return;
-      if (colDiff === 1 && Math.abs(lastBody.position.y - thisBody.position.y) > 2.0) return;
+      const xDiff = Math.abs(lastBody.position.x - thisBody.position.x);
+      const yDiff = Math.abs(lastBody.position.y - thisBody.position.y);
+      // Only one axis can differ — no diagonal chains allowed.
+      // Same column (xDiff ≤ 0.5): allow vertical adjacency up to 1.0 units.
+      // Adjacent column (xDiff ≤ 1.0): must be at nearly the same height (yDiff ≤ 0.5).
+      const adjacent = (xDiff <= 0.5 && yDiff <= 1.0) || (xDiff <= 1.0 && yDiff <= 0.5);
+      if (!adjacent) return;
     }
     chainEntrySlotRef.current[bodyId] = { col: body.column, y: body.position.y };
     store.getState().addToChain(bodyId, face);
@@ -349,6 +330,42 @@ export function useFarkleGame(
     // C2: Rally — after a max-chain, present Continue/Bank/Pass for 3 seconds
     if (result === 'ok' && chainIds.length === MAX_CHAIN && (gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO')) {
       store.getState().setRallyDecision(true, Date.now() + 3000);
+    }
+
+    // Combo-triggered rewards — checked directly via face counts, matching farkleScorer logic.
+    if (result === 'ok' && physics) {
+      const faceCounts = resolvedFaces.reduce(
+        (acc, f) => { acc[f] = (acc[f] ?? 0) + 1; return acc; },
+        {} as Record<number, number>,
+      );
+      const maxCount = Math.max(0, ...Object.values(faceCounts));
+      const len = resolvedFaces.length;
+      // Straight: 6 dice, each face 1-6 appears exactly once
+      const isStraight = len === 6 && [1,2,3,4,5,6].every(f => (faceCounts[f] ?? 0) === 1);
+      // Six of a Kind: all 6 dice show the same face
+      const isSixOfAKind = maxCount >= 6;
+      // Five of a Kind chain: exactly 5 dice chained, all the same face (the "Five Ns" combo)
+      const isFiveEqualChain = len === 5 && maxCount === 5;
+
+      const spawnCol = Math.floor(_sessionRng() * 7);
+      if (isSixOfAKind) {
+        // Casino mode: auto-score chains for 5 seconds
+        if (casinoIntervalRef.current) clearInterval(casinoIntervalRef.current);
+        casinoModeRef.current = Date.now() + 5000;
+        casinoIntervalRef.current = setInterval(() => {
+          if (!casinoModeRef.current || Date.now() >= casinoModeRef.current) {
+            clearInterval(casinoIntervalRef.current!);
+            casinoIntervalRef.current = null;
+            casinoModeRef.current = null;
+            return;
+          }
+          _doCasinoChain(physicsRef);
+        }, 900);
+      } else if (isStraight) {
+        physics.spawnBody(spawnCol, 'rainbow_bomb');
+      } else if (isFiveEqualChain) {
+        physics.spawnBody(spawnCol, 'bomb');
+      }
     }
 
     // Remove committed bodies from physics and push to tray for delayed scoring
@@ -651,6 +668,73 @@ export function useFarkleGame(
   }, []);
 
   return { startChain, extendChain, endChain, tapSphere, tapEntity, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue };
+}
+
+// ── Casino auto-chain ─────────────────────────────────────────────────────────
+
+function _doCasinoChain(physicsRef: MutableRefObject<VoxelPhysicsSystem | null>): void {
+  const s = useFarkleStore.getState();
+  if (s.gamePhase !== 'playing') return;
+
+  const candidates = s.bodies.filter(b =>
+    ['die', 'wild', 'mirror', 'catalyst'].includes(b.entityType),
+  );
+  if (candidates.length === 0) return;
+
+  // Same adjacency rules as extendChain — no diagonals
+  type Body = typeof candidates[number];
+  const adj = (a: Body, b: Body): boolean => {
+    const xd = Math.abs(a.position.x - b.position.x);
+    const yd = Math.abs(a.position.y - b.position.y);
+    return (xd <= 0.5 && yd <= 1.0) || (xd <= 1.0 && yd <= 0.5);
+  };
+
+  // BFS to find all connected components
+  const visited = new Set<string>();
+  const components: Body[][] = [];
+  for (const start of candidates) {
+    if (visited.has(start.id)) continue;
+    const group: Body[] = [];
+    const q: Body[] = [start];
+    visited.add(start.id);
+    while (q.length) {
+      const cur = q.shift()!;
+      group.push(cur);
+      for (const other of candidates) {
+        if (!visited.has(other.id) && adj(cur, other)) {
+          visited.add(other.id);
+          q.push(other);
+        }
+      }
+    }
+    components.push(group);
+  }
+
+  // Find the first component that produces a non-zero farkle score
+  const table = getTable();
+  for (const component of components) {
+    const group = component.slice(0, MAX_CHAIN);
+    const faces = group.map(b => b.face ?? 1) as DieFace[];
+    if (lookupScore(faces, table) === 0) continue;
+
+    // Light up the chain for a moment so the player sees it, then commit
+    const ids = group.map(b => b.id);
+    useFarkleStore.getState().clearChain();
+    for (let i = 0; i < group.length; i++) {
+      useFarkleStore.getState().addToChain(ids[i]!, group[i]!.face ?? 1);
+    }
+
+    setTimeout(() => {
+      useFarkleStore.setState({ chainFaces: group.map(b => b.face ?? 1) });
+      const result = useFarkleStore.getState().commitChain();
+      if (result !== 'ok') return;
+      const physics = physicsRef.current;
+      for (const id of ids) physics?.removeBody(id);
+      physics?.thawAdjacentIce(ids);
+      physics?.damageLockInColumns(ids);
+    }, 500);
+    return; // one chain per interval tick
+  }
 }
 
 // ── Face resolution helpers ───────────────────────────────────────────────────
