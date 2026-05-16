@@ -13,6 +13,7 @@ import { useFarkleStore } from '../store/farkleStore.js';
 import type { FarkleBody } from '../store/farkleStore.js';
 import { useExplosionStore } from '../store/explosionStore.js';
 import type { ExplosionEvent } from '../store/explosionStore.js';
+import { playCollisionImpact } from '../audio/gameAudio.js';
 
 // Organic Vegas 1.0 — neon pip colors on dark obsidian body
 const FACE_COLOR: Record<number, string> = {
@@ -115,6 +116,57 @@ const OVERFLOW_Y = 8.0;
 
 const CHAINABLE = new Set(['die', 'wild', 'mirror', 'catalyst']);
 const TAPPABLE = new Set(['sphere', 'bomb', 'rainbow_bomb', 'multiplier_orb', 'ghost']);
+
+// ── Physics Impact Listener ───────────────────────────────────────────────────
+// Reads body positions each render frame, derives apparent y-velocity, and
+// fires playCollisionImpact when a falling body suddenly decelerates (impact).
+// Pure read — no writes to the store, no changes to physics or sacred files.
+
+interface BodyKinematic { y: number; vy: number; }
+
+function PhysicsImpactListener() {
+  const bodies    = useFarkleStore(s => s.bodies);
+  const gamePhase = useFarkleStore(s => s.gamePhase);
+  const kinematics = useRef<Map<string, BodyKinematic>>(new Map());
+
+  useFrame((_, delta) => {
+    if (gamePhase !== 'playing' || delta <= 0) return;
+
+    const map = kinematics.current;
+    const activeIds = new Set<string>();
+
+    for (const body of bodies) {
+      activeIds.add(body.id);
+      const currY = body.position.y;
+      const prev  = map.get(body.id);
+
+      if (prev !== undefined) {
+        const currVy = (currY - prev.y) / delta;
+        const prevVy = prev.vy;
+
+        // Detect impact: body was falling at >= 1.2 m/s and suddenly decelerated
+        // (velocity change of >= 0.8 upward, meaning it hit something and slowed/bounced)
+        if (prevVy < -1.2 && currVy > prevVy + 0.8) {
+          const deltaV   = currVy - prevVy;   // always positive here
+          const magnitude = Math.min(1, deltaV / 14); // normalize: 14 m/s² → full impact
+          playCollisionImpact(magnitude);
+        }
+
+        map.set(body.id, { y: currY, vy: currVy });
+      } else {
+        // First frame this body is seen — seed it, don't fire yet
+        map.set(body.id, { y: currY, vy: 0 });
+      }
+    }
+
+    // Prune entries for bodies that have left the board
+    for (const id of map.keys()) {
+      if (!activeIds.has(id)) map.delete(id);
+    }
+  });
+
+  return null;
+}
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 
@@ -1945,6 +1997,7 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap, on
       onPointerCancel={onChainEnd}
     >
       <CameraRig />
+      <PhysicsImpactListener />
       {/* Raised ambient — dice base visibility */}
       <ambientLight intensity={2.0} color="#8aaabb" />
       {/* KEY LIGHT — strong warm angled from upper-right-front; creates realistic face shading */}
