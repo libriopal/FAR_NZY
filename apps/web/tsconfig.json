@@ -26,7 +26,8 @@
       "@match3d/farkle-engine/farkleScorer": ["../../packages/farkle-engine/src/farkleScorer.ts"],
       "@match3d/farkle-engine/floodFill": ["../../packages/farkle-engine/src/floodFill.ts"],
       "@match3d/farkle-engine/rtpConfig": ["../../packages/farkle-engine/src/rtpConfig.ts"],
-      "@match3d/farkle-engine/monteCarlo": ["../../packages/farkle-engine/src/monteCarlo.ts"]
+      "@match3d/farkle-engine/monteCarlo": ["../../packages/farkle-engine/src/monteCarlo.ts"],
+      "@dimforge/rapier3d-compat": ["../../packages/game-core/node_modules/@dimforge/rapier3d-compat/rapier.d.ts"]
     },
     "types": ["vite/client"],
     "resolveJsonModule": true,

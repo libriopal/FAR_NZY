@@ -10,6 +10,7 @@ import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
+import { WildBlocker } from './WildBlocker.js';
 import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
@@ -17,6 +18,8 @@ import type { AudioSettings } from './SettingsModal.js';
 import { VoxelPhysicsSystem } from '@match3d/game-core';
 import { adManager } from '@match3d/ads';
 import { useGameAudio } from '../hooks/useGameAudio.js';
+import { setMusicState, forceMusicState } from '../audio/gameAudio.js';
+import type { EmotionalState } from '../audio/gameAudio.js';
 import { LEVELS, DEFAULT_LEVEL } from '../data/levels.js';
 import type { DisruptionType } from '@match3d/farkle-shared';
 
@@ -67,11 +70,15 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const gamePhase = useFarkleStore(s => s.gamePhase);
+  const wildCount = useFarkleStore(s => s.bodies.filter(b => b.entityType === 'wild').length);
   const physicsRef = useRef<VoxelPhysicsSystem | null>(null);
   const gameStartedRef = useRef(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [audioSettings, setAudioSettings] = useState<AudioSettings>({ masterVolume: 0.7, sfxEnabled: true, ambientEnabled: true });
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugFace, setDebugFace] = useState<number | null>(null);
+  const [musicDebug, setMusicDebug] = useState<EmotionalState | null>(null);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const gameMode = useGameStore(s => s.gameMode);
   const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined);
@@ -81,6 +88,21 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
     || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isRallyMode = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';
+
+  const DEBUG_FACE_COLORS: Record<number, string> = {
+    1: '#ef4444', 2: '#f97316', 3: '#eab308',
+    4: '#22c55e', 5: '#3b82f6', 6: '#a855f7',
+  };
+
+  const handleMusicForce = useCallback((state: EmotionalState | null) => {
+    setMusicDebug(state);
+    forceMusicState(state);
+  }, []);
+
+  const handleEmptyTap = useCallback((col: number) => {
+    if (!debugMode || !debugFace || !physicsRef.current) return;
+    physicsRef.current.spawnBody(col, 'die', debugFace);
+  }, [debugMode, debugFace, physicsRef]);
 
   // Must be above early returns — hooks must always be called in the same order
   const handleDisrupt = useCallback((type: DisruptionType) => {
@@ -253,7 +275,20 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
         <div style={{ color: '#c9a84c', fontSize: 10, fontWeight: 700, letterSpacing: 4, fontFamily: 'monospace', textShadow: '0 0 10px rgba(201,168,76,0.6)' }}>
           ✦ {modeName} ✦
         </div>
-        <button onClick={() => setSettingsOpen(true)} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#9881;</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => { setDebugMode(d => !d); setDebugFace(null); }}
+            style={{
+              background: debugMode ? 'rgba(168,85,247,0.25)' : 'none',
+              border: debugMode ? '1px solid #a855f7' : '1px solid transparent',
+              color: debugMode ? '#a855f7' : 'rgba(201,168,76,0.4)',
+              borderRadius: 4, fontSize: 13, cursor: 'pointer', padding: '2px 6px',
+              fontFamily: 'monospace', lineHeight: 1,
+            }}
+            title="Debug spawn mode"
+          >⚙</button>
+          <button onClick={() => setSettingsOpen(true)} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#9881;</button>
+        </div>
       </div>
 
       {/* Game canvas — flex-1 */}
@@ -263,7 +298,101 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           onChainExtend={extendChain}
           onChainEnd={endChain}
           onEntityTap={tapSphere}
+          onEmptyTap={handleEmptyTap}
         />
+
+        {/* Wild Blocker inset — shows live 3D wild die when wild entities are on the board */}
+        {wildCount > 0 && (
+          <div style={{
+            position: 'absolute', bottom: 72, left: 12,
+            width: 180, height: 220,
+            borderRadius: 12, overflow: 'hidden',
+            border: '1px solid rgba(201,168,76,0.35)',
+            boxShadow: '0 0 18px rgba(201,168,76,0.2)',
+            pointerEvents: 'none',
+            zIndex: 15,
+          }}>
+            <WildBlocker />
+            <div style={{
+              position: 'absolute', bottom: 6, left: 0, right: 0,
+              textAlign: 'center', fontSize: 9, fontFamily: 'monospace',
+              fontWeight: 700, letterSpacing: 3,
+              color: 'rgba(201,168,76,0.8)',
+              textShadow: '0 0 6px rgba(201,168,76,0.5)',
+            }}>
+              WILD x{wildCount}
+            </div>
+          </div>
+        )}
+
+        {/* Debug die picker — vertical strip on the left */}
+        {debugMode && (
+          <>
+          <div style={{
+            position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+            zIndex: 25, display: 'flex', flexDirection: 'column', gap: 6,
+            background: 'rgba(5,0,18,0.85)', border: '1px solid rgba(168,85,247,0.4)',
+            borderRadius: 8, padding: 6,
+          }}>
+            {[1,2,3,4,5,6].map(face => {
+              const active = debugFace === face;
+              const color = DEBUG_FACE_COLORS[face] ?? '#4b5563';
+              return (
+                <button
+                  key={face}
+                  onPointerDown={e => { e.stopPropagation(); setDebugFace(active ? null : face); }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 6, border: active ? `2px solid ${color}` : '2px solid #374151',
+                    background: active ? `${color}33` : 'rgba(55,65,81,0.5)',
+                    color: active ? color : '#6b7280',
+                    fontFamily: 'monospace', fontWeight: 700, fontSize: 16,
+                    cursor: 'pointer', boxShadow: active ? `0 0 8px ${color}88` : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {face}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Music state debug panel — bottom center */}
+          <div style={{
+            position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 25, display: 'flex', flexDirection: 'row', gap: 5,
+            background: 'rgba(5,0,18,0.88)', border: '1px solid rgba(168,85,247,0.4)',
+            borderRadius: 8, padding: '5px 8px', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: 8, color: 'rgba(168,85,247,0.7)', fontFamily: 'monospace', marginRight: 3 }}>ERK</span>
+            {([
+              { state: null,           label: 'AUTO', color: '#6b7280' },
+              { state: 'calm'        , label: 'CALM', color: '#22d3ee' },
+              { state: 'melancholic' , label: 'MLNC', color: '#818cf8' },
+              { state: 'tense'       , label: 'TNSE', color: '#f97316' },
+              { state: 'euphoric'    , label: 'EUPH', color: '#facc15' },
+            ] as { state: EmotionalState | null; label: string; color: string }[]).map(({ state, label, color }) => {
+              const active = musicDebug === state;
+              return (
+                <button
+                  key={label}
+                  onPointerDown={e => { e.stopPropagation(); handleMusicForce(state); }}
+                  style={{
+                    padding: '3px 7px', borderRadius: 4, fontSize: 9, fontFamily: 'monospace',
+                    fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
+                    border: active ? `1px solid ${color}` : '1px solid #374151',
+                    background: active ? `${color}22` : 'rgba(55,65,81,0.5)',
+                    color: active ? color : '#6b7280',
+                    boxShadow: active ? `0 0 6px ${color}66` : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+          </>
+        )}
+
         <FarkleHUD
           onBank={bankScore}
           onBack={() => setActiveScreen('home')}
