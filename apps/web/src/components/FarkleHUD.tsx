@@ -10,6 +10,7 @@ import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
 import { useGameStore } from '../store/gameStore.js';
 import { LEVELS } from '../data/levels.js';
+import { getLevelTheme } from '../data/levelThemes.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
 
@@ -477,22 +478,43 @@ function ScoreDisplay() {
   }));
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const levelWinScore = LEVELS.find(l => l.id === selectedLevelId)?.winScore ?? WIN_SCORE;
+  const theme = getLevelTheme(selectedLevelId ?? 'level_01');
   const total = banked + unbanked;
   const mult = MULTIPLIER_LADDER[Math.min(multiplierStep, 5)] ?? 1;
   const progressPct = Math.min(100, (total / levelWinScore) * 100);
   const hasMult = mult > 1;
+
+  // Milestone flash — fires once per threshold crossing per session
+  const crossedRef = useRef<Set<number>>(new Set());
+  const [flashActive, setFlashActive] = useState(false);
+  const [flashColor, setFlashColor] = useState<string>(GH.gold);
+  useEffect(() => {
+    for (const frac of theme.milestones) {
+      const threshold = Math.round(levelWinScore * frac);
+      if (total >= threshold && !crossedRef.current.has(threshold)) {
+        crossedRef.current.add(threshold);
+        setFlashColor(frac < 0.5 ? GH.cyan : frac < 0.75 ? GH.gold : GH.magenta);
+        setFlashActive(true);
+        const t = setTimeout(() => setFlashActive(false), 320);
+        return () => clearTimeout(t);
+      }
+    }
+    return undefined;
+  }, [total, levelWinScore, theme.milestones]);
 
   return (
     <div style={{
       position: 'absolute', top: 82, left: '50%', transform: 'translateX(-50%)',
       textAlign: 'center', pointerEvents: 'none',
     }}>
-      {/* Gothic score panel */}
+      {/* Gothic score panel — milestone flash expands border glow */}
       <div style={{
         background: GH.panelBg,
-        border: `1px solid ${GH.panelBorder}`,
+        border: `1px solid ${flashActive ? flashColor : GH.panelBorder}`,
         borderRadius: 4, padding: '5px 16px',
         position: 'relative', minWidth: 120,
+        boxShadow: flashActive ? `0 0 22px ${flashColor}88, 0 0 44px ${flashColor}44` : undefined,
+        transition: 'box-shadow 0.32s ease-out, border-color 0.32s ease-out',
       }}>
         <div style={CRT_STYLE} />
         <GhCorners />

@@ -2,12 +2,13 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": false,
     "noEmit": true
   },
-  "include": ["packages/**/*", "apps/**/*"]
+  "include": ["packages/**/*"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "node_modules"]
 }

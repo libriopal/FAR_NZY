@@ -20,6 +20,7 @@ import { useGameAudio } from '../hooks/useGameAudio.js';
 import { setMusicState, forceMusicState } from '../audio/gameAudio.js';
 import type { EmotionalState } from '../audio/gameAudio.js';
 import { LEVELS, DEFAULT_LEVEL } from '../data/levels.js';
+import { getLevelTheme } from '../data/levelThemes.js';
 import type { DisruptionType } from '@match3d/farkle-shared';
 
 class GameErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
@@ -136,6 +137,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       );
       adManager.showInterstitial();
       gameStartedRef.current = true;
+      setMusicState(getLevelTheme(levelDef.id).erkState as EmotionalState);
       startGame();
     }).catch(err => {
       if (!cancelled) {
@@ -386,56 +388,68 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
         />
 
         {/* Level intro overlay — 3s immediate-understanding gate */}
-        {showIntro && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'rgba(5,0,18,0.88)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 14, pointerEvents: 'none', zIndex: 30,
-            opacity: introFading ? 0 : 1,
-            transition: introFading ? 'opacity 0.6s ease-out' : 'none',
-          }}>
-            {/* Filigree top rule */}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {[6,4,8,4,6].map((s, i) => (
-                <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
-              ))}
-            </div>
+        {showIntro && (() => {
+          const theme = getLevelTheme(levelDef.id);
+          return (
             <div style={{
-              color: 'rgba(201,168,76,0.55)', fontSize: 9, fontFamily: 'monospace',
-              letterSpacing: 5, textTransform: 'uppercase',
+              position: 'absolute', inset: 0,
+              background: 'rgba(5,0,18,0.88)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 14, pointerEvents: 'none', zIndex: 30,
+              opacity: introFading ? 0 : 1,
+              transition: introFading ? 'opacity 0.6s ease-out' : 'none',
             }}>
-              {levelDef.id.replace('_', ' ').toUpperCase()}
-            </div>
-            <div style={{
-              color: '#e8d5a3', fontSize: 26, fontWeight: 900, fontFamily: 'monospace',
-              letterSpacing: 3, textAlign: 'center', lineHeight: 1.2,
-              textShadow: '0 0 18px rgba(201,168,76,0.7), 0 0 40px rgba(201,168,76,0.3)',
-            }}>
-              {levelDef.name.toUpperCase()}
-            </div>
-            <div style={{ height: 1, width: 120, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.6), transparent)' }} />
-            <div style={{
-              color: '#00e5ff', fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
-              letterSpacing: 2, textShadow: '0 0 10px rgba(0,229,255,0.6)',
-            }}>
-              TARGET: {levelDef.winScore.toLocaleString()}
-            </div>
-            {levelDef.timeLimitSec && (
-              <div style={{
-                color: 'rgba(255,114,0,0.85)', fontSize: 10, fontFamily: 'monospace',
-                letterSpacing: 2,
-              }}>
-                ⏱ {Math.floor(levelDef.timeLimitSec / 60)}:{String(levelDef.timeLimitSec % 60).padStart(2, '0')} LIMIT
+              {/* Filigree top rule */}
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {[6,4,8,4,6].map((s, i) => (
+                  <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
+                ))}
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {[6,4,8,4,6].map((s, i) => (
-                <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
-              ))}
+              <div style={{
+                color: 'rgba(201,168,76,0.55)', fontSize: 9, fontFamily: 'monospace',
+                letterSpacing: 5, textTransform: 'uppercase',
+              }}>
+                {levelDef.id.replace('_', ' ').toUpperCase()}
+              </div>
+              <div style={{
+                color: '#e8d5a3', fontSize: 26, fontWeight: 900, fontFamily: 'monospace',
+                letterSpacing: 3, textAlign: 'center', lineHeight: 1.2,
+                textShadow: '0 0 18px rgba(201,168,76,0.7), 0 0 40px rgba(201,168,76,0.3)',
+              }}>
+                {levelDef.name.toUpperCase()}
+              </div>
+              <div style={{ height: 1, width: 120, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.6), transparent)' }} />
+              {/* Goal sentence — immediate-understanding gate */}
+              <div style={{
+                color: theme.accentColor, fontSize: 11, fontFamily: 'monospace',
+                letterSpacing: 1, textAlign: 'center', maxWidth: 260, lineHeight: 1.5,
+                textShadow: `0 0 12px ${theme.accentColor}88`,
+                padding: '0 16px',
+              }}>
+                {theme.introText}
+              </div>
+              <div style={{
+                color: '#00e5ff', fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
+                letterSpacing: 2, textShadow: '0 0 10px rgba(0,229,255,0.6)',
+              }}>
+                TARGET: {levelDef.winScore.toLocaleString()}
+              </div>
+              {levelDef.timeLimitSec && (
+                <div style={{
+                  color: 'rgba(255,114,0,0.85)', fontSize: 10, fontFamily: 'monospace',
+                  letterSpacing: 2,
+                }}>
+                  ⏱ {Math.floor(levelDef.timeLimitSec / 60)}:{String(levelDef.timeLimitSec % 60).padStart(2, '0')} LIMIT
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {[6,4,8,4,6].map((s, i) => (
+                  <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Beat Window — Gothic rhythm bar */}
