@@ -77,6 +77,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const [debugMode, setDebugMode] = useState(false);
   const [debugFace, setDebugFace] = useState<number | null>(null);
   const [musicDebug, setMusicDebug] = useState<EmotionalState | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [introFading, setIntroFading] = useState(false);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const gameMode = useGameStore(s => s.gameMode);
   const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined);
@@ -106,6 +108,12 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const handleDisrupt = useCallback((type: DisruptionType) => {
     sendDisruption(type, [0, 1, 2, 3, 4, 5, 6]);
   }, [sendDisruption]);
+
+  useEffect(() => {
+    const fadeTimer = setTimeout(() => setIntroFading(true), 2400);
+    const hideTimer = setTimeout(() => setShowIntro(false), 3000);
+    return () => { clearTimeout(fadeTimer); clearTimeout(hideTimer); };
+  }, []);
 
   useEffect(() => {
     // Synchronously clear any stale win/lose phase so routing effect doesn't fire immediately
@@ -376,6 +384,58 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
           {...((gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') ? { onInitiateHeist: initiateHeist, onBlockHeist: blockHeist } : {})}
         />
+
+        {/* Level intro overlay — 3s immediate-understanding gate */}
+        {showIntro && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(5,0,18,0.88)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 14, pointerEvents: 'none', zIndex: 30,
+            opacity: introFading ? 0 : 1,
+            transition: introFading ? 'opacity 0.6s ease-out' : 'none',
+          }}>
+            {/* Filigree top rule */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {[6,4,8,4,6].map((s, i) => (
+                <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
+              ))}
+            </div>
+            <div style={{
+              color: 'rgba(201,168,76,0.55)', fontSize: 9, fontFamily: 'monospace',
+              letterSpacing: 5, textTransform: 'uppercase',
+            }}>
+              {levelDef.id.replace('_', ' ').toUpperCase()}
+            </div>
+            <div style={{
+              color: '#e8d5a3', fontSize: 26, fontWeight: 900, fontFamily: 'monospace',
+              letterSpacing: 3, textAlign: 'center', lineHeight: 1.2,
+              textShadow: '0 0 18px rgba(201,168,76,0.7), 0 0 40px rgba(201,168,76,0.3)',
+            }}>
+              {levelDef.name.toUpperCase()}
+            </div>
+            <div style={{ height: 1, width: 120, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.6), transparent)' }} />
+            <div style={{
+              color: '#00e5ff', fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
+              letterSpacing: 2, textShadow: '0 0 10px rgba(0,229,255,0.6)',
+            }}>
+              TARGET: {levelDef.winScore.toLocaleString()}
+            </div>
+            {levelDef.timeLimitSec && (
+              <div style={{
+                color: 'rgba(255,114,0,0.85)', fontSize: 10, fontFamily: 'monospace',
+                letterSpacing: 2,
+              }}>
+                ⏱ {Math.floor(levelDef.timeLimitSec / 60)}:{String(levelDef.timeLimitSec % 60).padStart(2, '0')} LIMIT
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {[6,4,8,4,6].map((s, i) => (
+                <div key={i} style={{ width: s, height: s, background: 'rgba(201,168,76,0.5)', transform: 'rotate(45deg)' }} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Beat Window — Gothic rhythm bar */}
