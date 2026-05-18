@@ -89,33 +89,45 @@ export class WildCubeEngine {
     private audioAnalyser?: THREE.AudioAnalyser;
     private clock = new THREE.Clock();
     private isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+    private destroyed = false;
 
     constructor(container: HTMLElement, audioStream?: MediaStream) {
         this.initGraphics(container);
         this.initPostProcessing();
         this.initPhysics().then(() => {
+            if (this.destroyed) return;
             this.buildObjects();
             if (audioStream) this.initAudio(audioStream);
             this.animate(0);
         });
     }
 
+    private resizeObserver?: ResizeObserver;
+
     private initGraphics(container: HTMLElement) {
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-        this.camera.position.set(0, 2, 5);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: !this.isMobile, powerPreference: "high-performance" });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        const w = container.clientWidth || 180;
+        const h = container.clientHeight || 220;
+
+        this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
+        this.camera.position.set(0, 1.2, 4);
+        this.camera.lookAt(0, 0.8, 0);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: !this.isMobile, powerPreference: "high-performance", alpha: true });
+        this.renderer.setSize(w, h);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setClearColor(0x000000, 0);
         container.appendChild(this.renderer.domElement);
 
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.resizeObserver = new ResizeObserver(entries => {
+            const { width, height } = entries[0]!.contentRect;
+            this.camera.aspect = width / height;
             this.camera.updateProjectionMatrix();
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.composer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setSize(width, height);
+            this.composer.setSize(width, height);
         });
+        this.resizeObserver.observe(container);
     }
 
     private initPostProcessing() {
@@ -124,7 +136,7 @@ export class WildCubeEngine {
 
         // High intensity bloom configured to catch the white "W" and saturated cracks
         const bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            new THREE.Vector2(this.renderer.domElement.width, this.renderer.domElement.height),
             1.8,  // Strength
             0.4,  // Radius
             0.85  // Threshold (Only elements over-saturated past 1.0 bleed light)
@@ -178,12 +190,7 @@ export class WildCubeEngine {
         this.outerBody.setLinvel(new RAPIER.Vector3(0, 2, -2), true);
         this.outerBody.setAngvel(new RAPIER.Vector3(5, 4, 2), true);
 
-        // --- 2. Static World Floor ---
-        const floorGeo = new THREE.PlaneGeometry(30, 30);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.8 });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        this.scene.add(floor);
+        // --- 2. Static World Floor (physics only — no visible mesh) ---
         this.physicsWorld.createCollider(RAPIER.ColliderDesc.cuboid(15, 0.05, 15).setTranslation(0, -0.05, 0));
 
         // --- 3. Internal "W" Configuration ---
@@ -251,6 +258,7 @@ export class WildCubeEngine {
     // 4. TICK / RENDERING LOOP
     // ==========================================
     private animate = (_timestamp: number) => {
+        if (this.destroyed) return;
         requestAnimationFrame(this.animate);
         const time = this.clock.getElapsedTime();
 
@@ -287,7 +295,9 @@ export class WildCubeEngine {
     };
 
     destroy() {
+        this.destroyed = true;
+        this.resizeObserver?.disconnect();
         this.renderer.dispose();
-        this.physicsWorld.free();
+        this.physicsWorld?.free();
     }
 }

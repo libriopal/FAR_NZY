@@ -71,7 +71,7 @@ export interface AppState {
   setCurrentLevel: (level: LevelConfig) => void;
 }
 
-const SESSION_ID = Math.random().toString(36).slice(2);
+const SESSION_ID = crypto.randomUUID().replace(/-/g, '').slice(0, 14);
 
 export const useGameStore = create<AppState>()(
   subscribeWithSelector((set) => ({

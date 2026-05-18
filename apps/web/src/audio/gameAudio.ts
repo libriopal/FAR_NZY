@@ -6,6 +6,9 @@
 //     Responds to game state via setMusicState(); schedules notes with lookahead clock
 // ─────────────────────────────────────────────────────
 
+let _ar = (typeof crypto !== 'undefined' ? crypto.getRandomValues(new Uint32Array(1))[0]! : 0xdeadbeef) || 0xdeadbeef;
+const aRng = () => { _ar ^= _ar << 13; _ar ^= _ar >>> 17; _ar ^= _ar << 5; return (_ar >>> 0) / 4294967296; };
+
 let ctx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
 let droneOsc: OscillatorNode | null = null;
@@ -182,7 +185,7 @@ export function playBombBlast(rainbow = false) {
   const buf = ac.createBuffer(1, ac.sampleRate * 0.65, ac.sampleRate);
   const data = buf.getChannelData(0);
   for (let i = 0; i < data.length; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.6);
+    data[i] = (aRng() * 2 - 1) * Math.pow(1 - i / data.length, 1.6);
   }
   const src = ac.createBufferSource();
   src.buffer = buf;
@@ -216,7 +219,7 @@ export function playBombCollapse(rainbow = false) {
   const noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.9, ac.sampleRate);
   const nd = noiseBuf.getChannelData(0);
   for (let i = 0; i < nd.length; i++) {
-    nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (nd.length * 0.22));
+    nd[i] = (aRng() * 2 - 1) * Math.exp(-i / (nd.length * 0.22));
   }
   const noiseSrc = ac.createBufferSource();
   noiseSrc.buffer = noiseBuf;

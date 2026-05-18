@@ -28,10 +28,12 @@ export class GameSessionManager {
   private state: GameState;
   private timerHandle: ReturnType<typeof setInterval> | null = null;
 
-  constructor() {
+  constructor(seed: number = Date.now()) {
     this.bus = createGameEventBus();
     this.physics = new PhysicsPileSystem(this.bus);
-    this.itemSystem = new ItemSystem(this.bus);
+    let _s = ((seed ^ 0xdeadbeef) >>> 0) || 1;
+    const rng = () => { _s ^= _s << 13; _s ^= _s >>> 17; _s ^= _s << 5; return (_s >>> 0) / 4294967296; };
+    this.itemSystem = new ItemSystem(this.bus, rng);
     this.tray = new TraySystem(this.bus);
     this.matchSystem = new MatchSystem(this.bus, this.tray, this.itemSystem);
     this.objectiveSystem = new ObjectiveSystem(this.bus);

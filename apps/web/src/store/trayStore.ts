@@ -35,7 +35,8 @@ export const useTrayStore = create<TrayState>((set, get) => ({
     const current = get().slots.filter(s => s.state !== 'done');
     if (current.length >= TRAY_MAX_SLOTS) return null;
     const id = crypto.randomUUID();
-    const burnDurationMs = burnMs ?? (TRAY_BURN_MIN_MS + Math.floor(Math.random() * (TRAY_BURN_MAX_MS - TRAY_BURN_MIN_MS)));
+    const _r = crypto.getRandomValues(new Uint32Array(1))[0]! / 0xFFFFFFFF;
+    const burnDurationMs = burnMs ?? (TRAY_BURN_MIN_MS + Math.floor(_r * (TRAY_BURN_MAX_MS - TRAY_BURN_MIN_MS)));
     set(s => ({
       slots: [...s.slots, { id, entityType, face, burnStartAt: null, state: 'falling', burnDurationMs }],
     }));

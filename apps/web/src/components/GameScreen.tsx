@@ -10,7 +10,6 @@ import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
-import { WildBlocker } from './WildBlocker.js';
 import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
@@ -70,7 +69,6 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const gamePhase = useFarkleStore(s => s.gamePhase);
-  const wildCount = useFarkleStore(s => s.bodies.filter(b => b.entityType === 'wild').length);
   const physicsRef = useRef<VoxelPhysicsSystem | null>(null);
   const gameStartedRef = useRef(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -300,30 +298,6 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           onEntityTap={tapSphere}
           onEmptyTap={handleEmptyTap}
         />
-
-        {/* Wild Blocker inset — shows live 3D wild die when wild entities are on the board */}
-        {wildCount > 0 && (
-          <div style={{
-            position: 'absolute', bottom: 72, left: 12,
-            width: 180, height: 220,
-            borderRadius: 12, overflow: 'hidden',
-            border: '1px solid rgba(201,168,76,0.35)',
-            boxShadow: '0 0 18px rgba(201,168,76,0.2)',
-            pointerEvents: 'none',
-            zIndex: 15,
-          }}>
-            <WildBlocker />
-            <div style={{
-              position: 'absolute', bottom: 6, left: 0, right: 0,
-              textAlign: 'center', fontSize: 9, fontFamily: 'monospace',
-              fontWeight: 700, letterSpacing: 3,
-              color: 'rgba(201,168,76,0.8)',
-              textShadow: '0 0 6px rgba(201,168,76,0.5)',
-            }}>
-              WILD x{wildCount}
-            </div>
-          </div>
-        )}
 
         {/* Debug die picker — vertical strip on the left */}
         {debugMode && (

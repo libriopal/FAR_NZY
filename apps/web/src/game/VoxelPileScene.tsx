@@ -5,6 +5,12 @@
 // ─────────────────────────────────────────────────────
 
 import React, { useCallback, useRef, useEffect, useMemo, useState, type MutableRefObject } from 'react';
+
+// Module-level xorshift32 — replaces vRng() for visual effects.
+// Seeded from crypto entropy so each session looks distinct, but never
+// touches the Sacred Core CSPRNG used for game logic.
+let _vr = (typeof crypto !== 'undefined' ? crypto.getRandomValues(new Uint32Array(1))[0]! : 0xdeadbeef) || 0xdeadbeef;
+const vRng = () => { _vr ^= _vr << 13; _vr ^= _vr >>> 17; _vr ^= _vr << 5; return (_vr >>> 0) / 4294967296; };
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -1209,20 +1215,20 @@ function SmokeParticles({ rainbow = false }: { rainbow?: boolean }) {
   const initPos = useMemo(() => {
     const arr = new Float32Array(SMOKE_COUNT * 3);
     for (let i = 0; i < SMOKE_COUNT; i++) {
-      arr[i * 3]     = (Math.random() - 0.5) * 0.45;
-      arr[i * 3 + 1] = -0.45 - Math.random() * 0.25;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 0.45;
+      arr[i * 3]     = (vRng() - 0.5) * 0.45;
+      arr[i * 3 + 1] = -0.45 - vRng() * 0.25;
+      arr[i * 3 + 2] = (vRng() - 0.5) * 0.45;
     }
     return arr;
   }, []);
 
-  const lifetimes = useRef(Float32Array.from({ length: SMOKE_COUNT }, () => Math.random()));
+  const lifetimes = useRef(Float32Array.from({ length: SMOKE_COUNT }, () => vRng()));
   const vels = useRef((() => {
     const a = new Float32Array(SMOKE_COUNT * 3);
     for (let i = 0; i < SMOKE_COUNT; i++) {
-      a[i * 3]     = (Math.random() - 0.5) * 0.45;
-      a[i * 3 + 1] = -0.35 - Math.random() * 0.25;
-      a[i * 3 + 2] = (Math.random() - 0.5) * 0.45;
+      a[i * 3]     = (vRng() - 0.5) * 0.45;
+      a[i * 3 + 1] = -0.35 - vRng() * 0.25;
+      a[i * 3 + 2] = (vRng() - 0.5) * 0.45;
     }
     return a;
   })());
@@ -1239,15 +1245,15 @@ function SmokeParticles({ rainbow = false }: { rainbow?: boolean }) {
     const lt = lifetimes.current;
 
     for (let i = 0; i < SMOKE_COUNT; i++) {
-      lt[i] = (lt[i] ?? 0) + delta * (0.45 + Math.random() * 0.45);
+      lt[i] = (lt[i] ?? 0) + delta * (0.45 + vRng() * 0.45);
       if ((lt[i] ?? 0) >= 1) {
         lt[i] = 0;
-        pos[i * 3]     = (Math.random() - 0.5) * 0.4;
+        pos[i * 3]     = (vRng() - 0.5) * 0.4;
         pos[i * 3 + 1] = -0.45;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
-        vel[i * 3]     = (Math.random() - 0.5) * 0.45;
-        vel[i * 3 + 1] = -0.35 - Math.random() * 0.25;
-        vel[i * 3 + 2] = (Math.random() - 0.5) * 0.45;
+        pos[i * 3 + 2] = (vRng() - 0.5) * 0.4;
+        vel[i * 3]     = (vRng() - 0.5) * 0.45;
+        vel[i * 3 + 1] = -0.35 - vRng() * 0.25;
+        vel[i * 3 + 2] = (vRng() - 0.5) * 0.45;
       } else {
         pos[i * 3]     = (pos[i * 3] ?? 0) + (vel[i * 3] ?? 0) * delta;
         pos[i * 3 + 1] = (pos[i * 3 + 1] ?? 0) + (vel[i * 3 + 1] ?? 0) * delta;
@@ -1656,9 +1662,9 @@ function BombExplosionEffect({ event, onDone }: { event: ExplosionEvent; onDone:
   const partVels = useRef((() => {
     const a = new Float32Array(EXP_PCOUNT * 3);
     for (let i = 0; i < EXP_PCOUNT; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const elev  = (Math.random() - 0.35) * Math.PI;
-      const spd   = 1.8 + Math.random() * 2.8;
+      const angle = vRng() * Math.PI * 2;
+      const elev  = (vRng() - 0.35) * Math.PI;
+      const spd   = 1.8 + vRng() * 2.8;
       a[i * 3]     = Math.cos(angle) * Math.cos(elev) * spd;
       a[i * 3 + 1] = Math.sin(elev) * spd;
       a[i * 3 + 2] = Math.sin(angle) * Math.cos(elev) * spd;
@@ -1678,8 +1684,8 @@ function BombExplosionEffect({ event, onDone }: { event: ExplosionEvent; onDone:
     // ── Camera shake ─────────────────────────────────────────────────────────
     const now = performance.now();
     if (now < shakeUntil.current) {
-      camera.position.x = origCam.current.x + (Math.random() - 0.5) * shakeMag * 2;
-      camera.position.y = origCam.current.y + (Math.random() - 0.5) * shakeMag;
+      camera.position.x = origCam.current.x + (vRng() - 0.5) * shakeMag * 2;
+      camera.position.y = origCam.current.y + (vRng() - 0.5) * shakeMag;
     } else {
       camera.position.x = origCam.current.x;
       camera.position.y = origCam.current.y;

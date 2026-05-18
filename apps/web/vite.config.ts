@@ -82,6 +82,7 @@ export default defineConfig({
       '@match3d/farkle-shared': path.join(PACKAGES_ROOT, 'farkle-shared/src/index.ts'),
       '@match3d/farkle-engine': path.join(PACKAGES_ROOT, 'farkle-engine/src/web.ts'),
       '@assets': path.resolve(__dirname, '../../assets'),
+      '@dimforge/rapier3d-compat': path.resolve(__dirname, '../../packages/game-core/node_modules/@dimforge/rapier3d-compat/rapier.es.js'),
     },
   },
   optimizeDeps: {

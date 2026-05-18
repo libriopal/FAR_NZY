@@ -11,8 +11,11 @@ import type { GameEventBus } from '../events/EventBus.js';
 export class ItemSystem {
   private definitions = new Map<string, ItemDefinition>();
   private items = new Map<string, GameItem>();
+  private rng: () => number;
 
-  constructor(private readonly bus: GameEventBus) {}
+  constructor(private readonly bus: GameEventBus, rng?: () => number) {
+    this.rng = rng ?? (() => crypto.getRandomValues(new Uint32Array(1))[0]! / 0xFFFFFFFF);
+  }
 
   registerDefinitions(defs: ItemDefinition[]): void {
     for (const def of defs) {
@@ -148,7 +151,7 @@ export class ItemSystem {
     weights: Array<{ definitionId: string; weight: number }>,
     totalWeight: number
   ): string {
-    let r = Math.random() * totalWeight;
+    let r = this.rng() * totalWeight;
     for (const w of weights) {
       r -= w.weight;
       if (r <= 0) return w.definitionId;
@@ -160,7 +163,7 @@ export class ItemSystem {
     config: SpawnConfig['modifierConfig']
   ): ItemModifier[] {
     const mods: ItemModifier[] = [];
-    const r = Math.random();
+    const r = this.rng();
 
     if (r < config.frozenProbability) {
       mods.push({ type: 'frozen', turnsRemaining: 2 });
