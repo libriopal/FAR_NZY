@@ -56,6 +56,7 @@ export function AgeGate() {
     if (next.step === 'approved') {
       const profile = next.profile as ComplianceProfile;
       setComplianceApproved(profile);
+      sessionStorage.setItem('compliance_approved', '1');
       setActiveScreen('home');
       const userId = useGameStore.getState().userId;
       if (userId) {

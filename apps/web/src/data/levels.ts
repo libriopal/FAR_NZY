@@ -87,7 +87,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_10',
-    name: 'Grand Blueprint',
+    name: 'Obsidian Lattice',
     spawnWeights: { die:57, sphere:5,  ice:1, lock:1, wild:0.5, bomb:1, rainbow_bomb:1, mirror:0, stone:1, multiplier_orb:5, ghost:5, catalyst:6 },
     winScore: 100_000,
     timeLimitSec: null,

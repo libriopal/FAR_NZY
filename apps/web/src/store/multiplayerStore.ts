@@ -7,7 +7,17 @@
 import { create } from 'zustand';
 import type { DisruptionEvent, RallyRole } from '@match3d/farkle-shared';
 
-const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:3001';
+function resolveWsUrl(): string {
+  const explicit = import.meta.env.VITE_WS_URL as string | undefined;
+  if (explicit) return explicit;
+  // Derive from current page: https → wss, http → ws. Keeps local dev working and
+  // prevents mixed-content blocks on production HTTPS deployments.
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const host = window.location.hostname;
+  const port = window.location.hostname === 'localhost' ? ':3001' : '';
+  return `${proto}://${host}${port}`;
+}
+const WS_URL = resolveWsUrl();
 
 export interface MultiplayerPlayer {
   id: string;

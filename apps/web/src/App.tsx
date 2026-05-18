@@ -84,11 +84,7 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    if (activeScreen === 'home') {
-      sessionStorage.setItem('compliance_approved', '1');
-    }
-  }, [activeScreen]);
+  // compliance_approved is written only by AgeGate on verified approval — not here
 
   return (
     <div style={{ width: '100vw', height: '100dvh', overflow: 'hidden', userSelect: 'none' }}>
