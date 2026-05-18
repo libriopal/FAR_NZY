@@ -8,6 +8,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getAnalyserNode } from '../audio/gameAudio.js';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
+import { useGameStore } from '../store/gameStore.js';
+import { LEVELS } from '../data/levels.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
 
@@ -473,9 +475,11 @@ function ScoreDisplay() {
   const { banked, unbanked, multiplierStep, mode } = useFarkleStore(s => ({
     banked: s.banked, unbanked: s.unbanked, multiplierStep: s.multiplierStep, mode: s.mode,
   }));
+  const selectedLevelId = useGameStore(s => s.selectedLevelId);
+  const levelWinScore = LEVELS.find(l => l.id === selectedLevelId)?.winScore ?? WIN_SCORE;
   const total = banked + unbanked;
   const mult = MULTIPLIER_LADDER[Math.min(multiplierStep, 5)] ?? 1;
-  const progressPct = Math.min(100, (total / WIN_SCORE) * 100);
+  const progressPct = Math.min(100, (total / levelWinScore) * 100);
   const hasMult = mult > 1;
 
   return (
@@ -531,7 +535,7 @@ function ScoreDisplay() {
           }} />
         </div>
         <div style={{ color: GH.goldDim, fontSize: 8, fontFamily: 'monospace', marginTop: 1 }}>
-          {total.toLocaleString()}/{WIN_SCORE.toLocaleString()}
+          {total.toLocaleString()}/{levelWinScore.toLocaleString()}
         </div>
         <FiligreeRow count={3} color={GH.goldDim} />
       </div>

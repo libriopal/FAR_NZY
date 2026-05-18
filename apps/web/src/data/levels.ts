@@ -15,7 +15,7 @@ import type { LevelDef } from '@match3d/farkle-shared';
 export const LEVELS: LevelDef[] = [
   {
     id: 'level_01',
-    name: 'Seedling Plot',
+    name: 'Neural Foyer',
     spawnWeights: { die:84, sphere:10, ice:0, lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:0, stone:0, multiplier_orb:1, ghost:0, catalyst:0 },
     winScore: 10_000,
     timeLimitSec: null,
@@ -23,7 +23,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_02',
-    name: 'Glass Frame',
+    name: 'Neon Vestibule',
     spawnWeights: { die:82, sphere:9,  ice:0, lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:0, stone:0, multiplier_orb:2, ghost:1, catalyst:0 },
     winScore: 20_000,
     timeLimitSec: null,
@@ -31,7 +31,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_03',
-    name: 'Vine Trellis',
+    name: 'Void Trellis',
     spawnWeights: { die:80, sphere:8,  ice:1, lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:0, stone:0, multiplier_orb:2, ghost:1, catalyst:0 },
     winScore: 30_000,
     timeLimitSec: null,
@@ -39,7 +39,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_04',
-    name: 'Bioluminescent Bay',
+    name: 'Skeletal Bay',
     spawnWeights: { die:78, sphere:7,  ice:1, lock:0, wild:0, bomb:0, rainbow_bomb:0, mirror:0, stone:1, multiplier_orb:3, ghost:2, catalyst:0 },
     winScore: 40_000,
     timeLimitSec: 300,
@@ -47,7 +47,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_05',
-    name: 'Aero Scaffold',
+    name: 'Gothic Scaffold',
     spawnWeights: { die:75, sphere:7,  ice:1, lock:1, wild:0, bomb:1, rainbow_bomb:0, mirror:0, stone:1, multiplier_orb:3, ghost:2, catalyst:2 },
     winScore: 50_000,
     timeLimitSec: 270,
@@ -55,7 +55,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_06',
-    name: 'Steel Canopy',
+    name: 'Obsidian Canopy',
     spawnWeights: { die:73, sphere:6,  ice:1, lock:1, wild:0, bomb:1, rainbow_bomb:0, mirror:0, stone:1, multiplier_orb:3, ghost:2, catalyst:4 },
     winScore: 60_000,
     timeLimitSec: 240,
@@ -63,7 +63,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_07',
-    name: 'Hydro Core',
+    name: 'Cyberpunk Core',
     spawnWeights: { die:69, sphere:6,  ice:1, lock:1, wild:0, bomb:1, rainbow_bomb:0, mirror:0, stone:1, multiplier_orb:4, ghost:3, catalyst:5 },
     winScore: 70_000,
     timeLimitSec: 210,
@@ -71,7 +71,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_08',
-    name: 'Overgrowth Dome',
+    name: 'Horror Dome',
     spawnWeights: { die:64, sphere:5,  ice:1, lock:1, wild:0, bomb:1, rainbow_bomb:1, mirror:0, stone:1, multiplier_orb:4, ghost:4, catalyst:7 },
     winScore: 80_000,
     timeLimitSec: 180,
@@ -79,7 +79,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 'level_09',
-    name: 'Root Network',
+    name: 'Roguelike Nexus',
     spawnWeights: { die:60, sphere:5,  ice:1, lock:1, wild:0.3, bomb:1, rainbow_bomb:1, mirror:0, stone:1, multiplier_orb:4, ghost:5, catalyst:7 },
     winScore: 90_000,
     timeLimitSec: 180,
@@ -95,4 +95,4 @@ export const LEVELS: LevelDef[] = [
   },
 ];
 
-export const DEFAULT_LEVEL = LEVELS[9]!;
+export const DEFAULT_LEVEL = LEVELS[0]!;

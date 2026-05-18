@@ -99,7 +99,7 @@ export const useGameStore = create<AppState>()(
     activeScreen: 'splash',
     showReviveModal: false,
     showAdModal: false,
-    selectedLevelId: 'level_10',
+    selectedLevelId: 'level_01',
     gameMode: null,
 
     setUserId: (id) => set({ userId: id, isAuthenticated: true }),
