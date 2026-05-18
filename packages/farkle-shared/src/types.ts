@@ -169,6 +169,7 @@ export interface LobbySettings {
   currencyMode: CurrencyMode;
   stakeAmount: number;
   rainbowBlueReward: number;
+  levelWinScore: number;
 }
 
 export const GAME_CONSTANTS = {
@@ -248,6 +249,7 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   stakeAmount: 0,
   rainbowRedReward: 100,
   rainbowBlueReward: 50,
+  levelWinScore: 100_000,
 };
 
 export interface RTPConfig {

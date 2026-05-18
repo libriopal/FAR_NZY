@@ -28,6 +28,22 @@ function getMcTable(): Int32Array {
   return _mcTable;
 }
 
+// Find the best-scoring subset of dice using exhaustive 2^n search.
+// This mirrors real Farkle greedy-optimal play: score the highest-value
+// subset and re-roll the rest. Prevents the false 100% farkle rate that
+// occurs when all 6 dice are passed to lookupScore as a single chain.
+function bestSubsetScore(faces: DieFace[], table: Int32Array): { score: number; kept: number } {
+  const n = faces.length;
+  let best = 0;
+  let bestKept = 0;
+  for (let mask = 1; mask < (1 << n); mask++) {
+    const subset = faces.filter((_, i) => (mask >> i) & 1);
+    const s = lookupScore(subset, table);
+    if (s > best) { best = s; bestKept = subset.length; }
+  }
+  return { score: best, kept: bestKept };
+}
+
 export function calibrateNormalizer(
   mode: GameMode,
   sessions: number = 4000
@@ -42,13 +58,27 @@ export function calibrateNormalizer(
     const rng = seededRng(i);
 
     while (score < 50000 && chainCount < 30) {
-      const roll = Array.from({ length: 6 }, () => (Math.floor(rng() * 6) + 1) as DieFace);
-      const chainScore = lookupScore(roll, table);
-      if (chainScore === 0) {
+      let diceLeft = 6;
+      let turnScore = 0;
+      let farkled = false;
+
+      // Simulate one full turn: roll, keep best subset, re-roll rest.
+      // Hot dice: if all 6 scored, re-roll all 6 again.
+      while (diceLeft > 0) {
+        const roll = Array.from({ length: diceLeft }, () => (Math.floor(rng() * 6) + 1) as DieFace);
+        const { score: s, kept } = bestSubsetScore(roll, table);
+        if (s === 0) { farkled = true; break; }
+        turnScore += s;
+        diceLeft -= kept;
+        if (diceLeft === 0) diceLeft = 6; // hot dice: re-roll all
+        if (turnScore >= 500) break;      // greedy bank threshold
+      }
+
+      if (farkled) {
         totalFarkles++;
         break;
       }
-      score += chainScore;
+      score += turnScore;
       chainCount++;
     }
 

@@ -12,11 +12,9 @@
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
 import { GAME_CONSTANTS, RALLY_MILESTONES } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision } from '@match3d/farkle-engine';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
-
-const WIN_SCORE = 100_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -310,7 +308,7 @@ export class GameRoom {
       this.state.unbanked = 0;
       this.banksTaken++;
       this.checkMilestones(playerId, this.state.banked);
-      if (this.state.banked >= WIN_SCORE) {
+      if (this.state.banked >= this.settings.levelWinScore) {
         void this.endSession(playerId);
         return;
       }
@@ -373,7 +371,7 @@ export class GameRoom {
       this.checkMilestones(playerId, this.state.banked);
     }
     this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
-    if (this.state.banked >= WIN_SCORE) {
+    if (this.state.banked >= this.settings.levelWinScore) {
       void this.endSession(playerId);
       return;
     }
@@ -416,19 +414,20 @@ export class GameRoom {
     let payout = 0;
     let winnerId: string | null = null;
 
+    const rtpFactor = RTP_CONFIGS[this.gameMode as keyof typeof RTP_CONFIGS]?.targetRTP ?? 0.92;
     if (this.gameMode === 'VS_CASINO') {
-      // C14: highest-banked player wins totalPot × 0.92
+      // C14: highest-banked player wins totalPot × targetRTP
       const totalPot = this.settings.stakeAmount * this.players.size;
       let topScore = -1;
       for (const [pid, p] of this.players) {
         if (p.profile.banked > topScore) { topScore = p.profile.banked; winnerId = pid; }
       }
-      payout = Math.round(totalPot * 0.92);
+      payout = Math.round(totalPot * rtpFactor);
     } else if (this.gameMode === 'SOLO_CASINO') {
-      // C6: payout = (banked / WIN_SCORE) × stakeAmount × targetRTP(0.92)
+      // C6: payout = (banked / levelWinScore) × stakeAmount × targetRTP
       const player = this.players.get(triggeringPlayerId);
       const banked = player?.profile.banked ?? 0;
-      payout = Math.round((banked / WIN_SCORE) * this.settings.stakeAmount * 0.92);
+      payout = Math.round((banked / this.settings.levelWinScore) * this.settings.stakeAmount * rtpFactor);
       winnerId = triggeringPlayerId;
     }
 

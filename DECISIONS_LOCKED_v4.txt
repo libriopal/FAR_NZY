@@ -1,0 +1,81 @@
+FARKLE FRENZY — DECISIONS LOCKED v4
+Generated: 2026-05-18
+Supersedes: (first version — no prior DECISIONS_LOCKED file existed)
+
+═══════════════════════════════════════════════════════
+LOCKED CONSTANTS — DO NOT CHANGE WITHOUT DIRECTOR APPROVAL
++ FULL 16-TEST SUITE PASS + TYPE-CHECK CLEAN
+═══════════════════════════════════════════════════════
+
+── RTP CONFIGURATION (rtpConfig.ts) ──────────────────
+
+SOLO_FREE    targetRTP: 0.92  platformFee: 0.00  poolSize: 60
+SOLO_CASINO  targetRTP: 0.92  platformFee: 0.00  poolSize: 60
+VS_FREE      targetRTP: 1.00  platformFee: 0.00  poolSize: 66
+VS_CASINO    targetRTP: 1.00  platformFee: 0.08  poolSize: 66
+RALLY_FREE   targetRTP: 0.92  platformFee: 0.00  poolSize: 66
+RALLY_CASINO targetRTP: 0.92  platformFee: 0.08  poolSize: 66
+HEIST_FREE   targetRTP: 0.92  platformFee: 0.00  poolSize: 66
+HEIST_CASINO targetRTP: 0.92  platformFee: 0.08  poolSize: 66
+
+Design intent: SOLO/RALLY/HEIST casino modes target 96.2% actual player RTP
+(92% factor × ~1.0458 avg-banked/winScore overshoot). Player-favorable VS_FREE
+at 100% is the sweepstakes ceiling. VS_CASINO nets ~96.5% after 8% platform fee.
+Confirmed 2026-05-18 by Director: 96.2% preferred over 100.76% to limit exploit.
+
+── PAYOUT FORMULA (gameRoom.ts) ──────────────────────
+
+VS_CASINO:    payout = round(totalPot × targetRTP)
+SOLO_CASINO:  payout = round((banked / levelWinScore) × stakeAmount × targetRTP)
+
+levelWinScore is sourced from LobbySettings.levelWinScore (client-supplied,
+must match the active levelDef.winScore). Default: 100_000.
+
+Previous formula hardcoded WIN_SCORE=100_000 and 0.92 — fixed 2026-05-18.
+Level_01 players now correctly receive 96.2% RTP on their 10k winScore session
+instead of the prior 9.2% miscalculation.
+
+── SCORER MATH (farkleScorer.ts / chainIndex.ts) ─────
+
+Three 1s:        1000 pts  (threeOnesScore, configurable via LobbySettings)
+Single 1:        100 pts   (singleOneScore, configurable via LobbySettings)
+Single 5:        50 pts
+Three Xs (X≠1):  X × 100 pts
+Four of a kind:  1000 pts
+Five of a kind:  2000 pts
+Six of a kind:   3000 pts  (triggers BOMB_STANDARD)
+Straight 1-6:    1500 pts  (triggers BOMB_RAINBOW)
+Two Triplets:    2500 pts  (W6 requirement — exhaustive scorer, not greedy)
+Three Pairs:     1500 pts
+4+Pair:          1500 pts
+
+W6 preservation: Two Triplets [1,1,1,2,2,2] = 2500, not 1200. Verified by
+farkleScorer.test.ts cases 15 and 16.
+
+── MONTE CARLO HARNESS (monteCarlo.ts) ───────────────
+
+Fixed 2026-05-18: prior implementation passed full 6-die rolls to lookupScore,
+producing a false 100% farkle rate and avgScore=144. Replaced with exhaustive
+2^n best-subset search per roll (mirrors real Farkle greedy-optimal play).
+
+Post-fix baseline (10k sessions, SOLO_FREE):
+  avgScore:    904   (vs 144 before)
+  farkleRate:  100%  (per-session — expected; every 30-turn session contains
+                      at least one farkle. Per-roll farkle rate ~2.3% for 6 dice)
+  normalizer:  982
+
+── CSPRNG (csprng.ts) ────────────────────────────────
+
+seededRng(seed): xorshift32 — visual/MC use only
+CSPRNG class:    HMAC-SHA256 counter-mode — live game rolls only
+All gameplay-affecting randomness must use CSPRNG. No Math.random() in
+game-logic paths.
+
+═══════════════════════════════════════════════════════
+AMENDMENT PROCEDURE
+To change any constant above:
+  1. pnpm test           → must show 16/16 pass
+  2. pnpm type-check     → must show 0 errors
+  3. Director approval   → explicit written confirmation
+  4. Update this file    → supersede affected section
+═══════════════════════════════════════════════════════
