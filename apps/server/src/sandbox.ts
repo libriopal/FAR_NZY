@@ -4,7 +4,7 @@
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
 
-import { Router } from 'express';
+import { Router, type Router as ExpressRouter } from 'express';
 import { runMonteCarlo } from '@match3d/farkle-engine';
 import type { GameMode } from '@match3d/farkle-shared';
 import { MULTIPLIER_LADDER } from '@match3d/farkle-shared';
@@ -141,7 +141,7 @@ Respond ONLY with a JSON object in this exact shape:
 router.post('/simulate', async (req, res) => {
   try {
     const { patch, sessions = 4000 } = req.body;
-    if (!patch) return res.status(400).json({ error: 'Patch data is required' });
+    if (!patch) { res.status(400).json({ error: 'Patch data is required' }); return; }
     const results = await runMonteCarloSimulation(patch, sessions);
     res.json({ success: true, results });
   } catch (error) {
@@ -153,7 +153,7 @@ router.post('/simulate', async (req, res) => {
 router.post('/analyze', async (req, res) => {
   try {
     const { input } = req.body;
-    if (!input) return res.status(400).json({ error: 'Analysis input is required' });
+    if (!input) { res.status(400).json({ error: 'Analysis input is required' }); return; }
     const analysis = await analyzeRTPImpact(input);
     res.json({ success: true, analysis });
   } catch (error) {
@@ -166,4 +166,4 @@ router.get('/health', (req, res) => {
   res.json({ ok: true, aiAvailable: !!process.env.GEMINI_API_KEY });
 });
 
-export const sandboxRouter = router;
+export const sandboxRouter: ExpressRouter = router;

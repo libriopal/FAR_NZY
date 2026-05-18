@@ -5,6 +5,13 @@ import path from 'path';
 import fs from 'fs';
 
 const PACKAGES_ROOT = path.resolve(__dirname, '../../packages');
+// Rapier is installed once in the pnpm virtual store; use the shared path so the
+// alias does not depend on game-core having its own local node_modules symlink.
+const RAPIER_ES = path.resolve(
+  __dirname,
+  '../../node_modules/.pnpm/node_modules/@dimforge/rapier3d-compat/rapier.es.js'
+);
+const RAPIER_WASM_DIR = path.dirname(RAPIER_ES);
 
 // Copies rapier_wasm3d_bg.wasm into build output and fixes the broken "<deleted>"
 // base URL that Vite leaves when it can't resolve import.meta.url inside a library.
@@ -14,10 +21,7 @@ function rapierWasmPlugin(): Plugin {
     name: 'rapier-wasm',
     apply: 'build',
     generateBundle(_opts, bundle) {
-      const wasmSrc = path.resolve(
-        __dirname,
-        `../../node_modules/@dimforge/rapier3d-compat/${wasmFileName}`
-      );
+      const wasmSrc = path.join(RAPIER_WASM_DIR, wasmFileName);
       if (fs.existsSync(wasmSrc)) {
         this.emitFile({
           type: 'asset',
@@ -82,7 +86,7 @@ export default defineConfig({
       '@match3d/farkle-shared': path.join(PACKAGES_ROOT, 'farkle-shared/src/index.ts'),
       '@match3d/farkle-engine': path.join(PACKAGES_ROOT, 'farkle-engine/src/web.ts'),
       '@assets': path.resolve(__dirname, '../../assets'),
-      '@dimforge/rapier3d-compat': path.resolve(__dirname, '../../packages/game-core/node_modules/@dimforge/rapier3d-compat/rapier.es.js'),
+      '@dimforge/rapier3d-compat': RAPIER_ES,
     },
   },
   optimizeDeps: {
