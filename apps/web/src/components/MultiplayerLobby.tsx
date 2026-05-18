@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
+import { LEVELS } from '../data/levels.js';
 import type { GameMode } from '@match3d/farkle-shared';
 
 const S = {
@@ -63,6 +64,7 @@ const MODE_OPTIONS: { value: GameMode; label: string; desc: string }[] = [
 export function MultiplayerLobby() {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const setGameMode = useGameStore(s => s.setGameMode);
+  const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const { state, createRoom, joinRoom, startGame, leaveRoom } = useMultiplayer();
 
   const [playerName, setPlayerName] = useState('');
@@ -80,7 +82,8 @@ export function MultiplayerLobby() {
   function handleCreate() {
     if (!playerName.trim()) return;
     setGameMode(selectedMode);
-    createRoom(playerName.trim(), selectedMode);
+    const levelWinScore = LEVELS.find(l => l.id === selectedLevelId)?.winScore ?? 100_000;
+    createRoom(playerName.trim(), selectedMode, levelWinScore);
   }
 
   function handleJoin() {

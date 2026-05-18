@@ -15,7 +15,7 @@ export function useMultiplayer() {
   const state = useMultiplayerStore();
   return {
     state,
-    createRoom: (playerName: string, gameMode?: string) => mpActions.createRoom(playerName, gameMode),
+    createRoom: (playerName: string, gameMode?: string, levelWinScore?: number) => mpActions.createRoom(playerName, gameMode, levelWinScore),
     joinRoom: (roomCode: string, playerName: string) => mpActions.joinRoom(roomCode, playerName),
     startGame: () => mpActions.startGame(),
     submitChain: (chain: { row: number; col: number }[]) => mpActions.submitChain(chain),

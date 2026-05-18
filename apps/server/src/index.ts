@@ -26,10 +26,10 @@ const wss = new WebSocketServer({ server });
 
 const rooms = new Map<string, GameRoom>();
 
-function getOrCreateRoom(roomCode: string): GameRoom {
+function getOrCreateRoom(roomCode: string, levelWinScore?: number): GameRoom {
   let room = rooms.get(roomCode);
   if (!room) {
-    room = new GameRoom({ ...DEFAULT_SETTINGS, playerCount: 2, turnTimerSeconds: 15 });
+    room = new GameRoom({ ...DEFAULT_SETTINGS, playerCount: 2, turnTimerSeconds: 15, levelWinScore: levelWinScore ?? DEFAULT_SETTINGS.levelWinScore });
     rooms.set(roomCode, room);
   }
   return room;
@@ -57,7 +57,8 @@ wss.on('connection', (ws: WebSocket) => {
       roomCode = nanoid(6).toUpperCase();
       playerId = (msg.playerId as string) || nanoid(8);
       const gameMode = (msg.gameMode as string) || 'VS_FREE';
-      const room = getOrCreateRoom(roomCode);
+      const levelWinScore = typeof msg.levelWinScore === 'number' ? msg.levelWinScore : DEFAULT_SETTINGS.levelWinScore;
+      const room = getOrCreateRoom(roomCode, levelWinScore);
       room.setGameMode(gameMode);
       room.addPlayer(ws, playerId, (msg.playerName as string) || 'Player');
       ws.send(JSON.stringify({ type: 'ROOM_CREATED', roomCode, playerId }));

@@ -108,8 +108,8 @@ function _connect(onOpen: () => void) {
 }
 
 export const mpActions = {
-  createRoom(playerName: string, gameMode?: string) {
-    _connect(() => _send({ type: 'CREATE_ROOM', playerName, gameMode }));
+  createRoom(playerName: string, gameMode?: string, levelWinScore?: number) {
+    _connect(() => _send({ type: 'CREATE_ROOM', playerName, gameMode, levelWinScore }));
   },
   joinRoom(roomCode: string, playerName: string) {
     _connect(() => _send({ type: 'JOIN_ROOM', roomCode: roomCode.toUpperCase(), playerName }));
