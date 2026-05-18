@@ -11,7 +11,7 @@
 
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
-import { GAME_CONSTANTS, RALLY_MILESTONES } from '@match3d/farkle-shared';
+import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier } from '@match3d/farkle-shared';
 import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
@@ -104,7 +104,7 @@ export class GameRoom {
       farklePool: 0,
     };
     this.committedHash = hashServerSeed(this.csprng.getSeed());
-    this.startEnergyTick();
+    // Energy tick and turn timer start in handleStartGame, not here (#2, #8)
   }
 
   private broadcast(msg: object) {
@@ -126,15 +126,13 @@ export class GameRoom {
   }
 
   private startEnergyTick() {
-    const FRENZY_THRESHOLD = 150;
-    const MAX_ENERGY = 300;
-    const TICK_MS = 200; // 200ms tick → ×5 per second = 5/sec rate
+    if (this.energyInterval) return;
+    const TICK_MS = 200;
     this.energyInterval = setInterval(() => {
       for (const [id, p] of this.players.entries()) {
-        const inFrenzy = p.energy >= FRENZY_THRESHOLD;
-        // PRIME: +5/sec passive gain; FRENZY: -5/sec drain
+        const inFrenzy = p.energy >= ENERGY_CONSTANTS.FRENZY_THRESHOLD;
         const delta = inFrenzy ? -1 : 1; // per 200ms tick = 5/sec
-        p.energy = Math.max(0, Math.min(MAX_ENERGY, p.energy + delta));
+        p.energy = Math.max(0, Math.min(ENERGY_CONSTANTS.MAX, p.energy + delta));
         if (p.energy === 0) {
           this.broadcast({ type: 'ENERGY_ZERO', playerId: id });
         }
@@ -154,9 +152,9 @@ export class GameRoom {
     };
     this.players.set(playerId, { ws, profile: player, energy: 150 });
 
+    // Track first player as active; turn timer starts only on START_GAME (#2)
     if (!this.activePlayerId) {
       this.activePlayerId = playerId;
-      this.startTurnTimer();
     }
 
     this.send(ws, { type: 'ROOM_STATE', state: this.getPublicState() });
@@ -166,8 +164,9 @@ export class GameRoom {
   removePlayer(playerId: string) {
     this.players.delete(playerId);
     this.broadcast({ type: 'PLAYER_LEFT', playerId });
-    if (this.players.size === 0 && this.energyInterval) {
-      clearInterval(this.energyInterval);
+    if (this.players.size === 0) {
+      if (this.energyInterval) { clearInterval(this.energyInterval); this.energyInterval = null; }
+      if (this.turnTimer) { clearTimeout(this.turnTimer); this.turnTimer = null; }
     }
   }
 
@@ -181,6 +180,10 @@ export class GameRoom {
           this.send(player.ws, { type: 'ERROR', message: 'Not your turn' });
           return;
         }
+        // Phase guard: reject submissions during animations or after game over (#4)
+        if (this.state.phase === 'FARKLE_ANIM' || this.state.phase === 'GAME_OVER') {
+          return;
+        }
         // 100ms input lock — reject rapid-fire submissions
         const lastAt = this.lastActionAt.get(playerId) ?? 0;
         if (Date.now() - lastAt < this.INPUT_LOCK_MS) {
@@ -192,6 +195,22 @@ export class GameRoom {
         if (!chain || chain.length < 2) {
           this.send(player.ws, { type: 'ERROR', message: 'Chain too short' });
           return;
+        }
+        // Bounds + duplicate validation — prevents score exploits (#5)
+        const rows = this.state.grid.length;
+        const cols = this.state.grid[0]?.length ?? 0;
+        const seen = new Set<string>();
+        for (const pos of chain) {
+          if (pos.row < 0 || pos.row >= rows || pos.col < 0 || pos.col >= cols) {
+            this.send(player.ws, { type: 'ERROR', message: 'Invalid chain position' });
+            return;
+          }
+          const key = `${pos.row},${pos.col}`;
+          if (seen.has(key)) {
+            this.send(player.ws, { type: 'ERROR', message: 'Duplicate cell in chain' });
+            return;
+          }
+          seen.add(key);
         }
         this.processChain(playerId, chain);
         break;
@@ -266,7 +285,6 @@ export class GameRoom {
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
       this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
-      // Analytics: log farkle decision (fire-and-forget)
       insertChainDecision({
         id: nanoid(), session_id: this.sessionId, player_id: playerId,
         chain_number: this.totalChains, faces_played: faces as number[],
@@ -274,19 +292,19 @@ export class GameRoom {
         unbanked_before: lost, decision: 'FARKLE', was_optimal: false,
         timestamp: new Date().toISOString(),
       });
-      setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
+      setTimeout(() => { this.state = { ...this.state, phase: 'IDLE' }; this.nextTurn(); }, 800);
       return;
     }
     this.scoringChains++;
 
-    const scaled = Math.round(result.score * [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)]);
+    const multiplier = getMultiplier(this.state.multiplierStep);
+    const scaled = Math.round(result.score * multiplier);
     this.state = {
       ...this.state,
       unbanked: this.state.unbanked + scaled,
       multiplierStep: chain.length === 6 ? Math.min(this.state.multiplierStep + 1, 5) : 0,
     };
 
-    // Analytics: log chain decision (fire-and-forget)
     const farkleRisk = estimateFarkleRisk(
       faces.filter(f => f === 1).length,
       faces.filter(f => f === 5).length,
@@ -297,18 +315,23 @@ export class GameRoom {
       id: nanoid(), session_id: this.sessionId, player_id: playerId,
       chain_number: this.totalChains, faces_played: faces as number[],
       score_result: result.score,
-      multiplier_at: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      multiplier_at: getMultiplier(this.state.multiplierStep),
       unbanked_before: this.state.unbanked, decision,
       was_optimal: isOptimalDecision(decision, this.state.unbanked, this.state.multiplierStep, farkleRisk),
       timestamp: new Date().toISOString(),
     });
 
     if (chain.length < 6) {
-      this.state.banked += this.state.unbanked;
+      // Auto-bank: update both room total and per-player score (#1, #6)
+      const gain = this.state.unbanked;
+      const activePlayer = this.players.get(playerId);
+      this.state.banked += gain;
       this.state.unbanked = 0;
       this.banksTaken++;
-      this.checkMilestones(playerId, this.state.banked);
-      if (this.state.banked >= this.settings.levelWinScore) {
+      if (activePlayer) activePlayer.profile.banked += gain;
+      const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
+      this.checkMilestones(playerId, playerBanked);
+      if (playerBanked >= this.settings.levelWinScore) {
         void this.endSession(playerId);
         return;
       }
@@ -316,6 +339,7 @@ export class GameRoom {
 
     this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
+    this.broadcast({ type: 'ROOM_STATE', state: this.getPublicState() });
     this.startTurnTimer();
   }
 
@@ -324,12 +348,18 @@ export class GameRoom {
   }
 
   private handleStartGame(_fromPlayerId: string) {
+    // LOW #12: non-solo modes require at least 2 players
+    const isSolo = this.gameMode === 'SOLO_FREE' || this.gameMode === 'SOLO_CASINO';
+    if (!isSolo && this.players.size < 2) return;
+
     this.roleMap = this.assignRoles();
     const roles: Record<string, string | null> = {};
     for (const [pid] of this.players) {
       roles[pid] = this.roleMap.get(pid) ?? null;
     }
     this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles });
+    this.startEnergyTick(); // MEDIUM #8: start energy on game start, not construction
+    this.startTurnTimer();  // CRITICAL #2: start turn timer on game start, not addPlayer
   }
 
   private assignRoles(): Map<string, string> {
@@ -356,7 +386,6 @@ export class GameRoom {
       targetColumns: (targetColumns ?? []).filter((c: number) => c >= 0 && c <= 6),
       receivedAt: Date.now(),
     };
-    // Route disruption to all opponents
     for (const [pid, player] of this.players) {
       if (pid !== fromPlayerId) {
         this.send(player.ws, { type: 'DISRUPTION_INCOMING', disruption });
@@ -365,16 +394,27 @@ export class GameRoom {
   }
 
   private handleBank(playerId: string) {
+    // HIGH #3: only the active player may bank
+    if (playerId !== this.activePlayerId) return;
+
+    const activePlayer = this.players.get(playerId);
     if (this.state.unbanked > 0) {
-      this.state.banked += this.state.unbanked;
+      const gain = this.state.unbanked;
+      this.state.banked += gain;
       this.state.unbanked = 0;
-      this.checkMilestones(playerId, this.state.banked);
+      // Update per-player score (#1, #6)
+      if (activePlayer) activePlayer.profile.banked += gain;
+      const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
+      this.checkMilestones(playerId, playerBanked);
+      if (playerBanked >= this.settings.levelWinScore) {
+        this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
+        this.broadcast({ type: 'ROOM_STATE', state: this.getPublicState() });
+        void this.endSession(playerId);
+        return; // early exit — don't call nextTurn after session ends
+      }
     }
     this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
-    if (this.state.banked >= this.settings.levelWinScore) {
-      void this.endSession(playerId);
-      return;
-    }
+    this.broadcast({ type: 'ROOM_STATE', state: this.getPublicState() });
     this.nextTurn();
   }
 
@@ -405,6 +445,7 @@ export class GameRoom {
   private async endSession(triggeringPlayerId: string) {
     if (this.sessionEnded) return;
     this.sessionEnded = true;
+    this.state = { ...this.state, phase: 'GAME_OVER' }; // block further chain submissions (#4)
     if (this.turnTimer) clearTimeout(this.turnTimer);
 
     const serverSeed = this.csprng.getSeed();
@@ -415,8 +456,10 @@ export class GameRoom {
     let winnerId: string | null = null;
 
     const rtpFactor = RTP_CONFIGS[this.gameMode as keyof typeof RTP_CONFIGS]?.targetRTP ?? 0.92;
+
     if (this.gameMode === 'VS_CASINO') {
       // C14: highest-banked player wins totalPot × targetRTP
+      // Uses profile.banked which is now correctly updated per-player (#1)
       const totalPot = this.settings.stakeAmount * this.players.size;
       let topScore = -1;
       for (const [pid, p] of this.players) {
@@ -425,10 +468,19 @@ export class GameRoom {
       payout = Math.round(totalPot * rtpFactor);
     } else if (this.gameMode === 'SOLO_CASINO') {
       // C6: payout = (banked / levelWinScore) × stakeAmount × targetRTP
+      // profile.banked is now correctly updated (#1)
       const player = this.players.get(triggeringPlayerId);
-      const banked = player?.profile.banked ?? 0;
+      const banked = player?.profile.banked ?? this.state.banked;
       payout = Math.round((banked / this.settings.levelWinScore) * this.settings.stakeAmount * rtpFactor);
       winnerId = triggeringPlayerId;
+    } else if (this.gameMode === 'RALLY_CASINO' || this.gameMode === 'HEIST_CASINO') {
+      // MEDIUM #7: highest-scorer among connected players wins the pot
+      const totalPot = this.settings.stakeAmount * this.players.size;
+      let topScore = -1;
+      for (const [pid, p] of this.players) {
+        if (p.profile.banked > topScore) { topScore = p.profile.banked; winnerId = pid; }
+      }
+      payout = Math.round(totalPot * rtpFactor);
     }
 
     this.broadcast({
@@ -439,7 +491,6 @@ export class GameRoom {
       committedHash,
     });
 
-    // Analytics: insert session record (fire-and-forget)
     const finalBanked = this.state.banked;
     void insertSession({
       id: this.sessionId,
@@ -452,7 +503,7 @@ export class GameRoom {
       scoring_chains: this.scoringChains,
       farkle_count: this.totalChains - this.scoringChains,
       banks_taken: this.banksTaken,
-      peak_multiplier: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      peak_multiplier: getMultiplier(this.state.multiplierStep),
       final_banked: finalBanked,
       final_score: finalBanked,
       avg_chain_score: this.scoringChains > 0 ? finalBanked / this.scoringChains : 0,
