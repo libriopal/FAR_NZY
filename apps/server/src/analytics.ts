@@ -35,9 +35,9 @@
 //
 // RUNTIME BEHAVIOUR:
 //   All writes are fire-and-forget: they never throw, never block the game loop.
-//   If Supabase is unreachable (SUPABASE_URL / SUPABASE_SERVICE_KEY not set),
-//   functions silently return — game proceeds, compliance writes are lost.
-//   TODO: add write-ahead local fallback for offline resilience.
+//   If Supabase is unreachable, rows are queued in the write-ahead buffer and
+//   replayed automatically every 30 s when the connection recovers.
+//   Buffer cap: 10,000 rows. Overflow is discarded oldest-first with a warning.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /*
@@ -120,6 +120,49 @@ import type { SessionAnalytics, ChainDecision } from './skillMetrics.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _client: any = null;
 
+// ── Write-ahead buffer ────────────────────────────────────────────────────────
+// Compliance rows that failed (Supabase unreachable) are queued here and
+// replayed in FIFO order every RETRY_INTERVAL_MS. Cap prevents unbounded growth.
+const WAB_CAP = 10_000;
+const RETRY_INTERVAL_MS = 30_000;
+type WabEntry =
+  | { table: 'session_analytics'; row: Record<string, unknown> }
+  | { table: 'chain_decisions';   row: Record<string, unknown> }
+  | { table: 'wallet_transactions'; row: Record<string, unknown> };
+const _wab: WabEntry[] = [];
+
+function _wabPush(entry: WabEntry): void {
+  if (_wab.length >= WAB_CAP) {
+    _wab.shift(); // discard oldest — warn once per overflow
+    console.warn('[analytics] WAB overflow — oldest compliance row discarded');
+  }
+  _wab.push(entry);
+}
+
+async function _flushWab(): Promise<void> {
+  if (_wab.length === 0) return;
+  const client = getClient();
+  if (!client) return;
+  // Drain up to 200 rows per flush cycle to avoid overwhelming Supabase.
+  const batch = _wab.splice(0, 200);
+  for (const entry of batch) {
+    try {
+      await client.from(entry.table).insert(entry.row);
+    } catch {
+      _wab.unshift(entry); // re-queue at front on failure
+      break;               // stop this flush cycle; retry next interval
+    }
+  }
+}
+
+// Start the retry loop once (idempotent — harmless if module is hot-reloaded).
+let _retryStarted = false;
+function _ensureRetryLoop(): void {
+  if (_retryStarted) return;
+  _retryStarted = true;
+  setInterval(() => { _flushWab().catch(() => { /* ignore */ }); }, RETRY_INTERVAL_MS);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getClient(): any {
   if (_client) return _client;
@@ -139,27 +182,30 @@ function getClient(): any {
 // Write one session record. Casino modes only — free-mode sessions are not
 // subject to compliance requirements and are intentionally excluded.
 export async function insertSession(session: Omit<SessionAnalytics, 'skill_score'>): Promise<void> {
-  // Compliance gate: only SOLO_CASINO / VS_CASINO / RALLY_CASINO / HEIST_CASINO
   if (!session.mode.endsWith('_CASINO')) return;
+  _ensureRetryLoop();
+  const row = { ...session, skill_score: computeSkillScore(session) };
   try {
     const client = getClient();
-    if (!client) return;
-    const skill_score = computeSkillScore(session);
-    await client.from('session_analytics').upsert({ ...session, skill_score });
+    if (!client) { _wabPush({ table: 'session_analytics', row }); return; }
+    await client.from('session_analytics').upsert(row);
   } catch (e) {
-    console.error('[analytics] insertSession failed:', e);
+    console.error('[analytics] insertSession failed — queued for retry:', e);
+    _wabPush({ table: 'session_analytics', row });
   }
 }
 
 // Write one chain decision row. Callers (gameRoom.processChain) guard this
 // with isCasino before calling — this function trusts that gate.
 export function insertChainDecision(decision: ChainDecision): void {
+  _ensureRetryLoop();
   const client = getClient();
-  if (!client) return;
+  if (!client) { _wabPush({ table: 'chain_decisions', row: decision as unknown as Record<string, unknown> }); return; }
   client.from('chain_decisions').insert(decision)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .then(() => { /* fire-and-forget */ }).catch((e: any) => {
-      console.error('[analytics] insertChainDecision failed:', e);
+      console.error('[analytics] insertChainDecision failed — queued for retry:', e);
+      _wabPush({ table: 'chain_decisions', row: decision as unknown as Record<string, unknown> });
     });
 }
 
@@ -230,14 +276,16 @@ export interface WalletTransactionRow {
 }
 
 // Fire-and-forget wallet write. Never throws — game loop must not stall on
-// compliance writes. If Supabase is unreachable the row is lost silently.
-// TODO: wire a local write-ahead buffer for offline resilience.
+// compliance writes. Rows queue to the write-ahead buffer on failure and
+// replay automatically when Supabase recovers.
 export function insertWalletTransaction(tx: WalletTransactionRow): void {
+  _ensureRetryLoop();
   const client = getClient();
-  if (!client) return;
+  if (!client) { _wabPush({ table: 'wallet_transactions', row: tx as unknown as Record<string, unknown> }); return; }
   client.from('wallet_transactions').insert(tx)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .then(() => { /* fire-and-forget */ }).catch((e: any) => {
-      console.error('[analytics] insertWalletTransaction failed:', e);
+      console.error('[analytics] insertWalletTransaction failed — queued for retry:', e);
+      _wabPush({ table: 'wallet_transactions', row: tx as unknown as Record<string, unknown> });
     });
 }
