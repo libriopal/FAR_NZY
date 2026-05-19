@@ -4,7 +4,8 @@ import type { EntityType, SpawnWeights } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, BOMB_CONSTANTS, MIRROR_OPPOSITES } from '@match3d/farkle-shared';
 
 // ── Column layout ─────────────────────────────────────────────────────────────
-const COLUMN_X = [-3, -2, -1, 0, 1, 2, 3] as const;
+// Tighter column spacing matches the render grid (±2.4) for portrait fill
+const COLUMN_X = [-2.4, -1.6, -0.8, 0, 0.8, 1.6, 2.4] as const;
 const GROUND_Y = 0;
 const SPAWN_Y = 14;
 const MAX_STACK_Y = 9.5;
@@ -94,13 +95,13 @@ export class VoxelPhysicsSystem {
 
     const groundDesc = rapier.RigidBodyDesc.fixed().setTranslation(0, GROUND_Y - 0.5, 0);
     const ground = this.world.createRigidBody(groundDesc);
-    this.world.createCollider(rapier.ColliderDesc.cuboid(10, 0.5, 2), ground);
+    this.world.createCollider(rapier.ColliderDesc.cuboid(4, 0.5, 2), ground);
 
-    const leftWall = rapier.RigidBodyDesc.fixed().setTranslation(-3.7, 5, 0);
+    const leftWall = rapier.RigidBodyDesc.fixed().setTranslation(-3.1, 5, 0);
     const lw = this.world.createRigidBody(leftWall);
     this.world.createCollider(rapier.ColliderDesc.cuboid(0.1, 6, 2), lw);
 
-    const rightWall = rapier.RigidBodyDesc.fixed().setTranslation(3.7, 5, 0);
+    const rightWall = rapier.RigidBodyDesc.fixed().setTranslation(3.1, 5, 0);
     const rw = this.world.createRigidBody(rightWall);
     this.world.createCollider(rapier.ColliderDesc.cuboid(0.1, 6, 2), rw);
   }
