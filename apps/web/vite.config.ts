@@ -53,11 +53,11 @@ export default defineConfig({
       selfDestroying: true,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'The Living Blueprint: Glass Greenhouse Estate',
-        short_name: 'Living Blueprint',
-        description: 'Physics-based bio-architect match-3 puzzle game',
-        theme_color: '#0a1628',
-        background_color: '#0a1628',
+        name: 'Farkle Frenzy',
+        short_name: 'Farkle Frenzy',
+        description: 'Gothic Hacker Casino dice puzzle — Organic Vegas',
+        theme_color: '#050008',
+        background_color: '#050008',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

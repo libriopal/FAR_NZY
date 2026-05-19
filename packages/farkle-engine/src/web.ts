@@ -9,7 +9,11 @@
 // See .ff-core-lock for full classification manifest.
 // ═══════════════════════════════════════════════════════
 
-// Web-safe subset: scoring + RNG only (no 2D grid utilities)
+// Web-safe subset: scoring + RNG + H/A/I/G presentation constants
+// facets/shards/rhythm added when Feature H/A/I/G landed (FarkleHUD import requirement)
 export * from './farkleScorer.js';
 export * from './chainIndex.js';
 export * from './csprng.js';
+export * from './facets.js';
+export * from './shards.js';
+export * from './rhythm.js';
