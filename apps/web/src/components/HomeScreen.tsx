@@ -9,9 +9,54 @@ import { useGameStore } from '../store/gameStore.js';
 import { QuestPanel } from './QuestPanel.js';
 import { EventBanner } from './EventBanner.js';
 import { LEVELS } from '../data/levels.js';
-import { setVariant, getVariant } from '../styles/variants.js';
-import { VARIANTS, VARIANT_LABELS, VARIANT_ACCENT } from '../styles/tokens.js';
-import type { BioVariant } from '../styles/tokens.js';
+
+// Gothic Hacker Neon palette — matches FarkleHUD, WinLoseScreen, GameScreen
+// Colors sourced from dream/shared/source-of-truth/organic-vegas/design_tokens.json
+const GH = {
+  void:        '#050008',
+  neural:      '#0d0018',
+  bone:        '#e8d5a3',
+  boneDim:     'rgba(232,213,163,0.45)',
+  boneFaint:   'rgba(232,213,163,0.18)',
+  gold:        '#c9a84c',
+  goldBright:  '#f0c860',
+  goldGlow:    'rgba(201,168,76,0.55)',
+  goldDim:     'rgba(201,168,76,0.22)',
+  acidLime:    '#c8d400',
+  limeDim:     'rgba(200,212,0,0.25)',
+  cyan:        '#00e5ff',
+  cyanGlow:    'rgba(0,229,255,0.45)',
+  cyanDim:     'rgba(0,229,255,0.15)',
+  magenta:     '#ff00cc',
+  magentaDim:  'rgba(255,0,204,0.15)',
+  panelBg:     'rgba(5,0,18,0.92)',
+  panelBorder: 'rgba(201,168,76,0.42)',
+  cardBg:      'rgba(13,0,24,0.85)',
+  cardBorder:  'rgba(0,229,255,0.18)',
+  danger:      '#ef4444',
+} as const;
+
+// CRT scanline overlay — shared motif across all screens
+const CRT: React.CSSProperties = {
+  position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+  background: `
+    repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%)
+  `,
+};
+
+// Gothic filigree corner marks
+function GhCorner({ top, right, bottom, left }: { top?: number; right?: number; bottom?: number; left?: number }) {
+  const hAnchor = left !== undefined ? 'left' : 'right';
+  const vAnchor = top !== undefined ? 'top' : 'bottom';
+  return (
+    <div style={{ position: 'absolute', width: 12, height: 12, top, right, bottom, left }}>
+      <div style={{ position: 'absolute', width: 10, height: 1.5, background: GH.gold, [vAnchor]: 0, [hAnchor]: 0 }} />
+      <div style={{ position: 'absolute', width: 1.5, height: 10, background: GH.gold, [vAnchor]: 0, [hAnchor]: 0 }} />
+      <div style={{ position: 'absolute', width: 2.5, height: 2.5, background: GH.gold, transform: 'rotate(45deg)', [vAnchor]: 4.5, [hAnchor]: 4.5 }} />
+    </div>
+  );
+}
 
 export function HomeScreen() {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
@@ -20,119 +65,152 @@ export function HomeScreen() {
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const setSelectedLevelId = useGameStore(s => s.setSelectedLevelId);
   const [showLevels, setShowLevels] = useState(false);
-  const [currentVariant, setCurrentVariant] = useState<BioVariant>(getVariant());
 
-  function handleVariant(v: BioVariant) {
-    setVariant(v);
-    setCurrentVariant(v);
-  }
+  const selectedLevel = LEVELS.find(l => l.id === selectedLevelId) ?? LEVELS[0]!;
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      minHeight: '100vh', background: 'var(--ba-surface-bg)',
-      color: 'var(--ba-marble-200)', fontFamily: 'monospace', padding: 20,
+      minHeight: '100vh', background: GH.void,
+      color: GH.bone, fontFamily: 'monospace', padding: '20px 20px 32px',
+      position: 'relative', overflowX: 'hidden',
     }}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginTop: 40, marginBottom: 32 }}>
+      <div style={CRT} />
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div style={{
+        textAlign: 'center', marginTop: 36, marginBottom: 24,
+        position: 'relative', zIndex: 1,
+      }}>
+        {/* Filigree rule above title */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+          <div style={{ height: 1, width: 40, background: `linear-gradient(90deg, transparent, ${GH.goldDim})` }} />
+          <div style={{ width: 5, height: 5, background: GH.gold, transform: 'rotate(45deg)', boxShadow: `0 0 6px ${GH.goldGlow}` }} />
+          <div style={{ height: 1, width: 40, background: `linear-gradient(90deg, ${GH.goldDim}, transparent)` }} />
+        </div>
+
         <h1 style={{
-          fontSize: 22, fontWeight: 700, margin: 0,
-          background: 'linear-gradient(90deg, var(--ba-blueprint), var(--ba-glow-green), var(--ba-glow-teal))',
+          fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: 4,
+          background: `linear-gradient(90deg, ${GH.gold}, ${GH.acidLime}, ${GH.cyan})`,
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          textShadow: 'none',
+          filter: 'drop-shadow(0 0 12px rgba(200,212,0,0.4))',
         }}>
-          THE LIVING BLUEPRINT
+          FARKLE FRENZY
         </h1>
-        <p style={{ color: 'var(--ba-marble-500)', fontSize: 12, margin: '4px 0 0' }}>
-          Glass Greenhouse Estate
+        <p style={{
+          color: GH.boneDim, fontSize: 10, margin: '4px 0 0',
+          letterSpacing: 3, textTransform: 'uppercase',
+        }}>
+          Gothic Hacker Casino · Organic Vegas
         </p>
       </div>
 
-      {/* Resource Summary */}
-      <div className="ba-glass" style={{
-        display: 'flex', gap: 16, marginBottom: 32,
-        borderRadius: 12, padding: '12px 20px',
+      {/* ── Resource Summary ────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: 20, marginBottom: 20,
+        background: GH.cardBg, borderRadius: 10,
+        border: `1px solid ${GH.panelBorder}`,
+        padding: '10px 18px', position: 'relative', zIndex: 1,
       }}>
-        <ResourceBadge icon="⚙️" label="Bio-Steel" value={resources.bioSteel} tokenColor="var(--ba-blueprint)" />
-        <ResourceBadge icon="🌱" label="Aero-Seeds" value={resources.aeroSeeds} tokenColor="var(--ba-glow-green)" />
-        <ResourceBadge icon="🟡" label="Gold" value={resources.goldCoins} tokenColor="var(--ba-glow-amber)" />
-        <ResourceBadge icon="💎" label="SC" value={resources.sweepsCoins} tokenColor="var(--ba-glow-teal)" />
+        <GhCorner top={0} left={0} />
+        <GhCorner top={0} right={0} />
+        <GhCorner bottom={0} left={0} />
+        <GhCorner bottom={0} right={0} />
+        <ResourceBadge label="Steel"  value={resources.bioSteel}   color={GH.cyan}     />
+        <ResourceBadge label="Seeds"  value={resources.aeroSeeds}  color={GH.acidLime} />
+        <ResourceBadge label="Gold"   value={resources.goldCoins}  color={GH.gold}     />
+        <ResourceBadge label="SC"     value={resources.sweepsCoins} color={GH.magenta}  />
       </div>
 
-      {/* Live Events */}
-      <div style={{ width: '100%', maxWidth: 360, marginBottom: 8 }}>
+      {/* ── Live Events ─────────────────────────────────────────────────────── */}
+      <div style={{ width: '100%', maxWidth: 360, marginBottom: 6, position: 'relative', zIndex: 1 }}>
         <EventBanner />
       </div>
 
-      {/* Quests */}
-      <QuestPanel />
+      {/* ── Quests ──────────────────────────────────────────────────────────── */}
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 360 }}>
+        <QuestPanel />
+      </div>
 
-      {/* Main actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 360, marginTop: 8 }}>
+      {/* ── Main Actions ────────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 10,
+        width: '100%', maxWidth: 360, marginTop: 10, position: 'relative', zIndex: 1,
+      }}>
+        {/* Play row */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => { setGameMode('SOLO_FREE'); setActiveScreen('game'); }} style={{
-            flex: 1,
-            background: 'var(--ba-accent)', border: '1px solid rgba(255,255,255,0.15)',
-            color: '#fff', borderRadius: 12, padding: '16px 24px',
-            fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
-            boxShadow: '0 4px 20px var(--ba-accent-glow)',
-            transition: 'opacity 0.15s ease',
-          }}>
-            ▶ Play
+          <button
+            onClick={() => { setGameMode('SOLO_FREE'); setActiveScreen('game'); }}
+            style={{
+              flex: 1, background: GH.acidLime,
+              border: `1px solid rgba(200,212,0,0.6)`,
+              color: GH.void, borderRadius: 10, padding: '15px 20px',
+              fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'monospace',
+              boxShadow: `0 4px 20px ${GH.limeDim}`,
+              letterSpacing: 2, transition: 'opacity 0.15s ease',
+            }}
+          >
+            ▶ PLAY
           </button>
-          <button onClick={() => setShowLevels(v => !v)} className="ba-glass" style={{
-            color: 'var(--ba-accent)', borderRadius: 12, padding: '16px 14px',
-            fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
-            border: '1px solid var(--ba-card-border)',
-          }}>
-            {LEVELS.find(l => l.id === selectedLevelId)?.name.split(' ')[0] ?? 'Lvl'} ▾
+          <button
+            onClick={() => setShowLevels(v => !v)}
+            style={{
+              background: GH.cardBg, border: `1px solid ${GH.cardBorder}`,
+              color: GH.cyan, borderRadius: 10, padding: '15px 14px',
+              fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
+              letterSpacing: 1, minWidth: 68, textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 9, color: GH.boneDim, marginBottom: 2 }}>LEVEL</div>
+            <div>{selectedLevel.name.split(' ').slice(-1)[0]} ▾</div>
           </button>
         </div>
 
+        {/* Level picker */}
         {showLevels && (
-          <div className="ba-glass" style={{
-            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6,
+          <div style={{
+            background: GH.cardBg, border: `1px solid ${GH.panelBorder}`,
             borderRadius: 10, padding: 10,
+            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6,
           }}>
-            {LEVELS.map((lvl, i) => (
-              <button key={lvl.id} onClick={() => { setSelectedLevelId(lvl.id); setShowLevels(false); }} style={{
-                background: lvl.id === selectedLevelId ? 'var(--ba-accent)' : 'var(--ba-card-bg)',
-                border: `1px solid ${lvl.id === selectedLevelId ? 'var(--ba-accent)' : 'var(--ba-card-border)'}`,
-                color: lvl.id === selectedLevelId ? '#fff' : 'var(--ba-marble-200)',
-                borderRadius: 8, padding: '8px 4px',
-                fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
-                textAlign: 'center', fontWeight: lvl.id === selectedLevelId ? 700 : 400,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{i + 1}</div>
-                <div style={{ fontSize: 9, color: 'var(--ba-marble-500)', marginTop: 2 }}>{(lvl.winScore / 1000).toFixed(0)}k</div>
-              </button>
-            ))}
+            {LEVELS.map((lvl, i) => {
+              const active = lvl.id === selectedLevelId;
+              return (
+                <button
+                  key={lvl.id}
+                  onClick={() => { setSelectedLevelId(lvl.id); setShowLevels(false); }}
+                  style={{
+                    background: active ? GH.gold : 'rgba(201,168,76,0.06)',
+                    border: `1px solid ${active ? GH.gold : GH.goldDim}`,
+                    color: active ? GH.void : GH.bone,
+                    borderRadius: 8, padding: '8px 4px',
+                    fontSize: 11, cursor: 'pointer', fontFamily: 'monospace',
+                    textAlign: 'center', fontWeight: active ? 900 : 400,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{i + 1}</div>
+                  <div style={{ fontSize: 9, color: active ? GH.void : GH.boneDim, marginTop: 2 }}>
+                    {(lvl.winScore / 1000).toFixed(0)}k
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <NavButton label="⚔ Multiplayer" onClick={() => setActiveScreen('multiplayer')} />
-        <NavButton label="🏛 Estate" onClick={() => setActiveScreen('meta')} />
-        <NavButton label="🛒 Shop" onClick={() => setActiveScreen('shop')} />
-        <NavButton label="👥 Social" onClick={() => setActiveScreen('social')} />
+        <NavButton label="⚔  MULTIPLAYER" accent={GH.cyan}    onClick={() => setActiveScreen('multiplayer')} />
+        <NavButton label="🏛  ESTATE"      accent={GH.gold}    onClick={() => setActiveScreen('meta')} />
+        <NavButton label="🛒  SHOP"        accent={GH.magenta} onClick={() => setActiveScreen('shop')} />
+        <NavButton label="👥  SOCIAL"      accent={GH.bone}    onClick={() => setActiveScreen('social')} />
       </div>
 
-      {/* Variant switcher (F6) */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
-        {VARIANTS.map(v => (
-          <button key={v} onClick={() => handleVariant(v)} style={{
-            background: currentVariant === v ? VARIANT_ACCENT[v] : 'var(--ba-card-bg)',
-            border: `1px solid ${currentVariant === v ? VARIANT_ACCENT[v] : 'var(--ba-card-border)'}`,
-            color: currentVariant === v ? '#fff' : 'var(--ba-marble-500)',
-            borderRadius: 8, padding: '5px 12px',
-            fontSize: 10, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
-            transition: 'all 0.2s ease',
-          }}>
-            {VARIANT_LABELS[v]}
-          </button>
-        ))}
-      </div>
-
-      {/* Sweepstakes disclaimer */}
-      <p style={{ color: 'var(--ba-marble-800)', fontSize: 10, marginTop: 24, textAlign: 'center', maxWidth: 320 }}>
+      {/* ── Sweepstakes Disclaimer ──────────────────────────────────────────── */}
+      <p style={{
+        color: 'rgba(232,213,163,0.22)', fontSize: 10,
+        marginTop: 28, textAlign: 'center', maxWidth: 320,
+        lineHeight: 1.5, position: 'relative', zIndex: 1,
+      }}>
         NO PURCHASE NECESSARY. Sweeps Coins have no cash value. Void where prohibited.
         18+ US residents only (except WA).
       </p>
@@ -140,28 +218,33 @@ export function HomeScreen() {
   );
 }
 
-function ResourceBadge({ icon, label, value, tokenColor }: {
-  icon: string; label: string; value: number; tokenColor: string
-}) {
+function ResourceBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 18 }}>{icon}</div>
-      <div style={{ color: tokenColor, fontSize: 14, fontWeight: 700 }}>{value.toLocaleString()}</div>
-      <div style={{ color: 'var(--ba-marble-500)', fontSize: 10 }}>{label}</div>
+    <div style={{ textAlign: 'center', minWidth: 44 }}>
+      <div style={{ color, fontSize: 14, fontWeight: 700, textShadow: `0 0 8px ${color}` }}>
+        {value.toLocaleString()}
+      </div>
+      <div style={{ color: GH.boneDim, fontSize: 9, letterSpacing: 1, marginTop: 1 }}>
+        {label}
+      </div>
     </div>
   );
 }
 
-function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
+function NavButton({ label, accent, onClick }: { label: string; accent: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="ba-glass" style={{
-      border: '1px solid var(--ba-card-border)',
-      color: 'var(--ba-marble-200)', borderRadius: 12, padding: '16px 24px',
-      fontSize: 16, fontWeight: 700, cursor: 'pointer',
-      fontFamily: 'monospace', textAlign: 'left',
-      boxShadow: '0 4px 16px var(--ba-accent-glow)',
-      transition: 'opacity 0.1s ease',
-    }}>
+    <button
+      onClick={onClick}
+      style={{
+        background: GH.cardBg, border: `1px solid ${GH.cardBorder}`,
+        color: GH.bone, borderRadius: 10, padding: '14px 20px',
+        fontSize: 14, fontWeight: 700, cursor: 'pointer',
+        fontFamily: 'monospace', textAlign: 'left', letterSpacing: 1,
+        boxShadow: `inset 0 0 0 0 transparent`,
+        borderLeft: `3px solid ${accent}`,
+        transition: 'opacity 0.1s ease',
+      }}
+    >
       {label}
     </button>
   );
