@@ -216,6 +216,55 @@ export const HEIST_CONSTANTS = {
   HEIST_WINDOW_MS: 5000,   // teammates have 5s to block a heist
 } as const;
 
+// ── Ante system ───────────────────────────────────────────────────────────────
+// Antes are mandatory or optional pre-play contributions that increase the pot.
+// PRE_GAME antes are required before START_GAME in casino modes.
+// MILESTONE antes are optional triggers at score thresholds during play.
+// Every ante write produces a wallet_transactions row with sessionId + stage.
+
+export type AnteStageName =
+  | 'PRE_GAME'
+  | 'MILESTONE_1'
+  | 'MILESTONE_2'
+  | 'MILESTONE_3'
+  | 'MILESTONE_4';
+
+export interface AnteStageConfig {
+  stage: AnteStageName;
+  amountMultiplier: number;  // fraction of LobbySettings.stakeAmount (e.g. 0.10 = 10%)
+  required: boolean;         // if true, game cannot start without this ante being paid
+  triggerPoints?: number;    // milestone stages: score threshold that fires the ante prompt
+}
+
+export interface AnteSchedule {
+  stages: AnteStageConfig[];
+}
+
+// Mode-specific ante schedules.
+// Free modes have no antes — casino modes require a pre-game ante (10% of stake)
+// and some modes add optional milestone antes for deeper action.
+export const ANTE_SCHEDULES: Record<GameMode, AnteSchedule> = {
+  SOLO_FREE:    { stages: [] },
+  SOLO_CASINO:  { stages: [
+    { stage: 'PRE_GAME',    amountMultiplier: 0.10, required: true },
+  ]},
+  VS_FREE:      { stages: [] },
+  VS_CASINO:    { stages: [
+    { stage: 'PRE_GAME',    amountMultiplier: 0.10, required: true },
+  ]},
+  RALLY_FREE:   { stages: [] },
+  RALLY_CASINO: { stages: [
+    { stage: 'PRE_GAME',    amountMultiplier: 0.10, required: true },
+    { stage: 'MILESTONE_2', amountMultiplier: 0.05, required: false, triggerPoints: 25000 },
+  ]},
+  HEIST_FREE:   { stages: [] },
+  HEIST_CASINO: { stages: [
+    { stage: 'PRE_GAME',    amountMultiplier: 0.10, required: true },
+    { stage: 'MILESTONE_1', amountMultiplier: 0.05, required: false, triggerPoints: 10000 },
+    { stage: 'MILESTONE_3', amountMultiplier: 0.05, required: false, triggerPoints: 50000 },
+  ]},
+};
+
 export const FD_COLORS = {
   badge: 'bg-violet-900 border-violet-500 text-sky-300',
   bg: '#7C3AED',
@@ -252,10 +301,16 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   levelWinScore: 100_000,
 };
 
+// RTP configuration — all three fields required for audit compliance.
+// grossRTP: theoretical max return before house margin (e.g. 1.00 for zero-sum VS).
+// netRTP:   actual payout rate to players after house margin; used in endSession().
+// targetRTP: canonical audit target = netRTP; kept as primary field for Monte Carlo.
+// platformFee is REMOVED — margin is expressed as (grossRTP - netRTP) explicitly.
 export interface RTPConfig {
   mode?: GameMode;
-  targetRTP: number;
-  platformFee: number;
+  targetRTP: number;  // = netRTP; canonical payout rate for MC validation
+  grossRTP: number;   // pre-margin theoretical return
+  netRTP: number;     // post-margin player payout rate
   poolSize: number;
 }
 

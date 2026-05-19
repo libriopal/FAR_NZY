@@ -60,8 +60,36 @@
     final_banked    INTEGER DEFAULT 0,
     final_score     INTEGER DEFAULT 0,
     avg_chain_score NUMERIC DEFAULT 0,
-    skill_score     NUMERIC DEFAULT 0  -- computed from chain_decisions at session end
+    skill_score     NUMERIC DEFAULT 0,  -- computed from chain_decisions at session end
+    -- Compliance fields for disputed-payout reconstruction (added v2)
+    payout_amount   NUMERIC,            -- actual FD/PDX paid to this player at session end
+    rtp_actual      NUMERIC,            -- realized RTP: payout_amount / (stake + ante_total)
+    ante_total      NUMERIC,            -- sum of all antes this player paid this session
+    final_pot       NUMERIC,            -- total pot at session end (all stakes + all antes)
+    fee_removed_reason TEXT             -- audit trail marker, e.g. 'VS_CASINO_PLATFORM_FEE_REMOVED_v2'
   );
+
+  -- wallet_transactions — every wager, payout, ante, and bonus write
+  CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    player_id       TEXT NOT NULL,
+    session_id      UUID REFERENCES session_analytics(id) ON DELETE SET NULL,
+    type            TEXT NOT NULL CHECK (type IN (
+                      'FD_WAGER','PDX_WAGER','FD_AWARD','PDX_AWARD',
+                      'FD_ANTE','PDX_ANTE','MILESTONE_PAYOUT','RALLY_SPLIT',
+                      'FD_PURCHASE','PDX_GIFT','PDX_DAILY_BONUS','PDX_REDEEM','PDX_PROMO'
+                    )),
+    currency        TEXT NOT NULL CHECK (currency IN ('FD','PDX')),
+    amount          NUMERIC NOT NULL,    -- positive = credit, negative = debit
+    balance_after   NUMERIC NOT NULL,
+    ante_stage      TEXT,               -- e.g. 'PRE_GAME', 'MILESTONE_2' for ante rows
+    timestamp       TIMESTAMPTZ DEFAULT now(),
+    notes           TEXT
+  );
+
+  CREATE INDEX idx_wallet_player   ON wallet_transactions(player_id, timestamp DESC);
+  CREATE INDEX idx_wallet_session  ON wallet_transactions(session_id);
+  CREATE INDEX idx_wallet_type     ON wallet_transactions(type);
 
   -- Per-chain decision log for skill-dependency proof
   CREATE TABLE IF NOT EXISTS chain_decisions (
@@ -184,4 +212,32 @@ export async function getSkillDifferentialReport(): Promise<{ topDecile: number;
     console.error('[analytics] getSkillDifferentialReport failed:', e);
     return { topDecile: 0, bottomHalf: 0, ratio: 1 };
   }
+}
+
+// ── Wallet transaction ledger ─────────────────────────────────────────────────
+// Every wager, award, ante, rally split, and milestone payout writes one row.
+// Provides a complete audit trail for disputed payouts.
+
+export interface WalletTransactionRow {
+  player_id: string;
+  session_id?: string;
+  type: string;
+  currency: 'FD' | 'PDX';
+  amount: number;           // positive = credit to player, negative = debit
+  balance_after: number;
+  ante_stage?: string;      // 'PRE_GAME' | 'MILESTONE_1' ... for ante rows
+  notes?: string;
+}
+
+// Fire-and-forget wallet write. Never throws — game loop must not stall on
+// compliance writes. If Supabase is unreachable the row is lost silently.
+// TODO: wire a local write-ahead buffer for offline resilience.
+export function insertWalletTransaction(tx: WalletTransactionRow): void {
+  const client = getClient();
+  if (!client) return;
+  client.from('wallet_transactions').insert(tx)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .then(() => { /* fire-and-forget */ }).catch((e: any) => {
+      console.error('[analytics] insertWalletTransaction failed:', e);
+    });
 }

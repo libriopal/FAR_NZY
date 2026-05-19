@@ -27,7 +27,7 @@ export interface MultiplayerPlayer {
   isConnected: boolean;
   role?: RallyRole | null;
   tokens?: number;
-  trickStreak?: number;
+  eventHorizonStreak?: number;
 }
 
 export interface MultiplayerStoreState {
@@ -43,6 +43,8 @@ export interface MultiplayerStoreState {
   lastDisruption: DisruptionEvent | null;
   myRole: RallyRole | null;
   error: string | null;
+  fairnessCommitment: string | null;  // SHA-256 hash received before first roll; verify at SESSION_END
+  gravityFlipPending: boolean;        // true during the cinematic board-flip animation
 }
 
 const INITIAL: MultiplayerStoreState = {
@@ -51,6 +53,7 @@ const INITIAL: MultiplayerStoreState = {
   banked: 0, unbanked: 0, vault: 0,
   lastMessage: null, lastDisruption: null,
   myRole: null, error: null,
+  fairnessCommitment: null, gravityFlipPending: false,
 };
 
 export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...INITIAL }));
@@ -69,7 +72,8 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, status: 'lobby' as const, roomCode: msg.roomCode as string, playerId: msg.playerId as string };
       case 'ROOM_STATE': {
         const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number; vault?: number };
-        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, vault: rs.vault ?? prev.vault };
+        // gravityFlipPending cleared here — board state has been updated post-flip
+        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, vault: rs.vault ?? prev.vault, gravityFlipPending: false };
       }
       case 'GAME_STARTED': {
         const roleMap = ((msg.roles ?? {}) as Record<string, RallyRole>);
@@ -82,6 +86,10 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, activePlayerId: msg.activePlayerId as string };
       case 'DISRUPTION_INCOMING':
         return { ...next, lastDisruption: msg.disruption as DisruptionEvent };
+      case 'FAIRNESS_COMMITMENT':
+        return { ...next, fairnessCommitment: msg.committedHash as string };
+      case 'GRAVITY_FLIP':
+        return { ...next, gravityFlipPending: true };
       case 'ERROR':
         return { ...next, error: msg.message as string };
       default:
@@ -134,5 +142,8 @@ export const mpActions = {
   },
   sendRallyDecisionStart(expiresAt: number) {
     _send({ type: 'NOTIFY_RALLY_DECISION', expiresAt });
+  },
+  payAnte(stage: string) {
+    _send({ type: 'PAY_ANTE', stage });
   },
 };

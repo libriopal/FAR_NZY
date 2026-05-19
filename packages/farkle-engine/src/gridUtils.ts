@@ -569,6 +569,26 @@ export function cloneGrid(grid: Cell[][]): Cell[][] {
   return grid.map(row => row.map(cell => ({ ...cell })));
 }
 
+// ── Gravity Flip (Feature E) ──────────────────────────────────────────────────
+// Triggered every 5 banks. Flips the board vertically: row order reverses
+// (top → bottom, bottom → top) AND each die face is replaced by its opposite
+// (7 - face), so 1↔6, 2↔5, 3↔4. Non-die entities (stone, ice, lock, bomb)
+// keep their existing state; only die face values and colors update.
+// Face distribution stays symmetric → RTP is preserved across the flip.
+export function applyGravityFlip(grid: Cell[][]): Cell[][] {
+  const flipped = cloneGrid(grid).reverse();
+  for (const row of flipped) {
+    for (const cell of row) {
+      if (cell.face !== null && isDieTile(cell)) {
+        const newFace = (7 - cell.face) as DieFace;
+        cell.face = newFace;
+        cell.type = FACE_TO_COLOR[newFace];
+      }
+    }
+  }
+  return flipped;
+}
+
 export function getNeighbors(grid: Cell[][], row: number, col: number): GridPos[] {
   const rows = grid.length;
   const cols = grid[0].length;

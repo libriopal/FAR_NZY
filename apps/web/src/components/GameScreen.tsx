@@ -50,6 +50,57 @@ function ChapterBanner({ banked, winScore, accentColor, levelName }: { banked: n
   );
 }
 
+// ── GravityFlipCinematic ──────────────────────────────────────────────────────
+// Full-screen cinematic overlay shown when the board flips (every 5 banks).
+// Mounts for 1.2 s: a 600 ms board-flip animation, then 600 ms fade-out.
+// Physics continues after unmount; the board state from the server (ROOM_STATE)
+// already reflects the flipped grid, so no client-side grid manipulation needed.
+function GravityFlipCinematic({ onDone }: { onDone: () => void }) {
+  const [phase, setPhase] = useState<'flip' | 'fade'>('flip');
+  useEffect(() => {
+    const flipTimer = setTimeout(() => setPhase('fade'), 600);
+    const doneTimer = setTimeout(onDone, 1200);
+    return () => { clearTimeout(flipTimer); clearTimeout(doneTimer); };
+  }, [onDone]);
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(5,0,18,0.92)',
+      opacity: phase === 'fade' ? 0 : 1,
+      transition: phase === 'fade' ? 'opacity 0.6s ease' : 'none',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+        animation: phase === 'flip' ? 'gravityFlipBoard 0.6s ease-in-out forwards' : 'none',
+      }}>
+        <div style={{
+          fontSize: 11, fontFamily: 'monospace', letterSpacing: 6,
+          color: '#c9a84c', textShadow: '0 0 18px rgba(201,168,76,0.9)',
+          textTransform: 'uppercase',
+        }}>
+          ⟳ GRAVITY FLIP ⟳
+        </div>
+        <div style={{
+          fontSize: 9, fontFamily: 'monospace', letterSpacing: 2,
+          color: 'rgba(201,168,76,0.55)',
+        }}>
+          opposite faces · rows reversed
+        </div>
+      </div>
+      <style>{`
+        @keyframes gravityFlipBoard {
+          0%   { transform: rotateX(0deg) scale(1); }
+          40%  { transform: rotateX(90deg) scale(0.85); }
+          60%  { transform: rotateX(270deg) scale(0.85); }
+          100% { transform: rotateX(360deg) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 class GameErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null };
   static getDerivedStateFromError(e: Error) { return { error: e.message ?? String(e) }; }
@@ -108,6 +159,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const [musicDebug, setMusicDebug] = useState<EmotionalState | null>(null);
   const [showIntro, setShowIntro] = useState(true);
   const [introFading, setIntroFading] = useState(false);
+  const [showGravityFlip, setShowGravityFlip] = useState(false);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const gameMode = useGameStore(s => s.gameMode);
   const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined);
@@ -185,6 +237,11 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   useEffect(() => {
     useFarkleStore.getState().setRallyRole(mpState.myRole);
   }, [mpState.myRole]);
+
+  // Gravity Flip cinematic — triggered by server GRAVITY_FLIP message
+  useEffect(() => {
+    if (mpState.gravityFlipPending) setShowGravityFlip(true);
+  }, [mpState.gravityFlipPending]);
 
   // Apply incoming disruptions from multiplayer to local physics
   useEffect(() => {
@@ -334,6 +391,9 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
         accentColor={getLevelTheme(levelDef.id).accentColor}
         levelName={levelDef.name}
       />
+
+      {/* Gravity Flip cinematic overlay */}
+      {showGravityFlip && <GravityFlipCinematic onDone={() => setShowGravityFlip(false)} />}
 
       {/* Game canvas — flex-1 */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>

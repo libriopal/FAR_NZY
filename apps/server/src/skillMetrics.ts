@@ -20,6 +20,12 @@ export interface SessionAnalytics {
   final_score: number;
   avg_chain_score: number;
   skill_score?: number;
+  // Compliance fields — required for disputed-payout reconstruction
+  payout_amount?: number;       // actual FD/PDX paid to this player at session end
+  rtp_actual?: number;          // realized RTP: payout_amount / (stake + ante_total)
+  ante_total?: number;          // sum of all antes this player paid this session
+  final_pot?: number;           // total pot at session end (all stakes + all antes)
+  fee_removed_reason?: string;  // e.g. 'VS_CASINO_PLATFORM_FEE_REMOVED_v2' — audit trail
 }
 
 export interface ChainDecision {

@@ -68,9 +68,9 @@
 
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
-import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier, HEIST_CONSTANTS } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyTrickMeter, resolveComboBreaker, TRICK_EARN_THRESHOLD, MAX_TOKENS } from '@match3d/farkle-engine';
-import { insertChainDecision, insertSession } from './analytics.js';
+import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier, HEIST_CONSTANTS, ANTE_SCHEDULES } from '@match3d/farkle-shared';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyEventHorizon, resolveComboBreaker, EVENT_HORIZON_EARN_THRESHOLD, MAX_TOKENS, applyGravityFlip } from '@match3d/farkle-engine';
+import { insertChainDecision, insertSession, insertWalletTransaction } from './analytics.js';
 import { nanoid } from 'nanoid';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -159,9 +159,13 @@ export class GameRoom {
   private lastActionAt: Map<string, number> = new Map(); // rate-limit: INPUT_LOCK_MS between submissions
   private readonly INPUT_LOCK_MS = 100;  // 100ms minimum between SUBMIT_CHAIN messages
   // pipeline.ts mechanics (per-player, keyed by playerId):
-  private playerTokens: Map<string, number> = new Map();       // Combo Breaker token balance (0–MAX_TOKENS)
-  private playerTrickStreaks: Map<string, number> = new Map();  // consecutive banks since last farkle
+  private playerTokens: Map<string, number> = new Map();              // Combo Breaker token balance (0–MAX_TOKENS)
+  private playerEventHorizonStreaks: Map<string, number> = new Map(); // consecutive banks since last farkle
   private vaultTotal: number = 0;  // HEIST mode: 70% of all banks accumulate here (display-only this pass)
+  private rallyPot: number = 0;    // RALLY mode: running total of all banks; split evenly at session end
+  private bankCycleCount: number = 0;  // total banks across all players; every 5 triggers Gravity Flip
+  private antesPaidByPlayer: Map<string, number> = new Map(); // playerId → cumulative ante paid this session
+  private anteTotalCollected: number = 0; // sum of all antes from all players this session
 
   // ── constructor ─────────────────────────────────────────────────────────────
   // Called once when CREATE_ROOM arrives. Grid is seeded and hash committed here
@@ -315,8 +319,34 @@ export class GameRoom {
         this.nextTurn();
         break;
       case 'START_GAME':
-        this.handleStartGame(playerId);
+        void this.handleStartGame(playerId);
         break;
+      case 'PAY_ANTE': {
+        // Validate the ante stage against the mode's schedule before accepting payment.
+        const stage = msg.stage as string;
+        const schedule = ANTE_SCHEDULES[this.gameMode as import('@match3d/farkle-shared').GameMode];
+        const stageCfg = schedule?.stages.find(s => s.stage === stage);
+        if (!stageCfg) {
+          this.send(player.ws, { type: 'ERROR', message: `Unknown ante stage: ${stage}` });
+          return;
+        }
+        const anteAmount = Math.round(this.settings.stakeAmount * stageCfg.amountMultiplier);
+        const prev = this.antesPaidByPlayer.get(playerId) ?? 0;
+        this.antesPaidByPlayer.set(playerId, prev + anteAmount);
+        this.anteTotalCollected += anteAmount;
+        // Wallet debit — fire-and-forget compliance write
+        insertWalletTransaction({
+          player_id: playerId,
+          session_id: this.sessionId,
+          type: this.settings.currencyMode === 'PDX' ? 'PDX_ANTE' : 'FD_ANTE',
+          currency: this.settings.currencyMode,
+          amount: -anteAmount,
+          balance_after: 0, // caller must supply real balance; 0 = untracked in-game
+          ante_stage: stage,
+        });
+        this.broadcast({ type: 'ANTE_PAID', playerId, stage, amount: anteAmount });
+        break;
+      }
       case 'DISRUPT': {
         const disruptType = msg.disruptType as string;
         const targetColumns = msg.targetColumns as number[];
@@ -378,7 +408,7 @@ export class GameRoom {
   //   3. resolveComboBreaker — absorb farkle with token if available (pipeline.ts)
   //   4. On real farkle: reset streak, broadcast FARKLE_ANIM, nextTurn after 800ms
   //   5. On score:
-  //      a. applyTrickMeter(rawScore, streak, ladderMult) → MAX(trick, ladder)
+  //      a. applyEventHorizon(rawScore, streak, ladderMult) → MAX(eventHorizon, ladder)
   //      b. multiplierStep advances on 6-chain; resets on <6
   //      c. Auto-bank on chain<6: earn token if gain≥500, increment streak
   //      d. Heist vault split: 70% of gain tracked separately
@@ -412,7 +442,7 @@ export class GameRoom {
     // streak resets; unbanked is lost to farklePool; phase set to FARKLE_ANIM for 800ms.
     // Auditor: was_optimal=false always on farkle (by definition it was the wrong choice).
     if (effectiveFarkle) {
-      this.playerTrickStreaks.set(playerId, 0);  // reset streak — score momentum broken
+      this.playerEventHorizonStreaks.set(playerId, 0);  // reset streak — score momentum broken
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
       this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
@@ -438,8 +468,8 @@ export class GameRoom {
     // trickMult  = streak tier: COLD 1.0× / WARM 1.25× / HOT 1.5× / FRENZY 2.0×.
     // Final multiplier = MAX(ladderMult, trickMult) — NEVER a product, prevents runaway.
     const ladderMult = getMultiplier(this.state.multiplierStep);
-    const trickStreak = this.playerTrickStreaks.get(playerId) ?? 0;
-    const scaled = applyTrickMeter(result.score, trickStreak, ladderMult);
+    const eventHorizonStreak = this.playerEventHorizonStreaks.get(playerId) ?? 0;
+    const scaled = applyEventHorizon(result.score, eventHorizonStreak, ladderMult);
 
     // Step 5b: Update unbanked + advance multiplierStep.
     // multiplierStep advances ONLY on full 6-chain; any shorter chain resets it to 0.
@@ -480,16 +510,25 @@ export class GameRoom {
       this.state.banked += gain;
       this.state.unbanked = 0;
       this.banksTaken++;
+      this.bankCycleCount++;
       if (activePlayer) activePlayer.profile.banked += gain;
+      // Rally cooperative pot — every bank contributes to shared pool
+      const isRally = this.gameMode === 'RALLY_FREE' || this.gameMode === 'RALLY_CASINO';
+      if (isRally) this.rallyPot += gain;
       // Vault split (display-only; heist-button deferred)
       const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
       if (isHeist) this.vaultTotal += Math.round(gain * HEIST_CONSTANTS.VAULT_SPLIT);
       // Trick meter streak + token earn
-      const prevStreak = this.playerTrickStreaks.get(playerId) ?? 0;
-      this.playerTrickStreaks.set(playerId, prevStreak + 1);
-      if (gain >= TRICK_EARN_THRESHOLD) {
+      const prevStreak = this.playerEventHorizonStreaks.get(playerId) ?? 0;
+      this.playerEventHorizonStreaks.set(playerId, prevStreak + 1);
+      if (gain >= EVENT_HORIZON_EARN_THRESHOLD) {
         const cur = this.playerTokens.get(playerId) ?? 0;
         if (cur < MAX_TOKENS) this.playerTokens.set(playerId, cur + 1);
+      }
+      // Gravity Flip — every 5 total banks, flip the board: rows reverse + faces invert (7-face)
+      if (this.bankCycleCount % 5 === 0) {
+        this.state.grid = applyGravityFlip(this.state.grid);
+        this.broadcast({ type: 'GRAVITY_FLIP', bankCycle: this.bankCycleCount });
       }
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
@@ -509,7 +548,7 @@ export class GameRoom {
     this.gameMode = mode;
   }
 
-  private handleStartGame(_fromPlayerId: string) {
+  private async handleStartGame(_fromPlayerId: string) {
     // LOW #12: non-solo modes require at least 2 players
     const isSolo = this.gameMode === 'SOLO_FREE' || this.gameMode === 'SOLO_CASINO';
     if (!isSolo && this.players.size < 2) return;
@@ -519,8 +558,14 @@ export class GameRoom {
     for (const [pid] of this.players) {
       roles[pid] = this.roleMap.get(pid) ?? null;
       this.playerTokens.set(pid, 1);
-      this.playerTrickStreaks.set(pid, 0);
+      this.playerEventHorizonStreaks.set(pid, 0);
     }
+
+    // FAIRNESS: broadcast commitment hash BEFORE GAME_STARTED so clients capture it.
+    // Players retain committedHash and compare against serverSeed revealed at SESSION_END.
+    const hash = await this.committedHash;
+    this.broadcast({ type: 'FAIRNESS_COMMITMENT', committedHash: hash });
+
     this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles });
     this.startEnergyTick(); // MEDIUM #8: start energy on game start, not construction
     this.startTurnTimer();  // CRITICAL #2: start turn timer on game start, not addPlayer
@@ -566,15 +611,24 @@ export class GameRoom {
       const gain = this.state.unbanked;
       this.state.banked += gain;
       this.state.unbanked = 0;
+      this.banksTaken++;
+      this.bankCycleCount++;
       // Update per-player score (#1, #6)
       if (activePlayer) activePlayer.profile.banked += gain;
+      const isRally = this.gameMode === 'RALLY_FREE' || this.gameMode === 'RALLY_CASINO';
+      if (isRally) this.rallyPot += gain;
       const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
       if (isHeist) this.vaultTotal += Math.round(gain * HEIST_CONSTANTS.VAULT_SPLIT);
-      const prevStreak = this.playerTrickStreaks.get(playerId) ?? 0;
-      this.playerTrickStreaks.set(playerId, prevStreak + 1);
-      if (gain >= TRICK_EARN_THRESHOLD) {
+      const prevStreak = this.playerEventHorizonStreaks.get(playerId) ?? 0;
+      this.playerEventHorizonStreaks.set(playerId, prevStreak + 1);
+      if (gain >= EVENT_HORIZON_EARN_THRESHOLD) {
         const cur = this.playerTokens.get(playerId) ?? 0;
         if (cur < MAX_TOKENS) this.playerTokens.set(playerId, cur + 1);
+      }
+      // Gravity Flip — every 5 total banks
+      if (this.bankCycleCount % 5 === 0) {
+        this.state.grid = applyGravityFlip(this.state.grid);
+        this.broadcast({ type: 'GRAVITY_FLIP', bankCycle: this.bankCycleCount });
       }
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
@@ -652,47 +706,74 @@ export class GameRoom {
     const committedHash = await this.committedHash;
 
     const isCasino = this.gameMode.endsWith('_CASINO');
-    let payout = 0;
-    let winnerId: string | null = null;
+    // netRTP: actual player payout rate after house margin (platformFee removed — margin is
+    // expressed as grossRTP - netRTP; see rtpConfig.ts audit header for full documentation).
+    const cfg = RTP_CONFIGS[this.gameMode as keyof typeof RTP_CONFIGS];
+    const netRTP = cfg?.netRTP ?? 0.92;
+    const playerCount = this.players.size;
 
-    // targetRTP from rtpConfig.ts — 0.92 for most modes, 1.00 for VS (before platform fee)
-    const rtpFactor = RTP_CONFIGS[this.gameMode as keyof typeof RTP_CONFIGS]?.targetRTP ?? 0.92;
+    // Per-player payout map — populated by mode-specific logic below
+    const payouts = new Map<string, number>(); // playerId → payout amount
+    let winnerId: string | null = null;
+    const finalPot = this.settings.stakeAmount * playerCount + this.anteTotalCollected;
 
     if (this.gameMode === 'VS_CASINO') {
-      // Winner-take-most: highest profile.banked player wins entire pot × targetRTP
-      const totalPot = this.settings.stakeAmount * this.players.size;
+      // Zero-sum: highest profile.banked player wins the pot × netRTP.
+      // No platformFee — margin is netRTP already encoding the house cut.
+      const totalPot = this.settings.stakeAmount * playerCount + this.anteTotalCollected;
       let topScore = -1;
       for (const [pid, p] of this.players) {
         if (p.profile.banked > topScore) { topScore = p.profile.banked; winnerId = pid; }
       }
-      payout = Math.round(totalPot * rtpFactor);
+      if (winnerId) payouts.set(winnerId, Math.round(totalPot * netRTP));
+
     } else if (this.gameMode === 'SOLO_CASINO') {
-      // Proportional: score-to-goal ratio determines fraction of stakeAmount returned
+      // Proportional: score-to-goal ratio × stake × netRTP
       const player = this.players.get(triggeringPlayerId);
       const banked = player?.profile.banked ?? this.state.banked;
-      payout = Math.round((banked / this.settings.levelWinScore) * this.settings.stakeAmount * rtpFactor);
+      const stakeWithAnte = this.settings.stakeAmount + (this.antesPaidByPlayer.get(triggeringPlayerId) ?? 0);
+      payouts.set(triggeringPlayerId, Math.round((banked / this.settings.levelWinScore) * stakeWithAnte * netRTP));
       winnerId = triggeringPlayerId;
-    } else if (this.gameMode === 'RALLY_CASINO' || this.gameMode === 'HEIST_CASINO') {
-      // Same as VS_CASINO: highest-scorer takes pot. Milestone side-payouts already fired.
-      const totalPot = this.settings.stakeAmount * this.players.size;
+
+    } else if (this.gameMode === 'RALLY_CASINO') {
+      // COOPERATIVE: shared rallyPot is split EVENLY. No winner/loser.
+      // Spec: "No player may steal, betray, or redirect the pot in Rally mode."
+      const totalPot = this.settings.stakeAmount * playerCount + this.anteTotalCollected;
+      const payoutPerPlayer = Math.round(totalPot * netRTP / playerCount);
+      for (const [pid] of this.players) {
+        payouts.set(pid, payoutPerPlayer);
+      }
+
+    } else if (this.gameMode === 'HEIST_CASINO') {
+      // Vault-augmented: vault adds to pot; highest-scorer takes the combined pot × netRTP
+      const totalPot = this.settings.stakeAmount * playerCount + this.anteTotalCollected;
       let topScore = -1;
       for (const [pid, p] of this.players) {
         if (p.profile.banked > topScore) { topScore = p.profile.banked; winnerId = pid; }
       }
-      payout = Math.round(totalPot * rtpFactor);
+      if (winnerId) payouts.set(winnerId, Math.round(totalPot * netRTP));
     }
 
-    // Broadcast result: seed reveal is included for client-side fairness verification.
-    // Client should display a "Verify Fairness" UI using committedHash vs sha256(serverSeed).
+    // Determine primary payout for SESSION_END broadcast (winner for VS/Heist; first player for Rally)
+    const primaryPayout = winnerId ? (payouts.get(winnerId) ?? 0) : (payouts.values().next().value ?? 0);
+
+    // Broadcast result: seed reveal included for client-side fairness verification.
     this.broadcast({
       type: 'SESSION_END',
       winnerId,
-      payout: isCasino ? payout : 0,
-      serverSeed,      // ← players can verify sha256(this) === committedHash
-      committedHash,   // ← was computed before first roll; proves seed was fixed
+      payout: isCasino ? primaryPayout : 0,
+      payouts: isCasino ? Object.fromEntries(payouts) : {},
+      serverSeed,    // ← players verify sha256(this) === committedHash
+      committedHash, // ← committed before first roll; proves seed was fixed
     });
 
+    // Compliance analytics write — casino modes only
     const finalBanked = this.state.banked;
+    const playerAnte = this.antesPaidByPlayer.get(triggeringPlayerId) ?? 0;
+    const effectiveStake = this.settings.stakeAmount + playerAnte;
+    const playerPayout = payouts.get(triggeringPlayerId) ?? 0;
+    const rtpActual = effectiveStake > 0 ? playerPayout / effectiveStake : 0;
+
     void insertSession({
       id: this.sessionId,
       player_id: triggeringPlayerId,
@@ -708,7 +789,42 @@ export class GameRoom {
       final_banked: finalBanked,
       final_score: finalBanked,
       avg_chain_score: this.scoringChains > 0 ? finalBanked / this.scoringChains : 0,
+      payout_amount: playerPayout,
+      rtp_actual: rtpActual,
+      ante_total: playerAnte,
+      final_pot: finalPot,
+      fee_removed_reason: isCasino ? 'VS_CASINO_PLATFORM_FEE_REMOVED_v2' : undefined,
     });
+
+    // Wallet award transactions — fire-and-forget compliance writes
+    if (isCasino && playerPayout > 0) {
+      insertWalletTransaction({
+        player_id: triggeringPlayerId,
+        session_id: this.sessionId,
+        type: this.settings.currencyMode === 'PDX' ? 'PDX_AWARD' : 'FD_AWARD',
+        currency: this.settings.currencyMode,
+        amount: playerPayout,
+        balance_after: 0, // caller supplies real balance; 0 = in-game untracked
+        notes: `${this.gameMode} session payout (netRTP=${netRTP})`,
+      });
+    }
+    // For Rally, write awards to every player
+    if (this.gameMode === 'RALLY_CASINO') {
+      for (const [pid, amt] of payouts) {
+        if (pid === triggeringPlayerId) continue; // already written above
+        if (amt > 0) {
+          insertWalletTransaction({
+            player_id: pid,
+            session_id: this.sessionId,
+            type: this.settings.currencyMode === 'PDX' ? 'PDX_AWARD' : 'FD_AWARD',
+            currency: this.settings.currencyMode,
+            amount: amt,
+            balance_after: 0,
+            notes: `RALLY_CASINO cooperative split (netRTP=${netRTP})`,
+          });
+        }
+      }
+    }
   }
 
   private getPublicState() {
@@ -725,7 +841,7 @@ export class GameRoom {
         ...p.profile,
         energy: p.energy,
         tokens: this.playerTokens.get(p.profile.id) ?? 0,
-        trickStreak: this.playerTrickStreaks.get(p.profile.id) ?? 0,
+        eventHorizonStreak: this.playerEventHorizonStreaks.get(p.profile.id) ?? 0,
       })),
     };
   }
