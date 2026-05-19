@@ -4,7 +4,7 @@
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { getAnalyserNode, setMusicState } from '../audio/gameAudio.js';
 import type { EmotionalState } from '../audio/gameAudio.js';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
@@ -14,6 +14,8 @@ import { LEVELS } from '../data/levels.js';
 import { getLevelTheme } from '../data/levelThemes.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
+import { FACET_MAP, SHARD_MAP, BEAT_MARKERS, PERFECT_ZONE } from '@match3d/farkle-engine';
+import type { FacetId, ShardId } from '@match3d/farkle-engine';
 
 // ── Palette helpers ───────────────────────────────────────────────────────────
 
@@ -78,6 +80,10 @@ const _GLOBAL_STYLES = `
   }
   @keyframes void-veil-in  { from { opacity: 0; } to { opacity: 1; } }
   @keyframes void-veil-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes beat-perfect { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(1.6); } }
+  @keyframes beat-good    { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  @keyframes draft-slide-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes shard-pulse { 0%,100% { box-shadow:0 0 8px rgba(255,114,0,0.6); } 50% { box-shadow:0 0 18px rgba(255,114,0,0.9); } }
 `;
 
 // CRT scanline + vignette overlay (reusable)
@@ -784,13 +790,21 @@ function HiddenPocket() {
 }
 
 // ── Beat Window ───────────────────────────────────────────────────────────────
+// Module-level beat phase — sampled by getCurrentBeatAccuracy() on chain commit.
+let _currentBeatPhase = 0;
 
-const BEAT_MARKERS = 8;
+export function getCurrentBeatAccuracy(windowFactor = 1.0): 'PERFECT' | 'GOOD' | 'MISS' {
+  const dist = Math.abs(_currentBeatPhase - PERFECT_ZONE);
+  if (dist === 0) return 'PERFECT';
+  if (dist <= Math.max(1, Math.round(windowFactor * 1.5))) return 'GOOD';
+  return 'MISS';
+}
 
 function BeatWindow() {
   const mode = useFarkleStore(s => s.mode);
   const energy = useFarkleStore(s => s.energy);
   const [beatPhase, setBeatPhase] = useState(0);
+  const [lastAccuracy, setLastAccuracy] = useState<'PERFECT' | 'GOOD' | null>(null);
 
   // Beat tempo tied to energy level
   const bpm = 60 + (energy / MAX_ENERGY) * 120; // 60–180 BPM
@@ -798,7 +812,11 @@ function BeatWindow() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setBeatPhase(p => (p + 1) % BEAT_MARKERS);
+      setBeatPhase(p => {
+        const next = (p + 1) % BEAT_MARKERS;
+        _currentBeatPhase = next;  // keep module-level ref in sync
+        return next;
+      });
     }, beatMs);
     return () => clearInterval(interval);
   }, [beatMs]);
@@ -808,7 +826,7 @@ function BeatWindow() {
     mode === 'PRIME'  ? GH.magenta :
     GH.gold;
 
-  const perfectZone = Math.floor(BEAT_MARKERS / 2); // center marker is "perfect"
+  const perfectZone = PERFECT_ZONE;
 
   return (
     <div style={{
@@ -1578,6 +1596,180 @@ function HorrorHeartbeat() {
 
 const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
 
+// ── DraftPanel — Roguelike facet picker (Feature I) ───────────────────────────
+// Shown after each bank. Player picks one of 3 facets or skips.
+// Auto-dismisses after 10s with no action (retains current facet).
+
+function DraftPanel({
+  options, tier, onPick, onSkip,
+}: {
+  options: FacetId[];
+  tier: 1 | 2;
+  onPick: (id: FacetId) => void;
+  onSkip: () => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState(10);
+  useEffect(() => {
+    const t = setInterval(() => setTimeLeft(s => {
+      if (s <= 1) { onSkip(); return 0; }
+      return s - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [onSkip]);
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 160, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 50, pointerEvents: 'auto',
+      animation: 'draft-slide-in 0.25s ease',
+    }}>
+      <div style={{
+        background: GH.panelBg, border: `1px solid ${GH.goldGlow}`,
+        borderRadius: 8, padding: '10px 12px', minWidth: 260, position: 'relative',
+      }}>
+        <GhCorners />
+        <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.gold, letterSpacing: 3, marginBottom: 8, textAlign: 'center' }}>
+          ✦ FACET DRAFT {tier === 2 ? '· TIER II' : ''} · {timeLeft}s ✦
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {options.map(id => {
+            const def = FACET_MAP.get(id);
+            if (!def) return null;
+            return (
+              <button
+                key={id}
+                onClick={() => onPick(id)}
+                style={{
+                  flex: 1, background: GH.crystalFace,
+                  border: `1px solid ${GH.crystalBorder}`,
+                  borderRadius: 6, padding: '8px 6px',
+                  cursor: 'pointer', textAlign: 'center',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = `rgba(0,229,255,0.15)`; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = GH.crystalFace; }}
+              >
+                <div style={{ fontSize: 8, fontFamily: 'monospace', color: GH.cyanBright, letterSpacing: 1, marginBottom: 3 }}>
+                  {def.name}
+                </div>
+                <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.boneDim, lineHeight: 1.3 }}>
+                  {tier === 2 ? def.t2description : def.description}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={onSkip}
+          style={{
+            marginTop: 7, width: '100%', background: 'transparent',
+            border: `1px solid ${GH.goldDim}`, borderRadius: 4,
+            color: GH.boneDim, fontSize: 7, fontFamily: 'monospace',
+            cursor: 'pointer', padding: '4px 0', letterSpacing: 1,
+          }}
+        >
+          KEEP CURRENT
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── RuleShardChip — Abstract shard holder/activator (Feature G) ───────────────
+// Shown in the bottom-right corner when a shard is held or active.
+
+function RuleShardChip({
+  held, active, expiresAt, onActivate,
+}: {
+  held: ShardId | null;
+  active: ShardId | null;
+  expiresAt: number | null;
+  onActivate: () => void;
+}) {
+  const [msLeft, setMsLeft] = useState(0);
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => setMsLeft(Math.max(0, expiresAt - Date.now()));
+    tick();
+    const t = setInterval(tick, 200);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+
+  if (!held && !active) return null;
+  const id = active ?? held;
+  const def = id ? SHARD_MAP.get(id) : null;
+  if (!def) return null;
+
+  const isHeld   = !!held && !active;
+  const secsLeft = Math.ceil(msLeft / 1000);
+
+  return (
+    <div
+      onClick={isHeld ? onActivate : undefined}
+      style={{
+        position: 'absolute', bottom: 200, right: 8,
+        background: GH.panelBg,
+        border: `1px solid ${isHeld ? GH.amberHot : GH.cyan}`,
+        borderRadius: 6, padding: '6px 10px', cursor: isHeld ? 'pointer' : 'default',
+        pointerEvents: 'auto', zIndex: 30, minWidth: 90, textAlign: 'center',
+        animation: isHeld ? 'shard-pulse 1.4s ease-in-out infinite' : 'none',
+        boxShadow: isHeld ? `0 0 10px ${GH.amberGlow}` : `0 0 6px ${GH.cyanGlow}`,
+      }}
+    >
+      <div style={{ fontSize: 7, fontFamily: 'monospace', letterSpacing: 2, color: isHeld ? GH.amberHot : GH.cyan }}>
+        {isHeld ? '▲ SHARD' : '◈ ACTIVE'}
+      </div>
+      <div style={{ fontSize: 9, fontFamily: 'monospace', color: GH.bone, marginTop: 2 }}>
+        {def.name}
+      </div>
+      {active && expiresAt && (
+        <div style={{ fontSize: 7, fontFamily: 'monospace', color: GH.boneDim, marginTop: 1 }}>
+          {secsLeft}s
+        </div>
+      )}
+      {isHeld && (
+        <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.boneDim, marginTop: 2, lineHeight: 1.3 }}>
+          {def.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SlipstreamIndicator — Racing position badge (Feature A) ──────────────────
+// VS and Heist only. Shows player rank and window multiplier.
+
+function SlipstreamIndicator({
+  position, totalPlayers, windowFactor,
+}: {
+  position: number | null;
+  totalPlayers: number;
+  windowFactor: number | null;
+}) {
+  if (position === null || windowFactor === null || totalPlayers <= 1) return null;
+
+  const isLeader  = position === 1;
+  const isTrailer = position === totalPlayers;
+  const color = isLeader ? GH.gold : isTrailer ? GH.cyan : GH.magenta;
+  const label = isLeader ? '▲ LEAD' : isTrailer ? '▼ SLIP' : `P${position}`;
+
+  return (
+    <div style={{
+      position: 'absolute', top: 56, right: 8,
+      background: GH.panelBg, border: `1px solid ${color}44`,
+      borderRadius: 4, padding: '3px 7px',
+      pointerEvents: 'none', zIndex: 20,
+    }}>
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color, letterSpacing: 1 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.boneDim, letterSpacing: 0 }}>
+        ×{windowFactor.toFixed(2)} WIN
+      </div>
+    </div>
+  );
+}
+
 interface FarkleHUDProps {
   onBank: () => void;
   onBack: () => void;
@@ -1590,6 +1782,18 @@ interface FarkleHUDProps {
   onRallyPass?: () => void;
   onRallyContinue?: () => void;
   gameMode?: GameMode;
+  // H/A/I/G — genre props
+  draftOptions?: FacetId[];
+  draftTier?: 1 | 2;
+  onPickFacet?: (id: FacetId) => void;
+  onSkipDraft?: () => void;
+  shardHeld?: ShardId | null;
+  shardActive?: ShardId | null;
+  shardExpiresAt?: number | null;
+  onActivateShard?: () => void;
+  slipstreamPosition?: number | null;
+  slipstreamTotalPlayers?: number;
+  slipstreamWindowFactor?: number | null;
 }
 
 export function FarkleHUD({
@@ -1597,12 +1801,17 @@ export function FarkleHUD({
   onInitiateHeist, onBlockHeist,
   onRallyBank, onRallyPass, onRallyContinue,
   gameMode,
+  draftOptions, draftTier, onPickFacet, onSkipDraft,
+  shardHeld, shardActive, shardExpiresAt, onActivateShard,
+  slipstreamPosition, slipstreamTotalPlayers, slipstreamWindowFactor,
 }: FarkleHUDProps) {
   const [diceClass, setDiceClass] = useState<DiceClass>('rogue');
   const showDisruptions = onDisrupt && gameMode && DISRUPTION_MODES.has(gameMode);
   const isHeist = gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isRally = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';
   const hasTimer = useFarkleStore(s => s.timeRemaining !== null);
+  const showDraft = (draftOptions?.length ?? 0) > 0 && onPickFacet && onSkipDraft;
+  const showShard = (shardHeld != null || shardActive != null) && onActivateShard;
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -1636,6 +1845,31 @@ export function FarkleHUD({
       )}
       {isRally && onRallyBank && onRallyPass && onRallyContinue && (
         <RallyDecisionPanel onRallyBank={onRallyBank} onRallyPass={onRallyPass} onRallyContinue={onRallyContinue} />
+      )}
+
+      {/* ── Genre overlays (H/A/I/G) ── */}
+      {slipstreamPosition != null && (
+        <SlipstreamIndicator
+          position={slipstreamPosition}
+          totalPlayers={slipstreamTotalPlayers ?? 2}
+          windowFactor={slipstreamWindowFactor ?? null}
+        />
+      )}
+      {showShard && (
+        <RuleShardChip
+          held={shardHeld ?? null}
+          active={shardActive ?? null}
+          expiresAt={shardExpiresAt ?? null}
+          onActivate={onActivateShard!}
+        />
+      )}
+      {showDraft && (
+        <DraftPanel
+          options={draftOptions!}
+          tier={draftTier ?? 1}
+          onPick={onPickFacet!}
+          onSkip={onSkipDraft!}
+        />
       )}
 
       {/* ── Transient effects ── */}

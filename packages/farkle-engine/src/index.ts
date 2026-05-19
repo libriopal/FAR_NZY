@@ -23,3 +23,7 @@ export * from './floodFill.js';
 export * from './skillMetrics.js';
 export * from './avatar.js';
 export * from './pipeline.js';
+export * from './rhythm.js';
+export * from './slipstream.js';
+export * from './facets.js';
+export * from './shards.js';

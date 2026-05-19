@@ -11,7 +11,8 @@ import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { mpActions } from '../store/multiplayerStore.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
-import { FarkleHUD, BeatWindow, VoidResonanceLayer } from './FarkleHUD.js';
+import { FarkleHUD, BeatWindow, VoidResonanceLayer, getCurrentBeatAccuracy } from './FarkleHUD.js';
+import type { FacetId } from '@match3d/farkle-engine';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
 import type { AudioSettings } from './SettingsModal.js';
@@ -327,6 +328,13 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     else blockHeist();
   }, [isMultiplayer, blockHeist]);
 
+  // Genre wrappers (H/A/I/G) — multiplayer only; solo mode is visual-only
+  const handlePickFacet = useCallback((id: FacetId) => mpActions.pickFacet(id), []);
+  const handleSkipDraft  = useCallback(() => mpActions.skipDraft(),              []);
+  const handleActivateShard = useCallback(() => {
+    if (mpState.myShardHeld) mpActions.activateShard(mpState.myShardHeld);
+  }, [mpState.myShardHeld]);
+
   // Only route away on win/lose AFTER physics has initialized and startGame() was called.
   // gameStartedRef prevents stale 'lose'/'win' from a previous session from firing immediately.
   useEffect(() => {
@@ -515,6 +523,23 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isDisruptionMode ? { onDisrupt: handleDisrupt } : {})}
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
           {...(isHeistMode ? { onInitiateHeist: handleInitiateHeist, onBlockHeist: handleBlockHeist } : {})}
+          {...(isMultiplayer && mpState.myDraft ? {
+            draftOptions: mpState.myDraft.options,
+            draftTier: mpState.myDraft.tier,
+            onPickFacet: handlePickFacet,
+            onSkipDraft: handleSkipDraft,
+          } : {})}
+          {...(isMultiplayer ? {
+            shardHeld: mpState.myShardHeld,
+            shardActive: mpState.myShardActive,
+            shardExpiresAt: mpState.myShardExpiresAt,
+            onActivateShard: handleActivateShard,
+          } : {})}
+          {...(isMultiplayer && mpState.mySlipstream ? {
+            slipstreamPosition: mpState.mySlipstream.position,
+            slipstreamTotalPlayers: mpState.mySlipstream.totalPlayers,
+            slipstreamWindowFactor: mpState.mySlipstream.windowFactor,
+          } : {})}
         />
 
         <VoidResonanceLayer />

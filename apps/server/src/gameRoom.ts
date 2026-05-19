@@ -69,7 +69,8 @@
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
 import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier, HEIST_CONSTANTS, ANTE_SCHEDULES } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyEventHorizon, resolveComboBreaker, EVENT_HORIZON_EARN_THRESHOLD, MAX_TOKENS, applyGravityFlip } from '@match3d/farkle-engine';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyEventHorizon, resolveComboBreaker, EVENT_HORIZON_EARN_THRESHOLD, MAX_TOKENS, applyGravityFlip, seededRng, applyFlowMultiplier, tickRhythmAccuracy, INITIAL_RHYTHM_STATE, computeSlipstream, applyFacetToScore, startFacetDraft, pickFacet as _pickFacet, skipFacetDraft, tickFacetRound, INITIAL_FACET_STATE, applyActiveRuleShard, activateShard, tickShard, tryEarnShard, INITIAL_SHARD_STATE } from '@match3d/farkle-engine';
+import type { BeatAccuracy, RhythmState, SlipstreamState, FacetState, FacetId, FacetContext, RuleShardState, ShardId, ShardContext } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession, insertWalletTransaction } from './analytics.js';
 import { nanoid } from 'nanoid';
 
@@ -362,6 +363,33 @@ export class GameRoom {
       case 'BLOCK_HEIST':
         this.handleBlockHeist(playerId);
         break;
+      case 'PICK_FACET': {
+        const facetId = msg.facetId as FacetId;
+        const cur = this.playerFacets.get(playerId);
+        if (cur?.draftPending) {
+          const next = _pickFacet(cur, facetId);
+          this.playerFacets.set(playerId, next);
+          this.broadcast({ type: 'FACET_PICKED', playerId, facetId, tier: next.tier });
+        }
+        break;
+      }
+      case 'SKIP_DRAFT': {
+        const cur = this.playerFacets.get(playerId);
+        if (cur?.draftPending) {
+          this.playerFacets.set(playerId, skipFacetDraft(cur));
+        }
+        break;
+      }
+      case 'ACTIVATE_SHARD': {
+        const cur = this.playerShards.get(playerId);
+        const id = (msg.shardId as ShardId | undefined) ?? cur?.held;
+        if (id && cur) {
+          const next = activateShard(cur, id);
+          this.playerShards.set(playerId, next);
+          this.broadcast({ type: 'SHARD_ACTIVATED', playerId, shardId: id, expiresAt: next.expiresAt });
+        }
+        break;
+      }
       case 'LEAVE_ROOM':
         this.removePlayer(playerId);
         break;
@@ -380,6 +408,14 @@ export class GameRoom {
       }
     }
   }
+
+  // ── H/A/I/G Genre state (per-player) ──────────────────────────────────────
+  private playerRhythm: Map<string, RhythmState> = new Map();
+  private playerFacets: Map<string, FacetState> = new Map();
+  private playerShards: Map<string, RuleShardState> = new Map();
+  private playerSlipstream: Map<string, SlipstreamState> = new Map();
+  private turnCount = 0;  // recompute slipstream every 2 turns
+  private _genreRng: () => number = seededRng(Date.now() ^ 0xfa4c1e);
 
   private rallyVotes: Map<string, 'bank' | 'pass' | 'continue'> = new Map();
 
@@ -547,7 +583,39 @@ export class GameRoom {
     // Final multiplier = MAX(ladderMult, trickMult) — NEVER a product, prevents runaway.
     const ladderMult = getMultiplier(this.state.multiplierStep);
     const eventHorizonStreak = this.playerEventHorizonStreaks.get(playerId) ?? 0;
-    const scaled = applyEventHorizon(result.score, eventHorizonStreak, ladderMult);
+    let scaled = applyEventHorizon(result.score, eventHorizonStreak, ladderMult);
+
+    // ── L4 Genre wrappers (applied in fixed order, post-Event-Horizon) ────────
+    // I: Facet modifier
+    const facetState = this.playerFacets.get(playerId) ?? { ...INITIAL_FACET_STATE };
+    const facetCtx: FacetContext = {
+      banked: this.players.get(playerId)?.profile.banked ?? 0,
+      isFrenzy: (this.players.get(playerId)?.energy ?? 0) >= 150,
+      chainLength: chain.length,
+      faces: faces as number[],
+      consecutiveBanks: eventHorizonStreak,
+    };
+    scaled = applyFacetToScore(scaled, facetState, facetCtx);
+
+    // G: Rule Shard (tick expiry first, then apply)
+    const shardStatePre = this.playerShards.get(playerId) ?? { ...INITIAL_SHARD_STATE };
+    const shardState = tickShard(shardStatePre);
+    if (shardState !== shardStatePre) this.playerShards.set(playerId, shardState);
+    const shardCtx: ShardContext = {
+      isFrenzy: facetCtx.isFrenzy,
+      consecutiveBanks: eventHorizonStreak,
+      chainLength: chain.length,
+    };
+    scaled = applyActiveRuleShard(scaled, shardState, shardCtx);
+
+    // H: Flow multiplier (Rhythm) — capped by slipstream
+    const beatAcc = (msg as { beatAccuracy?: BeatAccuracy }).beatAccuracy ?? 'MISS';
+    const rhythmState = this.playerRhythm.get(playerId) ?? { ...INITIAL_RHYTHM_STATE };
+    const slipState = this.playerSlipstream.get(playerId);
+    const flowCap = slipState?.flowCap ?? 2.0;
+    const newRhythm = tickRhythmAccuracy(rhythmState, beatAcc, flowCap);
+    this.playerRhythm.set(playerId, newRhythm);
+    scaled = applyFlowMultiplier(scaled, newRhythm, flowCap);
 
     // Step 5b: Update unbanked + advance multiplierStep.
     // multiplierStep advances ONLY on full 6-chain; any shorter chain resets it to 0.
@@ -608,6 +676,27 @@ export class GameRoom {
         this.state.grid = applyGravityFlip(this.state.grid);
         this.broadcast({ type: 'GRAVITY_FLIP', bankCycle: this.bankCycleCount });
       }
+      // G: Try to earn a Rule Shard on this bank
+      const shardCur = this.playerShards.get(playerId) ?? { ...INITIAL_SHARD_STATE };
+      const earnRng = this._genreRng() / 0xffffffff;
+      const earnedShard = tryEarnShard(gain, earnRng, shardCur.held);
+      if (earnedShard) {
+        const withShard = { ...shardCur, held: earnedShard };
+        this.playerShards.set(playerId, withShard);
+        this.broadcast({ type: 'SHARD_EARNED', playerId, shardId: earnedShard });
+      }
+
+      // I: Tick facet round and start a new draft
+      const facetCur = this.playerFacets.get(playerId) ?? { ...INITIAL_FACET_STATE };
+      const facetAfterTick = tickFacetRound(facetCur, false);
+      const draftSeed = this._genreRng();
+      const facetWithDraft = startFacetDraft(facetAfterTick, draftSeed);
+      this.playerFacets.set(playerId, facetWithDraft);
+      this.send(
+        this.players.get(playerId)!.ws,
+        { type: 'DRAFT_START', options: facetWithDraft.draftOptions, tier: facetWithDraft.tier, roundsActive: facetWithDraft.roundsActive },
+      );
+
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
       if (playerBanked >= this.settings.levelWinScore) {
@@ -637,7 +726,14 @@ export class GameRoom {
       roles[pid] = this.roleMap.get(pid) ?? null;
       this.playerTokens.set(pid, 1);
       this.playerEventHorizonStreaks.set(pid, 0);
+      this.playerRhythm.set(pid, { ...INITIAL_RHYTHM_STATE });
+      this.playerFacets.set(pid, { ...INITIAL_FACET_STATE });
+      this.playerShards.set(pid, { ...INITIAL_SHARD_STATE });
     }
+    // Seed the genre RNG from the committed hash (deterministic per session)
+    const hashPrefix = parseInt(this.csprng.getSeed().slice(0, 8), 36) || Date.now();
+    this._genreRng = seededRng(hashPrefix);
+    this._recomputeSlipstream();
 
     // FAIRNESS: broadcast commitment hash BEFORE GAME_STARTED so clients capture it.
     // Players retain committedHash and compare against serverSeed revealed at SESSION_END.
@@ -708,6 +804,23 @@ export class GameRoom {
         this.state.grid = applyGravityFlip(this.state.grid);
         this.broadcast({ type: 'GRAVITY_FLIP', bankCycle: this.bankCycleCount });
       }
+      // G: Shard earn on explicit bank
+      const shardCurB = this.playerShards.get(playerId) ?? { ...INITIAL_SHARD_STATE };
+      const earnRngB = this._genreRng() / 0xffffffff;
+      const earnedShardB = tryEarnShard(gain, earnRngB, shardCurB.held);
+      if (earnedShardB) {
+        this.playerShards.set(playerId, { ...shardCurB, held: earnedShardB });
+        this.broadcast({ type: 'SHARD_EARNED', playerId, shardId: earnedShardB });
+      }
+      // I: Facet draft trigger
+      const facetCurB = this.playerFacets.get(playerId) ?? { ...INITIAL_FACET_STATE };
+      const facetAfterTickB = tickFacetRound(facetCurB, false);
+      const draftSeedB = this._genreRng();
+      const facetWithDraftB = startFacetDraft(facetAfterTickB, draftSeedB);
+      this.playerFacets.set(playerId, facetWithDraftB);
+      const ws = this.players.get(playerId)?.ws;
+      if (ws) this.send(ws, { type: 'DRAFT_START', options: facetWithDraftB.draftOptions, tier: facetWithDraftB.tier, roundsActive: facetWithDraftB.roundsActive });
+
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
       if (playerBanked >= this.settings.levelWinScore) {
@@ -727,8 +840,29 @@ export class GameRoom {
     const ids = [...this.players.keys()];
     const idx = ids.indexOf(this.activePlayerId ?? '');
     this.activePlayerId = ids[(idx + 1) % ids.length] ?? null;
+    this.turnCount++;
+    // A: Recompute slipstream every 2 turns (spec: §6.3)
+    if (this.turnCount % 2 === 0) this._recomputeSlipstream();
     this.broadcast({ type: 'TURN_CHANGE', activePlayerId: this.activePlayerId });
     this.startTurnTimer();
+  }
+
+  private _recomputeSlipstream() {
+    const isVS    = this.gameMode === 'VS_FREE'    || this.gameMode === 'VS_CASINO';
+    const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
+    if (!isVS && !isHeist) return;
+    // Rank players by profile.banked descending (highest = pos 1 = leader)
+    const ranked = [...this.players.entries()]
+      .sort((a, b) => b[1].profile.banked - a[1].profile.banked)
+      .map(([id]) => id);
+    const total = ranked.length;
+    const slipMap: Record<string, SlipstreamState> = {};
+    ranked.forEach((pid, i) => {
+      const state = computeSlipstream(i + 1, total);
+      this.playerSlipstream.set(pid, state);
+      slipMap[pid] = state;
+    });
+    this.broadcast({ type: 'SLIPSTREAM_UPDATE', slipstream: slipMap });
   }
 
   // C13: Rally Casino milestone payouts
@@ -915,12 +1049,28 @@ export class GameRoom {
       multiplierStep: this.state.multiplierStep,
       activePlayerId: this.activePlayerId,
       vault: this.vaultTotal,
-      players: [...this.players.values()].map(p => ({
-        ...p.profile,
-        energy: p.energy,
-        tokens: this.playerTokens.get(p.profile.id) ?? 0,
-        eventHorizonStreak: this.playerEventHorizonStreaks.get(p.profile.id) ?? 0,
-      })),
+      players: [...this.players.values()].map(p => {
+        const pid = p.profile.id;
+        const shard = this.playerShards.get(pid) ?? INITIAL_SHARD_STATE;
+        const facet = this.playerFacets.get(pid) ?? INITIAL_FACET_STATE;
+        const rhythm = this.playerRhythm.get(pid) ?? INITIAL_RHYTHM_STATE;
+        const slip = this.playerSlipstream.get(pid);
+        return {
+          ...p.profile,
+          energy: p.energy,
+          tokens: this.playerTokens.get(pid) ?? 0,
+          eventHorizonStreak: this.playerEventHorizonStreaks.get(pid) ?? 0,
+          // Genre state (H/A/I/G)
+          flowMultiplier: rhythm.flowMultiplier,
+          slipstreamPosition: slip?.position ?? null,
+          slipstreamWindowFactor: slip?.windowFactor ?? null,
+          facetId: facet.equipped,
+          facetTier: facet.tier,
+          shardHeld: shard.held,
+          shardActive: shard.active,
+          shardExpiresAt: shard.expiresAt,
+        };
+      }),
     };
   }
 
