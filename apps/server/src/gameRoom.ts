@@ -161,7 +161,10 @@ export class GameRoom {
   // pipeline.ts mechanics (per-player, keyed by playerId):
   private playerTokens: Map<string, number> = new Map();              // Combo Breaker token balance (0–MAX_TOKENS)
   private playerEventHorizonStreaks: Map<string, number> = new Map(); // consecutive banks since last farkle
-  private vaultTotal: number = 0;  // HEIST mode: 70% of all banks accumulate here (display-only this pass)
+  private vaultTotal: number = 0;       // HEIST: running vault accumulation
+  private heistInitiatorId: string | null = null;   // playerId currently running a heist, or null
+  private heistExpiresAt: number | null = null;      // epoch ms when the block window closes
+  private heistTimer: ReturnType<typeof setTimeout> | null = null; // fires _resolveHeist on expiry
   private rallyPot: number = 0;    // RALLY mode: running total of all banks; split evenly at session end
   private bankCycleCount: number = 0;  // total banks across all players; every 5 triggers Gravity Flip
   private antesPaidByPlayer: Map<string, number> = new Map(); // playerId → cumulative ante paid this session
@@ -353,6 +356,12 @@ export class GameRoom {
         this.handleDisrupt(playerId, disruptType, targetColumns);
         break;
       }
+      case 'INITIATE_HEIST':
+        this.handleInitiateHeist(playerId);
+        break;
+      case 'BLOCK_HEIST':
+        this.handleBlockHeist(playerId);
+        break;
       case 'LEAVE_ROOM':
         this.removePlayer(playerId);
         break;
@@ -397,6 +406,75 @@ export class GameRoom {
     if (decision === 'bank') this.handleBank(this.activePlayerId ?? '');
     else if (decision === 'pass') this.nextTurn();
     else this.startTurnTimer(); // continue: keep current player, restart turn timer
+  }
+
+  // ── Heist Vault Cycle ────────────────────────────────────────────────────────
+  // INITIATE_HEIST: any player may attempt a heist once vault ≥ VAULT_THRESHOLD.
+  //   Server starts a HEIST_WINDOW_MS (5 s) block window and broadcasts
+  //   HEIST_ATTEMPT so every client can show the countdown.
+  //   If the window expires unblocked, _resolveHeist() credits vault to initiator.
+  //
+  // BLOCK_HEIST: any other player sends BLOCK_HEIST within the window.
+  //   Server cancels the timer, broadcasts HEIST_BLOCKED, vault stays intact.
+  //
+  // RTP note: vault accumulates 70% of every bank (HEIST_CONSTANTS.VAULT_SPLIT).
+  //   On a successful heist the vault amount is credited to the initiator's
+  //   profile.banked and vaultTotal resets to 0. The house margin is already
+  //   expressed via netRTP in endSession — vault redistribution does not alter
+  //   the session-level RTP calculation.
+
+  private handleInitiateHeist(playerId: string) {
+    const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
+    if (!isHeist) return;
+    if (this.heistInitiatorId !== null) return;                         // already in progress
+    if (this.vaultTotal < HEIST_CONSTANTS.VAULT_THRESHOLD) return;     // vault not full enough
+    if (this.state.phase === 'GAME_OVER') return;
+
+    const expiresAt = Date.now() + HEIST_CONSTANTS.HEIST_WINDOW_MS;
+    this.heistInitiatorId = playerId;
+    this.heistExpiresAt = expiresAt;
+
+    this.broadcast({ type: 'HEIST_ATTEMPT', initiatorId: playerId, expiresAt, vaultAmount: this.vaultTotal });
+
+    this.heistTimer = setTimeout(() => {
+      this._resolveHeist();
+    }, HEIST_CONSTANTS.HEIST_WINDOW_MS);
+  }
+
+  private handleBlockHeist(playerId: string) {
+    if (!this.heistInitiatorId || playerId === this.heistInitiatorId) return;
+    if (this.heistTimer) { clearTimeout(this.heistTimer); this.heistTimer = null; }
+    const vaultAmount = this.vaultTotal;
+    this.heistInitiatorId = null;
+    this.heistExpiresAt = null;
+    this.broadcast({ type: 'HEIST_BLOCKED', blockerId: playerId, vaultAmount });
+  }
+
+  private _resolveHeist() {
+    const initiatorId = this.heistInitiatorId;
+    if (!initiatorId) return;
+    if (this.heistTimer) { clearTimeout(this.heistTimer); this.heistTimer = null; }
+
+    const vaultAmount = this.vaultTotal;
+    this.vaultTotal = 0;
+    this.heistInitiatorId = null;
+    this.heistExpiresAt = null;
+
+    // Credit vault to initiator's banked score
+    const initiator = this.players.get(initiatorId);
+    if (initiator) {
+      initiator.profile.banked += vaultAmount;
+      this.state.banked += vaultAmount;
+    }
+
+    this.broadcast({ type: 'HEIST_SUCCESS', initiatorId, vaultAmount });
+    this.broadcast({ type: 'ROOM_STATE', state: this.getPublicState() });
+
+    // Check win condition after vault claim
+    const playerBanked = initiator?.profile.banked ?? 0;
+    if (playerBanked >= this.settings.levelWinScore) {
+      void this.endSession(initiatorId);
+    }
   }
 
   // ── processChain ─────────────────────────────────────────────────────────────

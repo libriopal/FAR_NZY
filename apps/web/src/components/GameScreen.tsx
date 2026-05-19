@@ -9,6 +9,7 @@ import { useGameStore } from '../store/gameStore.js';
 import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
+import { mpActions } from '../store/multiplayerStore.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
 import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
 import { SettingsModal } from './SettingsModal.js';
@@ -166,6 +167,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   useGameAudio(audioSettings);
   const { state: mpState, sendDisruption, sendRallyVote, sendRallyDecisionStart } = useMultiplayer();
   const isMultiplayer = !!mpState.roomCode;
+  const isHeistMode = gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
     || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isRallyMode = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';
@@ -243,6 +245,27 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     if (mpState.gravityFlipPending) setShowGravityFlip(true);
   }, [mpState.gravityFlipPending]);
 
+  // Sync server-authoritative vault total into farkleStore so HeistPanel stays accurate
+  useEffect(() => {
+    if (isMultiplayer && isHeistMode) {
+      useFarkleStore.setState({ vaultPts: mpState.vault });
+    }
+  }, [mpState.vault, isMultiplayer, isHeistMode]);
+
+  // Apply server heist state into farkleStore (so HeistPanel countdown works correctly)
+  useEffect(() => {
+    const msg = mpState.lastMessage;
+    if (!msg || !isHeistMode) return;
+    if (msg.type === 'HEIST_ATTEMPT') {
+      useFarkleStore.getState().setHeistActive(msg.initiatorId as string, msg.expiresAt as number);
+    } else if (msg.type === 'HEIST_BLOCKED') {
+      useFarkleStore.getState().cancelHeist();
+    } else if (msg.type === 'HEIST_SUCCESS') {
+      useFarkleStore.getState().cancelHeist();
+      // Vault reset — server ROOM_STATE will carry the updated banked/vault totals
+    }
+  }, [mpState.lastMessage, isHeistMode]);
+
   // Apply incoming disruptions from multiplayer to local physics
   useEffect(() => {
     const d = mpState.lastDisruption;
@@ -292,6 +315,17 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     if (isMultiplayer) sendRallyVote('continue');
     else rallyContinue();
   }, [isMultiplayer, rallyContinue, sendRallyVote]);
+
+  // Multiplayer heist wrappers — send to server in MP; apply locally in solo
+  const handleInitiateHeist = useCallback(() => {
+    if (isMultiplayer) mpActions.initiateHeist();
+    else initiateHeist();
+  }, [isMultiplayer, initiateHeist]);
+
+  const handleBlockHeist = useCallback(() => {
+    if (isMultiplayer) mpActions.blockHeist();
+    else blockHeist();
+  }, [isMultiplayer, blockHeist]);
 
   // Only route away on win/lose AFTER physics has initialized and startGame() was called.
   // gameStartedRef prevents stale 'lose'/'win' from a previous session from firing immediately.
@@ -480,7 +514,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(gameMode ? { gameMode } : {})}
           {...(isDisruptionMode ? { onDisrupt: handleDisrupt } : {})}
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
-          {...((gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') ? { onInitiateHeist: initiateHeist, onBlockHeist: blockHeist } : {})}
+          {...(isHeistMode ? { onInitiateHeist: handleInitiateHeist, onBlockHeist: handleBlockHeist } : {})}
         />
 
         {/* Level intro overlay — 3s immediate-understanding gate */}

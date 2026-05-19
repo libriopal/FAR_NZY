@@ -45,6 +45,9 @@ export interface MultiplayerStoreState {
   error: string | null;
   fairnessCommitment: string | null;  // SHA-256 hash received before first roll; verify at SESSION_END
   gravityFlipPending: boolean;        // true during the cinematic board-flip animation
+  heistActive: boolean;               // a heist block window is open
+  heistInitiatorId: string | null;
+  heistExpiresAt: number | null;
 }
 
 const INITIAL: MultiplayerStoreState = {
@@ -54,6 +57,7 @@ const INITIAL: MultiplayerStoreState = {
   lastMessage: null, lastDisruption: null,
   myRole: null, error: null,
   fairnessCommitment: null, gravityFlipPending: false,
+  heistActive: false, heistInitiatorId: null, heistExpiresAt: null,
 };
 
 export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...INITIAL }));
@@ -90,6 +94,11 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, fairnessCommitment: msg.committedHash as string };
       case 'GRAVITY_FLIP':
         return { ...next, gravityFlipPending: true };
+      case 'HEIST_ATTEMPT':
+        return { ...next, heistActive: true, heistInitiatorId: msg.initiatorId as string, heistExpiresAt: msg.expiresAt as number };
+      case 'HEIST_BLOCKED':
+      case 'HEIST_SUCCESS':
+        return { ...next, heistActive: false, heistInitiatorId: null, heistExpiresAt: null };
       case 'ERROR':
         return { ...next, error: msg.message as string };
       default:
@@ -146,4 +155,6 @@ export const mpActions = {
   payAnte(stage: string) {
     _send({ type: 'PAY_ANTE', stage });
   },
+  initiateHeist() { _send({ type: 'INITIATE_HEIST' }); },
+  blockHeist()    { _send({ type: 'BLOCK_HEIST' }); },
 };
