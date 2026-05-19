@@ -23,6 +23,33 @@ import { LEVELS, DEFAULT_LEVEL } from '../data/levels.js';
 import { getLevelTheme } from '../data/levelThemes.js';
 import type { DisruptionType } from '@match3d/farkle-shared';
 
+function ChapterBanner({ banked, winScore, accentColor, levelName }: { banked: number; winScore: number; accentColor: string; levelName: string }) {
+  const pct = banked / Math.max(1, winScore);
+  const chapter = pct < 0.33 ? 'THE CALL' : pct < 0.67 ? 'THE ORDEAL' : 'THE RETURN';
+  const erkForChapter = pct >= 0.67 ? 'euphoric' : pct >= 0.33 ? 'tense' : 'calm';
+  const prevChapter = useRef(chapter);
+  useEffect(() => {
+    if (chapter !== prevChapter.current) {
+      prevChapter.current = chapter;
+      setMusicState(erkForChapter as EmotionalState);
+    }
+  }, [chapter, erkForChapter]);
+  return (
+    <div style={{
+      height: 14, flexShrink: 0,
+      background: 'rgba(5,0,18,0.88)',
+      borderBottom: `1px solid ${accentColor}44`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 10px', position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${pct * 100}%`, background: `linear-gradient(90deg, ${accentColor}22, ${accentColor}44)`, transition: 'width 0.5s ease' }} />
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: accentColor, letterSpacing: 2, zIndex: 1, textShadow: `0 0 6px ${accentColor}` }}>{chapter}</div>
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: 'rgba(232,213,163,0.4)', letterSpacing: 1, zIndex: 1 }}>{levelName}</div>
+      <div style={{ fontSize: 7, fontFamily: 'monospace', color: 'rgba(232,213,163,0.4)', letterSpacing: 1, zIndex: 1 }}>{Math.round(pct * 100)}%</div>
+    </div>
+  );
+}
+
 class GameErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null };
   static getDerivedStateFromError(e: Error) { return { error: e.message ?? String(e) }; }
@@ -70,6 +97,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const gamePhase = useFarkleStore(s => s.gamePhase);
+  const solobanked = useFarkleStore(s => s.banked);
   const physicsRef = useRef<VoxelPhysicsSystem | null>(null);
   const gameStartedRef = useRef(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -298,6 +326,14 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           <button onClick={() => setSettingsOpen(true)} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#9881;</button>
         </div>
       </div>
+
+      {/* Chapter progress banner — 14px */}
+      <ChapterBanner
+        banked={isMultiplayer ? mpState.banked : solobanked}
+        winScore={levelDef.winScore}
+        accentColor={getLevelTheme(levelDef.id).accentColor}
+        levelName={levelDef.name}
+      />
 
       {/* Game canvas — flex-1 */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>

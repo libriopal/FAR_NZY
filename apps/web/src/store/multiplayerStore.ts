@@ -26,6 +26,8 @@ export interface MultiplayerPlayer {
   isActive: boolean;
   isConnected: boolean;
   role?: RallyRole | null;
+  tokens?: number;
+  trickStreak?: number;
 }
 
 export interface MultiplayerStoreState {
@@ -36,6 +38,7 @@ export interface MultiplayerStoreState {
   activePlayerId: string | null;
   banked: number;
   unbanked: number;
+  vault: number;
   lastMessage: { type: string; [k: string]: unknown } | null;
   lastDisruption: DisruptionEvent | null;
   myRole: RallyRole | null;
@@ -45,7 +48,7 @@ export interface MultiplayerStoreState {
 const INITIAL: MultiplayerStoreState = {
   status: 'idle', roomCode: null, playerId: null,
   players: [], activePlayerId: null,
-  banked: 0, unbanked: 0,
+  banked: 0, unbanked: 0, vault: 0,
   lastMessage: null, lastDisruption: null,
   myRole: null, error: null,
 };
@@ -65,8 +68,8 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
       case 'ROOM_JOINED':
         return { ...next, status: 'lobby' as const, roomCode: msg.roomCode as string, playerId: msg.playerId as string };
       case 'ROOM_STATE': {
-        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number };
-        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked };
+        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number; vault?: number };
+        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, vault: rs.vault ?? prev.vault };
       }
       case 'GAME_STARTED': {
         const roleMap = ((msg.roles ?? {}) as Record<string, RallyRole>);

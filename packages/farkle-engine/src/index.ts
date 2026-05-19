@@ -22,3 +22,4 @@ export * from './rtpConfig.js';
 export * from './floodFill.js';
 export * from './skillMetrics.js';
 export * from './avatar.js';
+export * from './pipeline.js';

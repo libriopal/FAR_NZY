@@ -11,8 +11,8 @@
 
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
-import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS } from '@match3d/farkle-engine';
+import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier, HEIST_CONSTANTS } from '@match3d/farkle-shared';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyTrickMeter, resolveComboBreaker, TRICK_EARN_THRESHOLD, MAX_TOKENS } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
 
@@ -86,6 +86,9 @@ export class GameRoom {
   private banksTaken = 0;
   private lastActionAt: Map<string, number> = new Map();
   private readonly INPUT_LOCK_MS = 100;
+  private playerTokens: Map<string, number> = new Map();
+  private playerTrickStreaks: Map<string, number> = new Map();
+  private vaultTotal: number = 0;
 
   constructor(settings: LobbySettings) {
     this.id = nanoid(8).toUpperCase();
@@ -281,7 +284,18 @@ export class GameRoom {
     const result = scoreFarkle(faces as import('@match3d/farkle-shared').DieFace[]);
     this.totalChains++;
 
-    if (result.isFarkle) {
+    const cbTokens = this.playerTokens.get(playerId) ?? 0;
+    const { isFarkle: effectiveFarkle, tokenConsumed } = resolveComboBreaker(result.isFarkle, cbTokens);
+    if (tokenConsumed) {
+      this.playerTokens.set(playerId, cbTokens - 1);
+      this.broadcast({ type: 'COMBO_BREAKER_FIRED', playerId, tokensRemaining: cbTokens - 1 });
+      this.broadcast({ type: 'CHAIN_RESULT', result: { ...result, isFarkle: false, score: 0 }, unbanked: this.state.unbanked, banked: this.state.banked });
+      this.startTurnTimer();
+      return;
+    }
+
+    if (effectiveFarkle) {
+      this.playerTrickStreaks.set(playerId, 0);
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
       this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
@@ -297,8 +311,9 @@ export class GameRoom {
     }
     this.scoringChains++;
 
-    const multiplier = getMultiplier(this.state.multiplierStep);
-    const scaled = Math.round(result.score * multiplier);
+    const ladderMult = getMultiplier(this.state.multiplierStep);
+    const trickStreak = this.playerTrickStreaks.get(playerId) ?? 0;
+    const scaled = applyTrickMeter(result.score, trickStreak, ladderMult);
     this.state = {
       ...this.state,
       unbanked: this.state.unbanked + scaled,
@@ -329,6 +344,16 @@ export class GameRoom {
       this.state.unbanked = 0;
       this.banksTaken++;
       if (activePlayer) activePlayer.profile.banked += gain;
+      // Vault split (display-only; heist-button deferred)
+      const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
+      if (isHeist) this.vaultTotal += Math.round(gain * HEIST_CONSTANTS.VAULT_SPLIT);
+      // Trick meter streak + token earn
+      const prevStreak = this.playerTrickStreaks.get(playerId) ?? 0;
+      this.playerTrickStreaks.set(playerId, prevStreak + 1);
+      if (gain >= TRICK_EARN_THRESHOLD) {
+        const cur = this.playerTokens.get(playerId) ?? 0;
+        if (cur < MAX_TOKENS) this.playerTokens.set(playerId, cur + 1);
+      }
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
       if (playerBanked >= this.settings.levelWinScore) {
@@ -356,6 +381,8 @@ export class GameRoom {
     const roles: Record<string, string | null> = {};
     for (const [pid] of this.players) {
       roles[pid] = this.roleMap.get(pid) ?? null;
+      this.playerTokens.set(pid, 1);
+      this.playerTrickStreaks.set(pid, 0);
     }
     this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles });
     this.startEnergyTick(); // MEDIUM #8: start energy on game start, not construction
@@ -404,6 +431,14 @@ export class GameRoom {
       this.state.unbanked = 0;
       // Update per-player score (#1, #6)
       if (activePlayer) activePlayer.profile.banked += gain;
+      const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
+      if (isHeist) this.vaultTotal += Math.round(gain * HEIST_CONSTANTS.VAULT_SPLIT);
+      const prevStreak = this.playerTrickStreaks.get(playerId) ?? 0;
+      this.playerTrickStreaks.set(playerId, prevStreak + 1);
+      if (gain >= TRICK_EARN_THRESHOLD) {
+        const cur = this.playerTokens.get(playerId) ?? 0;
+        if (cur < MAX_TOKENS) this.playerTokens.set(playerId, cur + 1);
+      }
       const playerBanked = activePlayer?.profile.banked ?? this.state.banked;
       this.checkMilestones(playerId, playerBanked);
       if (playerBanked >= this.settings.levelWinScore) {
@@ -519,7 +554,13 @@ export class GameRoom {
       unbanked: this.state.unbanked,
       multiplierStep: this.state.multiplierStep,
       activePlayerId: this.activePlayerId,
-      players: [...this.players.values()].map(p => ({ ...p.profile, energy: p.energy })),
+      vault: this.vaultTotal,
+      players: [...this.players.values()].map(p => ({
+        ...p.profile,
+        energy: p.energy,
+        tokens: this.playerTokens.get(p.profile.id) ?? 0,
+        trickStreak: this.playerTrickStreaks.get(p.profile.id) ?? 0,
+      })),
     };
   }
 

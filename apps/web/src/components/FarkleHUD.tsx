@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────────────
 
 import React, { useEffect, useRef, useState } from 'react';
-import { getAnalyserNode } from '../audio/gameAudio.js';
+import { getAnalyserNode, setMusicState } from '../audio/gameAudio.js';
+import type { EmotionalState } from '../audio/gameAudio.js';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
 import { useGameStore } from '../store/gameStore.js';
@@ -1491,6 +1492,45 @@ function ShardFaucetPanel() {
   );
 }
 
+// ── Horror Heartbeat — atmospheric vignette + ERK tense on farkle ────────────
+
+function HorrorHeartbeat() {
+  const farkleCount = useFarkleStore(s => s.farkleCount);
+  const chainScore = useFarkleStore(s => s.chainScore);
+  const chainFaces = useFarkleStore(s => s.chainFaces);
+  const prevFarkle = useRef(0);
+  const [farkleFlash, setFarkleFlash] = useState(false);
+  const tensionMode = chainFaces.length >= 2 && chainScore === 0;
+
+  useEffect(() => {
+    if (farkleCount > prevFarkle.current) {
+      prevFarkle.current = farkleCount;
+      setFarkleFlash(true);
+      setMusicState('tense' as EmotionalState);
+      const t = setTimeout(() => setFarkleFlash(false), 1200);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [farkleCount]);
+
+  if (!tensionMode && !farkleFlash) return null;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+      boxShadow: farkleFlash
+        ? 'inset 0 0 60px rgba(239,68,68,0.5), inset 0 0 120px rgba(239,68,68,0.25)'
+        : 'inset 0 0 40px rgba(239,68,68,0.2)',
+      animation: farkleFlash ? 'horrorPulse 1.2s ease-out forwards' : 'horrorIdle 1.5s ease-in-out infinite',
+    }}>
+      <style>{`
+        @keyframes horrorPulse { 0% { opacity: 1; } 40% { opacity: 0.8; } 100% { opacity: 0; } }
+        @keyframes horrorIdle { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+      `}</style>
+    </div>
+  );
+}
+
 // ── Main HUD ──────────────────────────────────────────────────────────────────
 
 const DISRUPTION_MODES = new Set<GameMode>(['VS_FREE', 'VS_CASINO', 'HEIST_FREE', 'HEIST_CASINO']);
@@ -1556,6 +1596,7 @@ export function FarkleHUD({
       )}
 
       {/* ── Transient effects ── */}
+      <HorrorHeartbeat />
       <FrenzyInstabilityWarning />
       <FarkleFlash />
       <ModePulse />
