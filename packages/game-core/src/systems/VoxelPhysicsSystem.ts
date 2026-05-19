@@ -9,11 +9,17 @@ const GROUND_Y = 0;
 const SPAWN_Y = 14;
 const MAX_STACK_Y = 9.5;
 const SETTLED_SPEED = 0.8;
+// Body is considered at rest when speed is below this — skip constraint to allow sleep
+const SLEEP_SPEED = 0.12;
 const OVERFLOW_GRACE_MS = 4000;
 const DIE_HALF = 0.46;
 const SPHERE_RADIUS = 0.43;
 const LOCK_MAX_HP = 3;
 const STONE_HP = 3;
+// Max bodies per column — reduced from 6 to keep board readable
+const MAX_COL_BODIES = 4;
+// Height above which a column is considered full for fill purposes
+const FILL_HEIGHT_CAP = 4.5;
 // Ghost drift: gentle horizontal force toward lowest-height column each step
 const GHOST_DRIFT_FORCE = 0.8;
 
@@ -155,8 +161,8 @@ export class VoxelPhysicsSystem {
 
     const bodyDesc = R.RigidBodyDesc.dynamic()
       .setTranslation(spawnX, SPAWN_Y, 0)
-      .setLinearDamping(entityType === 'ghost' ? 0.15 : 0.4)
-      .setAngularDamping(entityType === 'ghost' ? 0.5 : 2.0)
+      .setLinearDamping(entityType === 'ghost' ? 0.2 : 1.2)
+      .setAngularDamping(entityType === 'ghost' ? 0.8 : 8.0)
       .setCcdEnabled(true);
 
     const body = this.world.createRigidBody(bodyDesc);
@@ -539,7 +545,7 @@ export class VoxelPhysicsSystem {
       }
     }, 1000 / 30);
 
-    this.spawnInterval = setInterval(() => this._fillColumns(), 300);
+    this.spawnInterval = setInterval(() => this._fillColumns(), 800);
   }
 
   stopSimulation(): void {
@@ -600,15 +606,21 @@ export class VoxelPhysicsSystem {
 
   private _applyColumnConstraint(): void {
     for (const [, data] of this.bodies) {
-      if (data.isGhost) continue; // ghost skips constraint
+      if (data.isGhost) continue;
       const body = this.world.getRigidBody(data.handle);
       if (!body || !body.isDynamic()) continue;
-      const t = body.translation();
       const v = body.linvel();
+      const av = body.angvel();
+      const speed = Math.abs(v.x) + Math.abs(v.y) + Math.abs(v.z);
+      const spin = Math.abs(av.x) + Math.abs(av.y) + Math.abs(av.z);
+      // Skip settled bodies — let Rapier sleep them naturally
+      if (speed < SLEEP_SPEED && spin < SLEEP_SPEED) continue;
+      const t = body.translation();
       const targetX = COLUMN_X[data.column] ?? 0;
       body.setTranslation({ x: targetX, y: t.y, z: 0 }, false);
       body.setLinvel({ x: 0, y: v.y, z: 0 }, false);
-      body.setAngvel({ x: 0, y: 0, z: v.z * 0.3 }, false);
+      // Kill spin almost entirely once the body is nearly still
+      body.setAngvel({ x: 0, y: 0, z: av.z * 0.05 }, false);
     }
   }
 
@@ -665,8 +677,8 @@ export class VoxelPhysicsSystem {
     }
 
     for (let col = 0; col < 7; col++) {
-      if ((colCounts[col] ?? 0) >= 6) continue;
-      if ((settledHeights[col] ?? 0) >= 5) continue;
+      if ((colCounts[col] ?? 0) >= MAX_COL_BODIES) continue;
+      if ((settledHeights[col] ?? 0) >= FILL_HEIGHT_CAP) continue;
       this.spawnBody(col, this._rollEntityType());
     }
   }

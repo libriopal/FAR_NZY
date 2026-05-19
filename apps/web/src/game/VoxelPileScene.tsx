@@ -130,16 +130,21 @@ const TAPPABLE = new Set(['sphere', 'bomb', 'rainbow_bomb', 'multiplier_orb', 'g
 
 interface BodyKinematic { y: number; vy: number; }
 
+// Min gap between collision sounds — prevents audio spam with many bodies in flight
+const COLLISION_AUDIO_THROTTLE_MS = 120;
+
 function PhysicsImpactListener() {
   const bodies    = useFarkleStore(s => s.bodies);
   const gamePhase = useFarkleStore(s => s.gamePhase);
   const kinematics = useRef<Map<string, BodyKinematic>>(new Map());
+  const lastImpactAt = useRef(0);
 
   useFrame((_, delta) => {
     if (gamePhase !== 'playing' || delta <= 0) return;
 
     const map = kinematics.current;
     const activeIds = new Set<string>();
+    const now = Date.now();
 
     for (const body of bodies) {
       activeIds.add(body.id);
@@ -150,17 +155,18 @@ function PhysicsImpactListener() {
         const currVy = (currY - prev.y) / delta;
         const prevVy = prev.vy;
 
-        // Detect impact: body was falling at >= 1.2 m/s and suddenly decelerated
-        // (velocity change of >= 0.8 upward, meaning it hit something and slowed/bounced)
-        if (prevVy < -1.2 && currVy > prevVy + 0.8) {
-          const deltaV   = currVy - prevVy;   // always positive here
-          const magnitude = Math.min(1, deltaV / 14); // normalize: 14 m/s² → full impact
-          playCollisionImpact(magnitude);
+        // Detect impact: body was falling at >= 1.5 m/s and suddenly decelerated
+        if (prevVy < -1.5 && currVy > prevVy + 1.0) {
+          if (now - lastImpactAt.current >= COLLISION_AUDIO_THROTTLE_MS) {
+            const deltaV   = currVy - prevVy;
+            const magnitude = Math.min(1, deltaV / 14);
+            playCollisionImpact(magnitude);
+            lastImpactAt.current = now;
+          }
         }
 
         map.set(body.id, { y: currY, vy: currVy });
       } else {
-        // First frame this body is seen — seed it, don't fire yet
         map.set(body.id, { y: currY, vy: 0 });
       }
     }
