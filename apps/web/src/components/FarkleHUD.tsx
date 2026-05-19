@@ -64,6 +64,20 @@ const _GLOBAL_STYLES = `
     64%       { opacity: 0.78; }
     80%       { opacity: 1; }
   }
+  @keyframes void-resonant-pulse {
+    0%, 100% { opacity: 1;    filter: drop-shadow(0 0 6px #00e5ff); }
+    50%       { opacity: 0.65; filter: drop-shadow(0 0 14px #c9a84c); }
+  }
+  @keyframes void-ring-expand {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.9; }
+    100% { transform: translate(-50%, -50%) scale(1);  opacity: 0; }
+  }
+  @keyframes void-spark-rise {
+    0%   { transform: translateY(0)   scale(1);   opacity: 1; }
+    100% { transform: translateY(-80px) scale(0.3); opacity: 0; }
+  }
+  @keyframes void-veil-in  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes void-veil-out { from { opacity: 1; } to { opacity: 0; } }
 `;
 
 // CRT scanline + vignette overlay (reusable)
@@ -287,26 +301,28 @@ function TrickMeter() {
   const { energy, mode } = useFarkleStore(s => ({ energy: s.energy, mode: s.mode }));
   const pct = (energy / MAX_ENERGY) * 100;
   const primePct = (FRENZY_THRESHOLD / MAX_ENERGY) * 100;
+  const isResonant = energy >= MAX_ENERGY;
 
-  const barColor =
-    mode === 'FRENZY' ? `linear-gradient(90deg, ${GH.cyan}, ${GH.cyanBright}, ${GH.magenta})` :
-    mode === 'PRIME'  ? `linear-gradient(90deg, ${GH.magenta}, ${GH.purpleMid})` :
-    `linear-gradient(90deg, rgba(201,168,76,0.4), rgba(201,168,76,0.7))`;
+  const barColor = isResonant
+    ? `linear-gradient(90deg, ${GH.cyan}, ${GH.gold}, ${GH.cyanBright})`
+    : mode === 'FRENZY' ? `linear-gradient(90deg, ${GH.cyan}, ${GH.cyanBright}, ${GH.magenta})`
+    : mode === 'PRIME'  ? `linear-gradient(90deg, ${GH.magenta}, ${GH.purpleMid})`
+    : `linear-gradient(90deg, rgba(201,168,76,0.4), rgba(201,168,76,0.7))`;
 
-  const glowColor =
-    mode === 'FRENZY' ? GH.cyanGlow :
-    mode === 'PRIME'  ? GH.magentaGlow :
-    GH.goldDim;
+  const glowColor = isResonant ? 'rgba(0,229,255,0.8)'
+    : mode === 'FRENZY' ? GH.cyanGlow
+    : mode === 'PRIME'  ? GH.magentaGlow
+    : GH.goldDim;
 
-  const modeLabel =
-    mode === 'FRENZY' ? '⚡FRENZY' :
-    mode === 'PRIME'  ? '◈ PRIME' :
-    '— NORMAL';
+  const modeLabel = isResonant  ? '✦ RESONANT ✦'
+    : mode === 'FRENZY' ? '⚡FRENZY'
+    : mode === 'PRIME'  ? '◈ PRIME'
+    : '— NORMAL';
 
-  const labelColor =
-    mode === 'FRENZY' ? GH.cyan :
-    mode === 'PRIME'  ? GH.magenta :
-    GH.boneDim;
+  const labelColor = isResonant  ? GH.gold
+    : mode === 'FRENZY' ? GH.cyan
+    : mode === 'PRIME'  ? GH.magenta
+    : GH.boneDim;
 
   // 4 crystal nodes at 25%, 50%(prime), 75%, 100%
   const nodes = [25, primePct, 75, 100];
@@ -327,7 +343,9 @@ function TrickMeter() {
         color: labelColor, fontSize: 10, fontFamily: 'monospace', fontWeight: 700,
         minWidth: 62, letterSpacing: 1,
         textShadow: `0 0 8px ${labelColor}`,
-        animation: mode === 'FRENZY' ? 'gh-frenzy-flicker 3.5s ease-in-out infinite' : 'none',
+        animation: isResonant
+          ? 'void-resonant-pulse 1.2s ease-in-out infinite'
+          : mode === 'FRENZY' ? 'gh-frenzy-flicker 3.5s ease-in-out infinite' : 'none',
       }}>
         {modeLabel}
       </div>
@@ -375,6 +393,31 @@ function TrickMeter() {
           boxShadow: mode !== 'NORMAL' ? `0 0 4px ${GH.magentaGlow}` : 'none',
           zIndex: 1,
         }} />
+
+        {/* VOID RESONANCE sigil — 6-pointed lattice ring at the MAX node */}
+        {isResonant && (
+          <svg viewBox="0 0 32 32" width={20} height={20} style={{
+            position: 'absolute', top: '50%', right: -4,
+            transform: 'translateY(-50%)',
+            animation: 'void-resonant-pulse 1.2s ease-in-out infinite',
+            zIndex: 5, overflow: 'visible',
+          }}>
+            {/* Outer ring */}
+            <circle cx="16" cy="16" r="14" fill="none" stroke={GH.cyan} strokeWidth="1.2" opacity="0.9" />
+            {/* 6 spokes — gothic lattice */}
+            {[0,60,120,180,240,300].map(deg => {
+              const rad = (deg * Math.PI) / 180;
+              return <line key={deg}
+                x1={16 + 5 * Math.cos(rad)} y1={16 + 5 * Math.sin(rad)}
+                x2={16 + 14 * Math.cos(rad)} y2={16 + 14 * Math.sin(rad)}
+                stroke={deg % 120 === 0 ? GH.gold : GH.cyan} strokeWidth="1" opacity="0.85"
+              />;
+            })}
+            {/* Inner void circle */}
+            <circle cx="16" cy="16" r="4" fill="none" stroke={GH.gold} strokeWidth="1.2" opacity="0.8" />
+            <circle cx="16" cy="16" r="1.5" fill={GH.gold} opacity="0.9" />
+          </svg>
+        )}
       </div>
 
       {/* Energy readout */}
@@ -1607,3 +1650,104 @@ export function FarkleHUD({
 
 // ── Beat Window (exported for GameScreen layout) ──────────────────────────────
 export { BeatWindow };
+
+// ── Void Resonance Layer (Feature F) ─────────────────────────────────────────
+// Cosmetic-only overlay that activates when energy hits MAX (300).
+// Visual layers:
+//   1. Gothic lattice veil — semi-transparent cathedral geometry over the game canvas
+//   2. Discharge burst — 5 concentric expanding rings + 7 rising gold sparks
+//      Fires when energy naturally drops from MAX (FRENZY drain, ~200 ms after peak)
+// No Sacred Core files or game logic are touched — pure CSS/React presentation.
+
+const VOID_LATTICE_BG = `
+  repeating-linear-gradient(0deg,   transparent 0, transparent 39px, rgba(0,229,255,0.055) 40px),
+  repeating-linear-gradient(60deg,  transparent 0, transparent 39px, rgba(0,229,255,0.055) 40px),
+  repeating-linear-gradient(120deg, transparent 0, transparent 39px, rgba(0,229,255,0.055) 40px)
+`.trim();
+
+export function VoidResonanceLayer() {
+  const energy = useFarkleStore(s => s.energy);
+  const [isResonant, setIsResonant] = useState(false);
+  const [discharging, setDischarging] = useState(false);
+  const prevEnergyRef = useRef(energy);
+  const isResonantRef = useRef(false);
+
+  useEffect(() => {
+    const prev = prevEnergyRef.current;
+    prevEnergyRef.current = energy;
+
+    // Transition IN: energy reaches MAX
+    if (!isResonantRef.current && energy >= MAX_ENERGY) {
+      isResonantRef.current = true;
+      setIsResonant(true);
+    }
+
+    // Transition OUT: energy drops below MAX (natural FRENZY drain) → discharge
+    if (isResonantRef.current && prev >= MAX_ENERGY && energy < MAX_ENERGY) {
+      isResonantRef.current = false;
+      setIsResonant(false);
+      setDischarging(true);
+      setMusicState('euphoric');
+      const t = setTimeout(() => setDischarging(false), 700);
+      return () => clearTimeout(t);
+    }
+  }, [energy]);
+
+  if (!isResonant && !discharging) return null;
+
+  return (
+    <>
+      {/* Lattice Veil */}
+      {isResonant && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 8,
+          background: VOID_LATTICE_BG,
+          animation: 'void-veil-in 0.6s ease forwards',
+        }} />
+      )}
+      {!isResonant && discharging && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 8,
+          background: VOID_LATTICE_BG,
+          animation: 'void-veil-out 0.4s ease forwards',
+        }} />
+      )}
+
+      {/* Discharge burst — concentric rings */}
+      {discharging && [0, 40, 80, 130, 190].map((delayMs, i) => (
+        <div key={i} style={{
+          position: 'absolute', left: '50%', top: '45%',
+          width: `${60 + i * 25}vmin`, height: `${60 + i * 25}vmin`,
+          borderRadius: '50%',
+          border: `${i === 0 ? 2 : 1}px solid ${i % 2 === 0 ? GH.cyan : GH.gold}`,
+          boxShadow: `0 0 ${8 + i * 3}px ${i % 2 === 0 ? GH.cyanGlow : GH.goldGlow}`,
+          transform: 'translate(-50%, -50%) scale(0)',
+          pointerEvents: 'none', zIndex: 9,
+          animationName: 'void-ring-expand',
+          animationDuration: '550ms',
+          animationDelay: `${delayMs}ms`,
+          animationTimingFunction: 'cubic-bezier(0.2, 0, 0.8, 1)',
+          animationFillMode: 'forwards',
+        }} />
+      ))}
+
+      {/* Discharge burst — column sparks */}
+      {discharging && [8, 21, 34, 50, 66, 79, 92].map((leftPct, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          left: `${leftPct}%`,
+          bottom: '10%',
+          color: i % 2 === 0 ? GH.gold : GH.cyan,
+          fontSize: 10,
+          fontFamily: 'monospace',
+          pointerEvents: 'none', zIndex: 9,
+          animationName: 'void-spark-rise',
+          animationDuration: `${420 + i * 30}ms`,
+          animationDelay: `${i * 25}ms`,
+          animationTimingFunction: 'ease-out',
+          animationFillMode: 'forwards',
+        }}>◆</div>
+      ))}
+    </>
+  );
+}

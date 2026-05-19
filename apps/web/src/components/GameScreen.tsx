@@ -11,7 +11,7 @@ import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { mpActions } from '../store/multiplayerStore.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
-import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
+import { FarkleHUD, BeatWindow, VoidResonanceLayer } from './FarkleHUD.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
 import type { AudioSettings } from './SettingsModal.js';
@@ -516,6 +516,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
           {...(isHeistMode ? { onInitiateHeist: handleInitiateHeist, onBlockHeist: handleBlockHeist } : {})}
         />
+
+        <VoidResonanceLayer />
 
         {/* Level intro overlay — 3s immediate-understanding gate */}
         {showIntro && (() => {
