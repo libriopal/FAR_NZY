@@ -185,9 +185,9 @@ function PhysicsImpactListener() {
 function CameraRig() {
   const { camera } = useThree();
   useEffect(() => {
-    // Portrait fill: closer + tilted up to show full stack height
-    camera.position.set(0, 3.5, 8.5);
-    camera.lookAt(0, 5.5, 0);
+    // Close-up portrait view: z=5.5 fills screen with large readable dice
+    camera.position.set(0, 2.0, 5.5);
+    camera.lookAt(0, 5.0, 0);
   }, [camera]);
   return null;
 }
@@ -2063,7 +2063,7 @@ export function VoxelPileScene({ onChainStart, onChainExtend, onChainEnd, onEnti
   return (
     <Canvas
       style={{ width: '100%', height: '100%', background: '#0a1628', touchAction: 'none' }}
-      camera={{ fov: 72, near: 0.1, far: 100 }}
+      camera={{ fov: 90, near: 0.1, far: 100 }}
       gl={{ antialias: false, powerPreference: 'high-performance' }}
       dpr={Math.min(window.devicePixelRatio, 2)}
       flat
