@@ -4,7 +4,7 @@
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
 
-import React, { useEffect, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { useGameStore } from './store/gameStore.js';
 import { AgeGate } from './components/AgeGate.js';
 import { KYCGate } from './components/KYCGate.js';
@@ -128,37 +128,44 @@ export default function App() {
 }
 
 function SplashScreen() {
+  const DOT_FRAMES = ['.', '..', '...', '.', '..', '...'] as const;
+  const [dotIdx, setDotIdx] = useState(0);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.id = 'splash-kf';
+    style.textContent = '@keyframes loadBar{0%{background-position:100% 0}100%{background-position:0% 0}}';
+    if (!document.getElementById('splash-kf')) document.head.appendChild(style);
+    return () => document.getElementById('splash-kf')?.remove();
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setDotIdx(i => (i + 1) % 6), 300);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh',
-      background: '#050008',
-      backgroundImage: 'radial-gradient(ellipse at 50% 30%, rgba(201,168,76,0.06) 0%, transparent 60%)',
-      flexDirection: 'column', gap: 14,
+      height: '100vh', background: '#050008',
+      backgroundImage: 'radial-gradient(ellipse at 50% 30%, rgba(255,0,204,0.04) 0%, rgba(0,255,255,0.04) 100%)',
+      flexDirection: 'column', gap: 18,
     }}>
-      {/* Filigree */}
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-        {[3,5,8,5,3].map((s,i) => (
-          <div key={i} style={{
-            width: s, height: s,
-            background: i === 2 ? '#c9a84c' : 'rgba(201,168,76,0.25)',
-            transform: 'rotate(45deg)',
-            boxShadow: i === 2 ? '0 0 6px rgba(201,168,76,0.55)' : 'none',
-          }} />
-        ))}
+      <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: 5, fontFamily: '"Cinzel", Georgia, serif', display: 'flex', alignItems: 'center' }}>
+        <span style={{ color: '#ff00cc', textShadow: '0 0 28px rgba(255,0,204,0.8)' }}>MAGENTA DIE</span>
+        <span style={{ color: 'rgba(255,255,255,0.25)', margin: '0 10px' }}>&amp;</span>
+        <span style={{ color: '#00ffff', textShadow: '0 0 28px rgba(0,255,255,0.8)' }}>CYAN CODE</span>
       </div>
       <div style={{
-        fontSize: 20, fontWeight: 900, color: '#f0c860', letterSpacing: 4,
-        fontFamily: '"Cinzel", Georgia, serif',
-        textShadow: '0 0 20px rgba(201,168,76,0.55)',
-      }}>
-        FARKLE FRENZY
-      </div>
-      <div style={{
-        color: 'rgba(232,213,163,0.35)', fontSize: 10,
-        fontFamily: '"JetBrains Mono", monospace', letterSpacing: 3,
-      }}>
-        INITIALIZING…
+        fontSize: 12, fontFamily: '"JetBrains Mono", monospace', letterSpacing: 3,
+        background: 'linear-gradient(to left, #00ffff 50%, #ff00cc 50%)',
+        backgroundSize: '200% 100%',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        animation: 'loadBar 3s linear infinite',
+      } as React.CSSProperties}>
+        INITIALIZING{DOT_FRAMES[dotIdx]}
       </div>
     </div>
   );
