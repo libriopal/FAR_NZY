@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────
-// FARKLE FRENZY — SURFACE FILE
-// Organic Vegas 1.0 ThemeRegistry
-// Single source of truth for palette, shader uniforms, and timing.
+// FARKLE FRENZY + FAR_NZY — ThemeRegistry v2
+// Organic Vegas 1.0 base + FAR_NZY expansion tokens.
+// Single source of truth for palette, shader uniforms, timing,
+// currency identity, reality duality, visual tiers, and UI sub-themes.
 // All CSS vars in bio-architect.css mirror these values.
 // ─────────────────────────────────────────────────────
 
@@ -27,6 +28,9 @@ export const OV = {
   magentaBright: '#ff80e8',
   magentaGlow:   'rgba(255,0,204,0.45)',
   amberHot:      '#ff7200',
+  // Acid lime — corpus-canonical #1 frequency color (#C8D400 ×48); BIOLOGICAL energy / primary CTA
+  acidLime:      '#c8d400',
+  acidLimeGlow:  'rgba(200,212,0,0.45)',
 
   // ── Specimen die — obsidian body ───────────────────
   obsidian:      '#0a080e',
@@ -80,4 +84,211 @@ export const OV = {
   dissolveMs:  400,
   springEase:  'cubic-bezier(0.34, 1.56, 0.64, 1)',
   fastEase:    'cubic-bezier(0.4, 0, 0.2, 1)',
+  bioEase:     'cubic-bezier(0.25, 0.46, 0.45, 0.94)',  // fluid, slow — Bio UI
+  vaultEase:   'cubic-bezier(0.4, 0, 0.6, 1)',           // snappy, mechanical — Vault UI
+  crystalEase: 'cubic-bezier(0.34, 1.56, 0.64, 1)',      // resonant spring — Crystal UI
+} as const;
+
+// ── Reality Duality Law ────────────────────────────────────────────────────────
+// Magenta = physical reality (human, organic, warm, gothic, bound)
+// Cyan    = virtual reality  (AI, digital, crystalline, open, electric)
+// Every state-change color must choose one axis.
+export const REALITY = {
+  physical: {
+    color:      '#ff00cc', // OV.magenta
+    glow:       'rgba(255,0,204,0.45)',
+    emissive:   '#4a0030',
+    label:      'Physical',
+  },
+  virtual: {
+    color:      '#00e5ff', // OV.cyan
+    glow:       'rgba(0,229,255,0.45)',
+    emissive:   '#003a4a',
+    label:      'Virtual',
+  },
+  infrastructure: {
+    color:      '#c9a84c', // OV.gold — the mesh between both worlds
+    glow:       'rgba(201,168,76,0.55)',
+    emissive:   '#3a2a00',
+    label:      'Mesh',
+  },
+} as const;
+
+// ── Visual Tier System ─────────────────────────────────────────────────────────
+// Level-progressive palette state. Exact level thresholds are a design gate.
+// Use these as R3F uniform targets interpolated by level number.
+export const TIER = {
+  1: {
+    name:              'The Signal',
+    mood:              'Welcoming hacker lofi. Calm. Electric but controlled.',
+    boardBg:           '#0a1628', // cool dark navy
+    ambientColor:      '#8aaabb',
+    bloomThreshold:    0.80,
+    bloomIntensity:    0.9,
+    vignetteOpacity:   0.35,
+    scanlineOpacity:   0.07,
+    glitch:            false,
+    horrorIntensity:   0,
+  },
+  2: {
+    name:              'The Static',
+    mood:              'The signal is degrading. Something is watching.',
+    boardBg:           '#0e1220',
+    ambientColor:      '#7a9aab',
+    bloomThreshold:    0.70,
+    bloomIntensity:    1.1,
+    vignetteOpacity:   0.45,
+    scanlineOpacity:   0.12,
+    glitch:            true,
+    horrorIntensity:   0.15,
+  },
+  3: {
+    name:              'The Infection',
+    mood:              'The flesh of the machine. Reality is warm and wet.',
+    boardBg:           '#120808',
+    ambientColor:      '#996655',
+    bloomThreshold:    0.65,
+    bloomIntensity:    1.4,
+    vignetteOpacity:   0.65,
+    scanlineOpacity:   0.18,
+    glitch:            true,
+    horrorIntensity:   0.55,
+  },
+  4: {
+    name:              'The Fracture',
+    mood:              'The laptop is the nightmare. Poetry and terror.',
+    boardBg:           '#1a0a0a',
+    ambientColor:      '#aa4422',
+    bloomThreshold:    0.55,
+    bloomIntensity:    1.8,
+    vignetteOpacity:   0.80,
+    scanlineOpacity:   0.25,
+    glitch:            true,
+    horrorIntensity:   1.0,
+  },
+} as const;
+
+// ── FAR_NZY Currency Identity ─────────────────────────────────────────────────
+// Three currencies with distinct visual personalities.
+// Never display legacy names: GC, SC, GoldCoin, SweepCoin.
+export const CURRENCY = {
+  fd: {
+    color:          '#00e5cc', // toxic cyan — BIOLOGICAL pillar
+    emissive:       '#1a7a4a',
+    glowColor:      'rgba(0,229,204,0.45)',
+    particleColor:  '#8bc34a',
+    labelSingular:  'FarqlDust',
+    labelPlural:    'FarqlDust',   // uncountable noun
+    symbol:         'FD',
+    legacy:         'GC',
+    tier:           'common',
+    icon:           'spore-dust',
+    pillar:         'BIOLOGICAL',
+  },
+  pdx: {
+    color:          '#7b00ff', // ultraviolet — CRYSTALLINE pillar
+    emissive:       '#4a0080',
+    glowColor:      'rgba(123,0,255,0.45)',
+    particleColor:  '#bf80ff',
+    labelSingular:  'PrimeDie',
+    labelPlural:    'PrimeDice',
+    symbol:         'PDX',
+    legacy:         'SC',
+    tier:           'premium',
+    icon:           'prime-die',
+    pillar:         'CRYSTALLINE',
+  },
+  sdx: {
+    color:          '#050008', // near-black — VOIDSHARD base
+    emissive:       '#3d007a',
+    glowColor:      '#7b00ff', // UV fresnel edge
+    lightningColor: '#bf80ff', // internal lightning
+    particleColor:  '#000000', // negative-space dark particles
+    labelSingular:  'Voidshard',
+    labelPlural:    'Voidshards',
+    symbol:         'SDX',
+    tier:           'scarce',
+    icon:           'voidshard',
+    pillar:         'CRYSTALLINE',
+    cryptographic:  true,
+    nftBacked:      true,
+  },
+} as const;
+
+// ── FAR_NZY UI Sub-themes ─────────────────────────────────────────────────────
+export const UI_THEME = {
+  // Bio UI — BIOLOGICAL screens (BioGarden, FD economy)
+  bio: {
+    borderRadius:   '24px',
+    border:         '1px solid rgba(0,229,204,0.3)',
+    background:     'rgba(10,15,10,0.85)',
+    colorLabel:     '#8bc34a',
+    colorBody:      '#e8f5e9',
+    transitionMs:   400,
+    ease:           'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+  },
+  // Vault UI — INDUSTRIAL screens (economy, settings, compliance)
+  vault: {
+    borderRadius:   '2px',
+    border:         '1px solid #ffb300',
+    background:     'rgba(17,17,17,0.95)',
+    colorLabel:     '#ffb300',
+    colorBody:      '#8a8a8a',
+    transitionMs:   150,
+    ease:           'cubic-bezier(0.4, 0, 0.6, 1)',
+  },
+  // Crystal UI — CRYSTALLINE screens (PDX/SDX staking, shop)
+  crystal: {
+    borderRadius:   '0px',
+    clipPath:       'polygon(8px 0%, calc(100% - 8px) 0%, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0% calc(100% - 8px), 0% 8px)',
+    border:         '1px solid rgba(123,0,255,0.5)',
+    background:     'rgba(26,0,51,0.9)',
+    colorLabel:     '#bf80ff',
+    colorBody:      '#e1bee7',
+    transitionMs:   250,
+    ease:           'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+} as const;
+
+// ── Typography ─────────────────────────────────────────────────────────────────
+// Matches design_tokens.json fontStacks.
+export const TYPE = {
+  fontDisplay:  '"Cinzel", "Cormorant Garamond", Georgia, serif',
+  fontBody:     '"Inter", "Roboto", "Helvetica Neue", Arial, sans-serif',
+  fontCode:     '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+  scale: {
+    display:      { size: 40, lineHeight: 1.04, weight: 700 },
+    sectionTitle: { size: 22, lineHeight: 1.12, weight: 650 },
+    body:         { size: 16, lineHeight: 1.45, weight: 450 },
+    caption:      { size: 12, lineHeight: 1.32, weight: 500 },
+    hudNumeric:   { size: 24, lineHeight: 1.00, weight: 700 },
+  },
+} as const;
+
+// ── Spacing (4px unit, matches design_tokens.json) ────────────────────────────
+export const SPACE = [0, 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 64] as const;
+
+// ── FAR_NZY Pillar Palettes ───────────────────────────────────────────────────
+export const PILLAR = {
+  BIOLOGICAL: {
+    primary:    '#1a7a4a', // emerald green
+    accent:     '#00e5cc', // toxic cyan
+    highlight:  '#8bc34a', // neon moss
+    surface:    '#0a0f0a', // dark forest black
+    glow:       'rgba(0,229,204,0.35)',
+  },
+  INDUSTRIAL: {
+    primary:    '#ffb300', // amber
+    accent:     '#ff6d00', // reactor orange
+    highlight:  '#b7410e', // rust
+    surface:    '#111111', // matte black
+    secondary:  '#8a8a8a', // cold gray
+  },
+  CRYSTALLINE: {
+    primary:    '#7b00ff', // ultraviolet
+    accent:     '#bf80ff', // cosmic violet
+    highlight:  '#c2185b', // deep magenta
+    surface:    '#1a0033', // near-black purple
+    deep:       '#4a0080', // cosmic violet dark
+  },
 } as const;

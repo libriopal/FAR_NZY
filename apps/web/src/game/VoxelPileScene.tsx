@@ -12,7 +12,10 @@ import React, { useCallback, useRef, useEffect, useMemo, useState, type MutableR
 let _vr = (typeof crypto !== 'undefined' ? crypto.getRandomValues(new Uint32Array(1))[0]! : 0xdeadbeef) || 0xdeadbeef;
 const vRng = () => { _vr ^= _vr << 13; _vr ^= _vr >>> 17; _vr ^= _vr << 5; return (_vr >>> 0) / 4294967296; };
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
+import { Text, Environment, Sparkles, ContactShadows } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+// r3f-perf — dev-only baseline profiler (tree-shaken in prod by Vite)
+import { Perf } from 'r3f-perf';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { useFarkleStore } from '../store/farkleStore.js';
@@ -20,6 +23,7 @@ import type { FarkleBody } from '../store/farkleStore.js';
 import { useExplosionStore } from '../store/explosionStore.js';
 import type { ExplosionEvent } from '../store/explosionStore.js';
 import { playCollisionImpact } from '../audio/gameAudio.js';
+import { OV } from '../theme/tokens.js';
 
 // Organic Vegas 1.0 — neon pip colors on dark obsidian body
 const FACE_COLOR: Record<number, string> = {
@@ -182,13 +186,54 @@ function PhysicsImpactListener() {
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 
+// Home position: z=5.5 fills screen with large readable dice
+const CAM_HOME = { x: 0, y: 2.0, z: 5.5 };
+const CAM_LOOK = new THREE.Vector3(0, 5.0, 0);
+
 function CameraRig() {
   const { camera } = useThree();
+  const farkleCount = useFarkleStore(s => s.farkleCount);
+  const prevFarkle  = useRef(farkleCount);
+
+  // Spring state — target + current velocity per axis
+  const posRef = useRef({ x: CAM_HOME.x, y: CAM_HOME.y, z: CAM_HOME.z });
+  const velRef = useRef({ x: 0, y: 0, z: 0 });
+  const tgtRef = useRef({ x: CAM_HOME.x, y: CAM_HOME.y, z: CAM_HOME.z });
+
   useEffect(() => {
-    // Close-up portrait view: z=5.5 fills screen with large readable dice
-    camera.position.set(0, 2.0, 5.5);
-    camera.lookAt(0, 5.0, 0);
+    camera.position.set(CAM_HOME.x, CAM_HOME.y, CAM_HOME.z);
+    camera.lookAt(CAM_LOOK);
   }, [camera]);
+
+  // Farkle detected — impulse: pull back + drop slightly (physical reality reasserts)
+  useEffect(() => {
+    const fired = farkleCount > prevFarkle.current;
+    prevFarkle.current = farkleCount;
+    if (!fired) return;
+    tgtRef.current = { x: CAM_HOME.x, y: CAM_HOME.y - 0.35, z: CAM_HOME.z + 0.7 };
+    const id = window.setTimeout(() => {
+      tgtRef.current = { x: CAM_HOME.x, y: CAM_HOME.y, z: CAM_HOME.z };
+    }, 500);
+    return () => window.clearTimeout(id);
+  }, [farkleCount]);
+
+  useFrame((_, dt) => {
+    const stiffness = 120;
+    const damping   = 14;
+    const pos = posRef.current;
+    const vel = velRef.current;
+    const tgt = tgtRef.current;
+
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const force  = (tgt[axis] - pos[axis]) * stiffness - vel[axis] * damping;
+      vel[axis]   += force * dt;
+      pos[axis]   += vel[axis] * dt;
+    }
+
+    camera.position.set(pos.x, pos.y, pos.z);
+    camera.lookAt(CAM_LOOK);
+  });
+
   return null;
 }
 
@@ -210,12 +255,12 @@ function ColumnGrid() {
     <group>
       <mesh position={[0, -0.1, 0]} receiveShadow>
         <boxGeometry args={[8, 0.1, 1.2]} />
-        <meshStandardMaterial color="#0d2040" />
+        <meshStandardMaterial color={OV.neural} />
       </mesh>
       {[-2.8, -2.0, -1.2, -0.4, 0.4, 1.2, 2.0, 2.8].map((x, i) => (
         <mesh key={i} position={[x, 5, 0]}>
           <boxGeometry args={[0.04, 12, 0.8]} />
-          <meshStandardMaterial color="#1a4060" opacity={0.5} transparent />
+          <meshStandardMaterial color={OV.goldDim} opacity={0.5} transparent />
         </mesh>
       ))}
       {COLUMN_X.map((x, i) => {
@@ -224,7 +269,7 @@ function ColumnGrid() {
           <mesh key={i} position={[x, 5, -0.1]}>
             <boxGeometry args={[0.85, 12, 0.1]} />
             <meshStandardMaterial
-              color={isOverflowing ? '#3a0808' : '#0a1628'}
+              color={isOverflowing ? OV.magenta : OV.void}
               opacity={isOverflowing ? 0.6 : 0.4}
               transparent
             />
@@ -301,6 +346,47 @@ function ChainLine() {
       </bufferGeometry>
       <lineBasicMaterial color="#ffd700" linewidth={2} />
     </line>
+  );
+}
+
+// ── Chain confirm burst — Sparkles at chain tail on length increase ───────────
+function ChainConfirmBurst() {
+  const chain  = useFarkleStore(s => s.chain);
+  const bodies = useFarkleStore(s => s.bodies);
+  const prevLen = useRef(0);
+  const [burst, setBurst] = useState<{ pos: [number,number,number]; key: number } | null>(null);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const len = chain.length;
+    if (len > prevLen.current && len >= 2) {
+      const tailId = chain[len - 1];
+      const body   = tailId ? bodies.find(b => b.id === tailId) : undefined;
+      const pos: [number,number,number] = body
+        ? [body.position.x, body.position.y, body.position.z]
+        : [0, 2, 0];
+      setBurst({ pos, key: Date.now() });
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => setBurst(null), 600);
+    }
+    prevLen.current = len;
+    return () => { if (timerRef.current !== null) window.clearTimeout(timerRef.current); };
+  }, [chain, bodies]);
+
+  if (!burst) return null;
+
+  return (
+    <Sparkles
+      key={burst.key}
+      position={burst.pos}
+      count={28}
+      scale={0.9}
+      size={0.8}
+      speed={1.4}
+      opacity={0.75}
+      color={OV.cyan}
+      noise={0.6}
+    />
   );
 }
 
@@ -2011,21 +2097,30 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap, on
     >
       <CameraRig />
       <PhysicsImpactListener />
-      {/* Raised ambient — dice base visibility */}
-      <ambientLight intensity={2.0} color="#8aaabb" />
-      {/* KEY LIGHT — strong warm angled from upper-right-front; creates realistic face shading */}
+      {/* Environment map — provides specular reflections for MeshStandardMaterial envMapIntensity */}
+      <Environment preset="city" />
+      {/* Ambient — slightly reduced now that env map contributes */}
+      <ambientLight intensity={1.6} color="#8aaabb" />
+      {/* KEY LIGHT — warm upper-right-front; primary face shading */}
       <directionalLight position={[6, 8, 7]} intensity={3.5} color="#fff8e0" />
-      {/* FILL LIGHT — cooler upper-left, softens shadows without flattening */}
+      {/* FILL LIGHT — cool upper-left; softens without flattening */}
       <directionalLight position={[-4, 5, 3]} intensity={1.5} color="#c8dde8" />
-      {/* Three candle lights — left, center, right — different phases so they flicker independently */}
-      <CandleLight position={[-3.2, 1.5, 3.0]} phase={0.0} />
-      <CandleLight position={[ 0.0, 2.5, 3.5]} phase={1.7} />
-      <CandleLight position={[ 3.2, 1.5, 3.0]} phase={3.3} />
-      {/* Warm backfill so rear face of dice keeps edge definition */}
+      {/* Single animated candle — center position, merged from three for mobile draw-call budget */}
+      <CandleLight position={[0.0, 2.5, 3.5]} phase={1.7} />
+      {/* Warm backfill — rear face edge definition */}
       <pointLight position={[0, 5, -3]} intensity={1.5} color="#ff7a20" distance={14} decay={2} />
       <ColumnGrid />
+      <ContactShadows
+        position={[0, -0.09, 0]}
+        opacity={0.45}
+        scale={10}
+        blur={1.8}
+        far={6}
+        color={OV.void}
+      />
       <DoublerCellPanels />
       <ChainLine />
+      <ChainConfirmBurst />
       <RallyTimerOrb />
       <ChainDragController onChainExtend={onChainExtend} onChainEnd={onChainEnd} {...(onEmptyTap !== undefined ? { onEmptyTap } : {})} />
       {bodies.map(body => (
@@ -2045,6 +2140,14 @@ function SceneContent({ onChainStart, onChainExtend, onChainEnd, onEntityTap, on
           onDone={() => removeExplosion(ev.id)}
         />
       ))}
+      <EffectComposer>
+        <Bloom
+          luminanceThreshold={_isMobile ? 0.85 : 0.75}
+          luminanceSmoothing={0.1}
+          intensity={_isMobile ? 0.7 : 1.2}
+        />
+        <Vignette offset={0.35} darkness={_isMobile ? 0.4 : 0.55} eskil={false} />
+      </EffectComposer>
     </group>
   );
 }
@@ -2061,20 +2164,28 @@ interface VoxelPileSceneProps {
 
 export function VoxelPileScene({ onChainStart, onChainExtend, onChainEnd, onEntityTap, onEmptyTap }: VoxelPileSceneProps) {
   return (
-    <Canvas
-      style={{ width: '100%', height: '100%', background: '#0a1628', touchAction: 'none' }}
-      camera={{ fov: 90, near: 0.1, far: 100 }}
-      gl={{ antialias: false, powerPreference: 'high-performance' }}
-      dpr={Math.min(window.devicePixelRatio, 2)}
-      flat
-    >
-      <SceneContent
-        onChainStart={onChainStart}
-        onChainExtend={onChainExtend}
-        onChainEnd={onChainEnd}
-        onEntityTap={onEntityTap}
-        {...(onEmptyTap !== undefined ? { onEmptyTap } : {})}
-      />
-    </Canvas>
+    <div style={{ width: '100%', height: '100%', background: OV.neural }}>
+      <Canvas
+        style={{ width: '100%', height: '100%', touchAction: 'none' }}
+        camera={{ fov: 75, near: 0.1, far: 100 }}
+        gl={{
+          antialias: !_isMobile,
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+          outputColorSpace: THREE.SRGBColorSpace,
+        }}
+        dpr={[1, Math.min(window.devicePixelRatio, 2)]}
+      >
+        {import.meta.env.DEV && <Perf position="top-right" />}
+        <SceneContent
+          onChainStart={onChainStart}
+          onChainExtend={onChainExtend}
+          onChainEnd={onChainEnd}
+          onEntityTap={onEntityTap}
+          {...(onEmptyTap !== undefined ? { onEmptyTap } : {})}
+        />
+      </Canvas>
+    </div>
   );
 }

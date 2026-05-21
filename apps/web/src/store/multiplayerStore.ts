@@ -6,7 +6,8 @@
 
 import { create } from 'zustand';
 import type { DisruptionEvent, RallyRole } from '@match3d/farkle-shared';
-import type { FacetId, ShardId, SlipstreamState } from '@match3d/farkle-engine';
+import type { FacetId, ShardId } from '@match3d/farkle-engine';
+import type { SlipstreamState } from '@match3d/farkle-engine/slipstream';
 
 function resolveWsUrl(): string {
   const explicit = import.meta.env.VITE_WS_URL as string | undefined;

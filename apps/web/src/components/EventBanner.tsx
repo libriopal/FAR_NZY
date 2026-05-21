@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useLiveEvents } from '../hooks/useLiveEvents.js';
 import type { LiveEvent } from '../hooks/useLiveEvents.js';
+import { OV, TYPE, CURRENCY } from '../theme/tokens.js';
 
 export function EventBanner() {
   const { events, isClaimed, claimEvent } = useLiveEvents();
@@ -26,9 +27,9 @@ export function EventBanner() {
     setClaiming(null);
     const r = event.reward;
     const parts: string[] = [];
-    if (r.goldCoins) parts.push(`+${r.goldCoins} Gold`);
-    if (r.sweepsCoins) parts.push(`+${r.sweepsCoins} SC`);
-    if (r.bioSteel) parts.push(`+${r.bioSteel} Bio-Steel`);
+    if (r.goldCoins)   parts.push(`+${r.goldCoins} ${CURRENCY.fd.symbol}`);
+    if (r.sweepsCoins) parts.push(`+${r.sweepsCoins} ${CURRENCY.pdx.symbol}`);
+    if (r.bioSteel)    parts.push(`+${r.bioSteel} SDX`);
     setToast(parts.join(' · '));
     setTimeout(() => setToast(null), 2500);
   };
@@ -44,9 +45,9 @@ export function EventBanner() {
   };
 
   const EVENT_COLORS: Record<string, { border: string; glow: string; badge: string }> = {
-    daily_checkin:  { border: '#1a6fd4', glow: '#1a6fd440', badge: '#1a4080' },
-    weekly_featured: { border: '#7c3aed', glow: '#7c3aed40', badge: '#3a1a6a' },
-    bonus_weekend:  { border: '#f59e0b', glow: '#f59e0b40', badge: '#4a3000' },
+    daily_checkin:   { border: OV.cyan,    glow: OV.cyanGlow,    badge: 'rgba(0,229,255,0.10)'   },
+    weekly_featured: { border: CURRENCY.pdx.color, glow: CURRENCY.pdx.glowColor, badge: 'rgba(123,0,255,0.12)' },
+    bonus_weekend:   { border: OV.gold,    glow: OV.goldGlow,    badge: 'rgba(201,168,76,0.10)'  },
   };
 
   return (
@@ -55,42 +56,42 @@ export function EventBanner() {
       <button
         onClick={() => setExpanded(v => !v)}
         style={{
-          width: '100%', background: 'rgba(10,22,40,0.8)',
-          border: `1px solid ${hasUnclaimed ? '#1a6fd4' : '#1a3050'}`,
+          width: '100%', background: 'rgba(5,0,18,0.88)',
+          border: `1px solid ${hasUnclaimed ? OV.cyan : OV.goldDim}`,
           borderRadius: 10, padding: '10px 14px',
           display: 'flex', alignItems: 'center', gap: 10,
-          cursor: 'pointer', fontFamily: 'monospace',
-          boxShadow: hasUnclaimed ? '0 0 12px rgba(26,111,212,0.25)' : 'none',
+          cursor: 'pointer', fontFamily: TYPE.fontCode,
+          boxShadow: hasUnclaimed ? `0 0 12px ${OV.cyanGlow}` : 'none',
           marginBottom: 8,
         }}
       >
-        <span style={{ fontSize: 16 }}>🌟</span>
-        <span style={{ flex: 1, color: '#7ecfff', fontSize: 13, fontWeight: 700, textAlign: 'left' }}>
+        <span style={{ fontSize: 14, color: OV.goldBright }}>✦</span>
+        <span style={{ flex: 1, color: OV.bone, fontSize: 13, fontWeight: 700, textAlign: 'left' }}>
           {hasUnclaimed
             ? `${unclaimed.length} reward${unclaimed.length > 1 ? 's' : ''} ready to claim`
             : `${events.length} active event${events.length > 1 ? 's' : ''}`}
         </span>
         {hasUnclaimed && (
           <span style={{
-            background: '#1a6fd4', color: '#fff', fontSize: 10,
+            background: OV.cyan, color: OV.void, fontSize: 10,
             borderRadius: 10, padding: '2px 8px', fontWeight: 700,
           }}>
             CLAIM
           </span>
         )}
-        <span style={{ color: '#1a4060', fontSize: 12 }}>{expanded ? '▲' : '▼'}</span>
+        <span style={{ color: OV.boneDim, fontSize: 12 }}>{expanded ? '▲' : '▼'}</span>
       </button>
 
       {/* Expanded event cards */}
       {expanded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
           {events.map(event => {
-            const colors = EVENT_COLORS[event.type] ?? { border: '#1a6fd4', glow: '#1a6fd440', badge: '#1a4080' };
+            const colors = EVENT_COLORS[event.type] ?? { border: OV.cyan, glow: OV.cyanGlow, badge: 'rgba(0,229,255,0.10)' };
             const claimed = isClaimed(event);
             return (
               <div key={event.id} style={{
-                background: 'rgba(10,22,40,0.9)',
-                border: `1px solid ${claimed ? '#1a3050' : colors.border}`,
+                background: 'rgba(5,0,18,0.92)',
+                border: `1px solid ${claimed ? OV.goldDim : colors.border}`,
                 borderRadius: 10, padding: '12px 14px',
                 boxShadow: claimed ? 'none' : `0 0 10px ${colors.glow}`,
                 opacity: claimed ? 0.6 : 1,
@@ -98,38 +99,39 @@ export function EventBanner() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                      <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: 13 }}>
+                      <span style={{ color: OV.bone, fontWeight: 700, fontSize: 13, fontFamily: TYPE.fontCode }}>
                         {event.title}
                       </span>
                       <span style={{
                         fontSize: 9, background: colors.badge, color: colors.border,
-                        borderRadius: 4, padding: '2px 5px',
+                        borderRadius: 4, padding: '2px 5px', fontFamily: TYPE.fontCode,
+                        letterSpacing: 1,
                       }}>
                         {event.type === 'daily_checkin' ? 'DAILY'
                           : event.type === 'weekly_featured' ? 'WEEKLY' : 'WEEKEND'}
                       </span>
                     </div>
-                    <div style={{ color: '#4a7a9a', fontSize: 11, marginBottom: 5 }}>
+                    <div style={{ color: OV.boneDim, fontSize: 11, marginBottom: 5, fontFamily: TYPE.fontCode }}>
                       {event.description}
                     </div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       {event.reward.goldCoins > 0 && (
-                        <span style={{ color: '#ffd700', fontSize: 11 }}>
-                          🟡 +{event.reward.goldCoins}
+                        <span style={{ color: OV.goldBright, fontSize: 11, fontFamily: TYPE.fontCode }}>
+                          {CURRENCY.fd.symbol} +{event.reward.goldCoins}
                         </span>
                       )}
                       {event.reward.sweepsCoins > 0 && (
-                        <span style={{ color: '#00e5ff', fontSize: 11 }}>
-                          💎 +{event.reward.sweepsCoins}
+                        <span style={{ color: OV.cyan, fontSize: 11, fontFamily: TYPE.fontCode }}>
+                          {CURRENCY.pdx.symbol} +{event.reward.sweepsCoins}
                         </span>
                       )}
                       {event.reward.bioSteel && event.reward.bioSteel > 0 && (
-                        <span style={{ color: '#7ecfff', fontSize: 11 }}>
-                          ⚙️ +{event.reward.bioSteel}
+                        <span style={{ color: CURRENCY.sdx.lightningColor, fontSize: 11, fontFamily: TYPE.fontCode }}>
+                          SDX +{event.reward.bioSteel}
                         </span>
                       )}
                     </div>
-                    <div style={{ color: '#1a3050', fontSize: 10, marginTop: 4 }}>
+                    <div style={{ color: OV.boneDim, fontSize: 10, marginTop: 4, fontFamily: TYPE.fontCode }}>
                       {formatTimeLeft(event.endsAt)}
                     </div>
                   </div>
@@ -138,18 +140,18 @@ export function EventBanner() {
                       onClick={() => handleClaim(event)}
                       disabled={!!claiming}
                       style={{
-                        background: claiming === event.id ? '#1a1a2a' : colors.border,
-                        border: 'none', color: '#fff',
+                        background: claiming === event.id ? OV.neural : colors.border,
+                        border: 'none', color: claiming === event.id ? OV.boneDim : OV.void,
                         borderRadius: 8, padding: '8px 14px',
                         fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        fontFamily: 'monospace', whiteSpace: 'nowrap',
+                        fontFamily: TYPE.fontCode, whiteSpace: 'nowrap',
                         opacity: claiming && claiming !== event.id ? 0.5 : 1,
                       }}
                     >
-                      {claiming === event.id ? '...' : 'Claim'}
+                      {claiming === event.id ? '···' : 'Claim'}
                     </button>
                   ) : (
-                    <span style={{ color: '#1a4060', fontSize: 11 }}>✓ Done</span>
+                    <span style={{ color: OV.boneDim, fontSize: 11, fontFamily: TYPE.fontCode }}>✓ Done</span>
                   )}
                 </div>
               </div>
@@ -161,10 +163,10 @@ export function EventBanner() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)',
-          background: '#1a6fd4', color: '#fff', padding: '10px 24px',
-          borderRadius: 24, fontFamily: 'monospace', fontSize: 14,
-          boxShadow: '0 4px 20px rgba(26,111,212,0.6)', zIndex: 999,
-          whiteSpace: 'nowrap',
+          background: OV.gold, color: OV.void, padding: '10px 24px',
+          borderRadius: 24, fontFamily: TYPE.fontCode, fontSize: 14,
+          boxShadow: `0 4px 20px ${OV.goldGlow}`, zIndex: 999,
+          whiteSpace: 'nowrap', fontWeight: 700, letterSpacing: 1,
         }}>
           {toast}
         </div>

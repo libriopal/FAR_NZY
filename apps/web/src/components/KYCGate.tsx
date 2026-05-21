@@ -6,24 +6,33 @@
 import React, { useState } from 'react';
 import { useKYCStore } from '../store/kycStore.js';
 import type { KYCStatus } from '../store/kycStore.js';
+import { OV, TYPE } from '../theme/tokens.js';
 
+// Reality duality: verified=cyan (virtual clearance), unverified=magenta (physical block)
 const STATUS_COLOR: Record<KYCStatus, string> = {
-  unverified: '#ef4444',
-  pending: '#f59e0b',
-  verified: '#10b981',
+  unverified: OV.magenta,
+  pending:    OV.amberHot,
+  verified:   OV.cyan,
 };
 
 const STATUS_LABEL: Record<KYCStatus, string> = {
   unverified: 'Not Verified',
-  pending: 'Pending Review',
-  verified: 'Verified',
+  pending:    'Pending Review',
+  verified:   'Verified',
+};
+
+const inputStyle: React.CSSProperties = {
+  background: OV.neural,
+  border: `1px solid ${OV.goldDim}`,
+  borderRadius: 6, color: OV.bone,
+  padding: '8px 10px', fontFamily: TYPE.fontCode, fontSize: 12,
 };
 
 export function KYCGate({ requiredForMode }: { requiredForMode?: string }) {
-  const { status, modalOpen, openModal, closeModal, setStatus } = useKYCStore();
+  const { status, modalOpen, openModal: _openModal, closeModal, setStatus } = useKYCStore();
   const [step, setStep] = useState<'intro' | 'form' | 'submitted'>('intro');
   const [name, setName] = useState('');
-  const [dob, setDob] = useState('');
+  const [dob, setDob]   = useState('');
   const [error, setError] = useState('');
 
   if (!modalOpen) return null;
@@ -35,79 +44,117 @@ export function KYCGate({ requiredForMode }: { requiredForMode?: string }) {
     setStep('submitted');
   };
 
+  const accentColor = STATUS_COLOR[status];
+
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1100,
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.82)',
+      zIndex: 1100,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div style={{
-        background: '#0f0a1e', border: '1px solid #4f46e5', borderRadius: 14,
-        width: '88%', maxWidth: 400, padding: 24, display: 'flex', flexDirection: 'column', gap: 16,
-        fontFamily: 'monospace',
+        background: 'rgba(5,0,18,0.97)',
+        border: `1px solid ${OV.goldDim}`,
+        borderTop: `2px solid ${OV.gold}`,
+        borderRadius: 8,
+        width: '88%', maxWidth: 400, padding: 24,
+        display: 'flex', flexDirection: 'column', gap: 14,
+        fontFamily: TYPE.fontCode,
+        boxShadow: `0 0 32px rgba(201,168,76,0.1)`,
       }}>
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ color: '#a78bfa', fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>
+          <div style={{ color: OV.goldBright, fontSize: 11, fontWeight: 700, letterSpacing: 3 }}>
             IDENTITY VERIFICATION
           </div>
-          <button onClick={closeModal} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 18, cursor: 'pointer' }}>
+          <button onClick={closeModal} style={{
+            background: 'none', border: 'none', color: OV.boneDim,
+            fontSize: 18, cursor: 'pointer', lineHeight: 1,
+          }}>
             &#x2715;
           </button>
         </div>
 
-        <div style={{ color: STATUS_COLOR[status], fontSize: 11, fontWeight: 700 }}>
-          Status: {STATUS_LABEL[status]}
+        {/* Status badge */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          color: accentColor, fontSize: 11, fontWeight: 700,
+          textShadow: `0 0 8px ${accentColor}`,
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', background: accentColor,
+            boxShadow: `0 0 4px ${accentColor}`,
+          }} />
+          {STATUS_LABEL[status]}
         </div>
 
         {requiredForMode && status !== 'verified' && (
-          <div style={{ color: '#f59e0b', fontSize: 11, background: 'rgba(245,158,11,0.1)', borderRadius: 6, padding: '6px 10px' }}>
+          <div style={{
+            color: OV.amberHot, fontSize: 11,
+            background: 'rgba(255,114,0,0.08)',
+            border: `1px solid rgba(255,114,0,0.25)`,
+            borderRadius: 6, padding: '6px 10px',
+          }}>
             Verification required for {requiredForMode} mode.
           </div>
         )}
 
         {status === 'verified' ? (
-          <div style={{ color: '#10b981', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>
-            Your identity has been verified.
+          <div style={{ color: OV.cyan, fontSize: 13, textAlign: 'center', padding: '12px 0',
+            textShadow: `0 0 8px ${OV.cyanGlow}` }}>
+            ✓ Identity verified — signal cleared.
           </div>
         ) : status === 'pending' || step === 'submitted' ? (
-          <div style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: '8px 0' }}>
+          <div style={{ color: OV.boneDim, fontSize: 12, textAlign: 'center', padding: '8px 0', lineHeight: 1.6 }}>
             Your submission is under review. You will be notified when verification completes.
           </div>
         ) : step === 'intro' ? (
           <>
-            <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.6 }}>
-              To access casino modes and real-money features, you must complete identity verification.
-              This is required by law and takes less than 2 minutes.
+            <div style={{ color: OV.boneDim, fontSize: 12, lineHeight: 1.7 }}>
+              To access casino modes and real-money features, complete identity verification.
+              Required by law. Takes less than 2 minutes.
             </div>
             <button onClick={() => setStep('form')} style={{
-              background: '#4f46e5', border: 'none', color: '#fff', borderRadius: 8,
-              padding: '10px 0', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 700,
+              background: OV.gold,
+              border: 'none', color: OV.void,
+              borderRadius: 6, padding: '11px 0',
+              fontSize: 12, fontFamily: TYPE.fontCode, cursor: 'pointer', fontWeight: 700,
+              letterSpacing: 2,
+              boxShadow: `0 0 12px ${OV.goldGlow}`,
             }}>
-              Begin Verification
+              BEGIN VERIFICATION →
             </button>
           </>
         ) : (
           <>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#e2e8f0', fontSize: 12 }}>
-              Full Legal Name
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, color: OV.boneDim, fontSize: 11 }}>
+              FULL LEGAL NAME
               <input
                 value={name} onChange={e => setName(e.target.value)}
-                style={{ background: '#1e1b4b', border: '1px solid #4f46e5', borderRadius: 6, color: '#fff', padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}
+                style={inputStyle}
                 placeholder="John Smith"
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#e2e8f0', fontSize: 12 }}>
-              Date of Birth
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, color: OV.boneDim, fontSize: 11 }}>
+              DATE OF BIRTH
               <input
                 type="date" value={dob} onChange={e => setDob(e.target.value)}
-                style={{ background: '#1e1b4b', border: '1px solid #4f46e5', borderRadius: 6, color: '#fff', padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}
+                style={inputStyle}
               />
             </label>
-            {error && <div style={{ color: '#ef4444', fontSize: 11 }}>{error}</div>}
+            {error && (
+              <div style={{ color: OV.magenta, fontSize: 11, textShadow: `0 0 6px ${OV.magentaGlow}` }}>
+                {error}
+              </div>
+            )}
             <button onClick={handleSubmit} style={{
-              background: '#4f46e5', border: 'none', color: '#fff', borderRadius: 8,
-              padding: '10px 0', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', fontWeight: 700,
+              background: OV.gold, border: 'none', color: OV.void,
+              borderRadius: 6, padding: '11px 0',
+              fontSize: 12, fontFamily: TYPE.fontCode, cursor: 'pointer', fontWeight: 700,
+              letterSpacing: 2, boxShadow: `0 0 12px ${OV.goldGlow}`,
             }}>
-              Submit for Review
+              SUBMIT FOR REVIEW →
             </button>
           </>
         )}

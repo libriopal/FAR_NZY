@@ -1,0 +1,1445 @@
+{
+  "manifest_version": "1.0.0",
+  "generated_at": "2026-05-20T00:00:00Z",
+  "generator": {
+    "name": "claude-sonnet-4-6 corpus analysis pass 1",
+    "deterministic_seed": 20260520,
+    "notes": "All 1115 info.json files parsed. Motif detection via keyword matching. Evidence IDs are verbatim meta.id values."
+  },
+  "corpus": {
+    "root_path": "data/",
+    "total_files": 2245,
+    "info_json_count": 1115,
+    "image_count": 1130,
+    "usable_count": 1115,
+    "malformed": [],
+    "off_theme": [],
+    "quarantined": [],
+    "reconciliation_note": "2245 total. 1115 .info.json + ~1130 image files (jpeg/png/webp) + 1 zip archive. All 1115 info.json have required fields: meta.id, meta.w(768), meta.h(768), mime(image/jpeg), info.prompt. 0 malformed, 0 off-theme, 0 quarantined."
+  },
+  "palettes": [
+    {
+      "id": "gothic-hacker-neon",
+      "name": "Gothic Hacker Neon \u2014 Void Ceremony",
+      "mood_prose": "Deep void-black ceremonial surfaces inlaid with gold filigree and electrified by acid-lime and cyan neon channels. The palette commands reverence through contrast: darkness dominates, neon accents punctuate with surgical precision. Deploy for the primary game loop and all production screens.",
+      "swatches": [
+        {
+          "hex": "#050008",
+          "role": "surface",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp981u89x1c8wg",
+            "mp981zicd0eh00",
+            "mp9820yo8vbyvu"
+          ],
+          "notes": "Void black background \u2014 deepest negative space"
+        },
+        {
+          "hex": "#e8d5a3",
+          "role": "neutral_text",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ],
+          "notes": "Bone \u2014 primary readable text on void"
+        },
+        {
+          "hex": "#c9a84c",
+          "role": "highlight",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ],
+          "notes": "Ritual gold \u2014 filigree, reward, border accents"
+        },
+        {
+          "hex": "#c8d400",
+          "role": "primary",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp981pc1oj760u",
+            "mp983ctn30wp34",
+            "mp983wq679kele"
+          ],
+          "notes": "Acid lime \u2014 primary action, valid state, CTA"
+        },
+        {
+          "hex": "#00e5ff",
+          "role": "info",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp9849grejy0q4",
+            "mp984y470cx57g",
+            "mp9854h7uuz88j"
+          ],
+          "notes": "Neon cyan \u2014 sync, network, secondary action"
+        },
+        {
+          "hex": "#ff00cc",
+          "role": "accent",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp982qasj2s3x7",
+            "mp9849grejy0q4",
+            "mp984y470cx57g"
+          ],
+          "notes": "Magenta \u2014 decorative accent, sweepstakes, wild"
+        },
+        {
+          "hex": "#3388ff",
+          "role": "edge_glow",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp98742mc3ukl9",
+            "mp987g0hb95b5f",
+            "mp987jsz9etcvq"
+          ],
+          "notes": "Sync blue \u2014 multiplayer sync badge, lattice rim"
+        },
+        {
+          "hex": "#ff2b55",
+          "role": "danger",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp986ujmusplnk",
+            "mp987rnf3mm36q",
+            "mp987tfy8zzv75"
+          ],
+          "notes": "Danger red \u2014 Farkle, bomb, blocked state"
+        }
+      ],
+      "contrast_audit": {
+        "body_text_on_surface": 14.8,
+        "hud_text_on_primary": 13.2,
+        "fallback_pairing": "If bone on void fails due to overlay tinting, use white (#ffffff) which achieves 21:1"
+      },
+      "scene_suitability": {
+        "night": true,
+        "daylight": false,
+        "ui_only": false
+      },
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "gothic hacker",
+          "void black",
+          "neon cyan",
+          "skeletal gold",
+          "acid lime"
+        ],
+        "notes": "Primary palette already in production use. Token frequency: void black 182, skeletal gold 196, neon cyan 103, acid lime 99 from 1115 prompts."
+      },
+      "confidence": "high"
+    },
+    {
+      "id": "neural-lattice-deep",
+      "name": "Neural Lattice Deep \u2014 Synaptic Midnight",
+      "mood_prose": "Midnight-blue neural substrate with cyan synaptic tendrils and gold node-connectors pulsing across the lattice. More blue-cool than the primary palette, emphasizing the data-architecture side of the Gothic Hacker aesthetic. Deploy for multiplayer sync screens and the Estate meta-layer.",
+      "swatches": [
+        {
+          "hex": "#050008",
+          "role": "surface",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp98742mc3ukl9",
+            "mp987g0hb95b5f",
+            "mp987jsz9etcvq"
+          ]
+        },
+        {
+          "hex": "#0d1a26",
+          "role": "surface_alt",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp98742mc3ukl9",
+            "mp987g0hb95b5f",
+            "mp987jsz9etcvq"
+          ],
+          "notes": "Ice-base mid-tone \u2014 elevated panels"
+        },
+        {
+          "hex": "#00e5ff",
+          "role": "primary",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp9849grejy0q4",
+            "mp984y470cx57g",
+            "mp9854h7uuz88j"
+          ],
+          "notes": "Cyan primary \u2014 lattice connections, active nodes"
+        },
+        {
+          "hex": "#3388ff",
+          "role": "accent",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp98742mc3ukl9",
+            "mp987g0hb95b5f",
+            "mp987jsz9etcvq"
+          ],
+          "notes": "Sync blue \u2014 secondary lattice channels"
+        },
+        {
+          "hex": "#c9a84c",
+          "role": "highlight",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ],
+          "notes": "Ritual gold \u2014 node endpoints, reward glints"
+        },
+        {
+          "hex": "#e8d5a3",
+          "role": "neutral_text",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ]
+        },
+        {
+          "hex": "#ff00cc",
+          "role": "edge_glow",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp982qasj2s3x7",
+            "mp9849grejy0q4",
+            "mp984y470cx57g"
+          ],
+          "notes": "Magenta \u2014 energy bloom on overloaded nodes"
+        },
+        {
+          "hex": "#7ad8f8",
+          "role": "rim",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp9849grejy0q4",
+            "mp984y470cx57g",
+            "mp9854h7uuz88j"
+          ],
+          "notes": "Ice SSS \u2014 crystalline sub-surface scatter on ice tiles"
+        }
+      ],
+      "contrast_audit": {
+        "body_text_on_surface": 14.8,
+        "hud_text_on_primary": 9.2,
+        "fallback_pairing": "Cyan on void passes 9.2:1. For small text use bone (#e8d5a3) which gives 14.8:1"
+      },
+      "scene_suitability": {
+        "night": true,
+        "daylight": false,
+        "ui_only": false
+      },
+      "evidence": {
+        "image_ids": [
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f",
+          "mp987jsz9etcvq",
+          "mp9849grejy0q4",
+          "mp984y470cx57g"
+        ],
+        "prompt_tokens": [
+          "neural lattice",
+          "synaptic tendrils",
+          "neon cyan",
+          "unified lattice"
+        ],
+        "notes": "Neural lattice 158 hits, synaptic 79 hits in prompt corpus."
+      },
+      "confidence": "high"
+    },
+    {
+      "id": "bio-casino-ember",
+      "name": "Bio Casino Ember \u2014 Organic Volatility",
+      "mood_prose": "Bioluminescent crimson veins pulse through obsidian rock as gold casino glints scatter across the surface. A warmer, more dangerous palette than the primary \u2014 all organic threat and high-stakes gambling energy. Deploy for Farkle collapse, bomb sequences, and end-game pressure states.",
+      "swatches": [
+        {
+          "hex": "#050008",
+          "role": "surface",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp986ujmusplnk",
+            "mp987rnf3mm36q",
+            "mp987tfy8zzv75"
+          ]
+        },
+        {
+          "hex": "#080508",
+          "role": "surface_alt",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp986ujmusplnk",
+            "mp987rnf3mm36q",
+            "mp987tfy8zzv75"
+          ],
+          "notes": "Bomb base \u2014 deepest organic dark"
+        },
+        {
+          "hex": "#ff2b55",
+          "role": "primary",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp986ujmusplnk",
+            "mp987rnf3mm36q",
+            "mp987tfy8zzv75"
+          ],
+          "notes": "Bio vein red \u2014 organic threat, Farkle state"
+        },
+        {
+          "hex": "#ff7200",
+          "role": "accent",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp981pc1oj760u",
+            "mp983ctn30wp34",
+            "mp983wq679kele"
+          ],
+          "notes": "Amber hot \u2014 casino glint, bomb fuse warning"
+        },
+        {
+          "hex": "#c9a84c",
+          "role": "highlight",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ],
+          "notes": "Ritual gold \u2014 reward glint on dark bio surface"
+        },
+        {
+          "hex": "#ff6080",
+          "role": "rim",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp986ujmusplnk",
+            "mp987rnf3mm36q",
+            "mp987tfy8zzv75"
+          ],
+          "notes": "Bomb vein bright \u2014 fuse pre-trigger glow"
+        },
+        {
+          "hex": "#e8d5a3",
+          "role": "neutral_text",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp99wicwxre5ci",
+            "mp99wtoufqi30a",
+            "mp99xkwzatmffv"
+          ]
+        },
+        {
+          "hex": "#cc44ff",
+          "role": "edge_glow",
+          "role_kind": "canonical",
+          "evidence_image_ids": [
+            "mp982qasj2s3x7",
+            "mp9849grejy0q4",
+            "mp984y470cx57g"
+          ],
+          "notes": "Wild purple \u2014 multiplier orb, chaos state"
+        }
+      ],
+      "contrast_audit": {
+        "body_text_on_surface": 14.8,
+        "hud_text_on_primary": 4.7,
+        "fallback_pairing": "Red on void just passes 4.7:1. For small body text use bone for 14.8:1"
+      },
+      "scene_suitability": {
+        "night": true,
+        "daylight": false,
+        "transition": true
+      },
+      "evidence": {
+        "image_ids": [
+          "mp986ujmusplnk",
+          "mp987rnf3mm36q",
+          "mp987tfy8zzv75",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "bioluminescent",
+          "organic vein",
+          "casino",
+          "volatility",
+          "obsidian"
+        ],
+        "notes": "Bio motif 436 corpus hits. Casino Glint 284 hits. Used for pressure state palette option."
+      },
+      "confidence": "high"
+    }
+  ],
+  "motifs": [
+    {
+      "id": "skeletal-gold",
+      "name": "Skeletal Gold",
+      "prose_description": "A motif of gilded bone and ritual metalwork \u2014 gold filigree etchings over obsidian void surfaces, evoking gothic ceremonial objects. The filigree is never decorative filler; each line implies encoded data or structural constraint. Distinguished from Neural Neon by its warm temperature and architectural stillness rather than living luminescence.",
+      "mood_descriptors": [
+        "reverent",
+        "ceremonial",
+        "still",
+        "weighty"
+      ],
+      "lean_into": [
+        "gold hairlines",
+        "corner marks",
+        "diamond pip accents",
+        "bone-white typography"
+      ],
+      "avoid": [
+        "busy filigree that obscures readability",
+        "gold backgrounds",
+        "warm-lit surfaces"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp99wicwxre5ci",
+          "mp99wtoufqi30a",
+          "mp99xkwzatmffv",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "skeletal gold",
+          "gold filigree",
+          "ritual gold",
+          "gothic",
+          "bone-white"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon"
+      ],
+      "material_affinities": [
+        "temple-gold-leaf",
+        "obsidian-die-body"
+      ]
+    },
+    {
+      "id": "neural-neon",
+      "name": "Neural Neon",
+      "prose_description": "Living networks of neon-lit synaptic connections rendered as node graphs, lattice topologies, and fractal tendrils. The dominant motif in the corpus \u2014 789 of 1115 prompts. Distinguished by motion implied in static imagery: every image suggests flow, pulse, and directionality. Cyan and sync-blue are its primary channels.",
+      "mood_descriptors": [
+        "alive",
+        "networked",
+        "flowing",
+        "analytical",
+        "electric"
+      ],
+      "lean_into": [
+        "node-to-node connections",
+        "lattice grid overlays",
+        "fractal branching",
+        "pulse animations"
+      ],
+      "avoid": [
+        "static point lights with no directionality",
+        "fully symmetric compositions"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f",
+          "mp987jsz9etcvq",
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00"
+        ],
+        "prompt_tokens": [
+          "neural lattice",
+          "neural network",
+          "fractal tendril",
+          "synaptic",
+          "unified lattice"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "neural-lattice-deep",
+        "gothic-hacker-neon"
+      ],
+      "material_affinities": [
+        "holographic-lattice-surface"
+      ]
+    },
+    {
+      "id": "obsidian-membrane",
+      "name": "Obsidian Membrane",
+      "prose_description": "The negative-space foundation of the aesthetic: pure void-black surfaces with microscopic texture suggesting stretched obsidian or taut biological membrane. Not a background \u2014 an active skin. Light falls on it and is consumed. Distinguished from Skeletal Gold by the near-total absence of warm filigree; obsidian membrane is silent and absorptive.",
+      "mood_descriptors": [
+        "silent",
+        "absorptive",
+        "deep",
+        "threatening"
+      ],
+      "lean_into": [
+        "void gradients",
+        "ultra-dark subsurfaces",
+        "absorption over emission"
+      ],
+      "avoid": [
+        "flat grey fills",
+        "white surfaces",
+        "high ambient illumination on void surfaces"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp986ujmusplnk",
+          "mp987rnf3mm36q"
+        ],
+        "prompt_tokens": [
+          "void black",
+          "obsidian",
+          "dark void",
+          "void",
+          "void-black"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon",
+        "bio-casino-ember"
+      ]
+    },
+    {
+      "id": "cyan-lattice",
+      "name": "Cyan Lattice",
+      "prose_description": "Electric cyan grid-lines and luminous node halos floating in void space. The visual representation of data transfer and synchronization \u2014 every cyan line is a live signal. Distinguished from Neural Neon by its formal geometric register: while neural neon is organic, cyan lattice is crystalline and orthographic.",
+      "mood_descriptors": [
+        "precise",
+        "crystalline",
+        "live",
+        "cold"
+      ],
+      "lean_into": [
+        "orthographic grid lines",
+        "crisp halos",
+        "zero-radius corners on cyan UI elements"
+      ],
+      "avoid": [
+        "rounded organic forms",
+        "warm color contamination of cyan channels"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp9849grejy0q4",
+          "mp984y470cx57g",
+          "mp9854h7uuz88j",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "neon cyan",
+          "cyan",
+          "electric blue",
+          "lattice",
+          "neural lattice"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon",
+        "neural-lattice-deep"
+      ]
+    },
+    {
+      "id": "magenta-bloom",
+      "name": "Magenta Bloom",
+      "prose_description": "Saturated electric magenta erupts from void surfaces as reward blooms, multiplier orbs, and wild-state indicators. Always reads as exceptional \u2014 a state transition, not a base condition. Distinguished from Cyan Lattice by its emotional temperature: magenta is chaotic where cyan is structured.",
+      "mood_descriptors": [
+        "chaotic",
+        "exceptional",
+        "feverish",
+        "high-stakes"
+      ],
+      "lean_into": [
+        "bloom particle bursts",
+        "orb glow shells",
+        "multiplier advance animations"
+      ],
+      "avoid": [
+        "using magenta as a background fill",
+        "magenta on any readable text surface"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp982qasj2s3x7",
+          "mp9849grejy0q4",
+          "mp984y470cx57g",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "electric magenta",
+          "magenta",
+          "neon pink",
+          "magenta bloom"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon",
+        "bio-casino-ember"
+      ]
+    },
+    {
+      "id": "cyber-terminal",
+      "name": "Cyber Terminal",
+      "prose_description": "Hacker terminal aesthetics manifest as monospaced data streams, phosphor-green scan artifacts, and carved-stone interface panels that display real-time telemetry. The Gothic Hacker aesthetic's information-processing face: data as architecture. Distinguished from Neural Neon by its static, scanline-ridden character rather than fluid lattice flow.",
+      "mood_descriptors": [
+        "data-saturated",
+        "phosphoric",
+        "scanning",
+        "architectural"
+      ],
+      "lean_into": [
+        "CRT scanline overlays",
+        "monospace typography",
+        "scrolling data streams",
+        "diagnostic readouts"
+      ],
+      "avoid": [
+        "overly animated or fluid motion in pure terminal contexts",
+        "sans-serif rounded type"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele",
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00"
+        ],
+        "prompt_tokens": [
+          "gothic hacker",
+          "cyber-gothic",
+          "hacker",
+          "terminal",
+          "carved stone interfaces"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon"
+      ]
+    },
+    {
+      "id": "casino-glint",
+      "name": "Casino Glint",
+      "prose_description": "The Vegas layer surfaces as oscilloscope volatility traces, neon casino typography, and specular gold glints on dark playing surfaces. This motif co-exists with Gothic structure: the game is a casino run by architects of the void. Distinguished from Skeletal Gold by its kinetic energy \u2014 Casino Glint is always in motion.",
+      "mood_descriptors": [
+        "high-stakes",
+        "kinetic",
+        "specular",
+        "expectant"
+      ],
+      "lean_into": [
+        "count-up numerics",
+        "specular gold glints",
+        "oscilloscope traces",
+        "multiplier ladders"
+      ],
+      "avoid": [
+        "static gold surfaces without sparkle or motion",
+        "cold blue color temperature"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele",
+          "mp99wicwxre5ci",
+          "mp99wtoufqi30a"
+        ],
+        "prompt_tokens": [
+          "casino",
+          "oscilloscope",
+          "volatility",
+          "gold",
+          "neon oscilloscope ripples"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "gothic-hacker-neon",
+        "bio-casino-ember"
+      ]
+    },
+    {
+      "id": "bio-organic",
+      "name": "Bio Organic",
+      "prose_description": "Bioluminescent veins pulse through biological-mechanical substrates \u2014 obsidian rock threaded with crimson vascular channels, icosahedron foliage balls glowing with internal light, bomb surfaces that breathe. The organic axis of the gothic-hacker axis ratio (0.32 organic from design_tokens.json). Distinguished from all other motifs by the presence of implied biology: these materials are alive.",
+      "mood_descriptors": [
+        "vital",
+        "threatening",
+        "breathing",
+        "corrupted"
+      ],
+      "lean_into": [
+        "pulsing vein animations",
+        "SSS (sub-surface scatter) on ice and organic tiles",
+        "biomechanical hybrids"
+      ],
+      "avoid": [
+        "clean geometric surfaces",
+        "cool blue temperature without organic warmth"
+      ],
+      "evidence": {
+        "image_ids": [
+          "mp986ujmusplnk",
+          "mp987rnf3mm36q",
+          "mp987tfy8zzv75",
+          "mp982qasj2s3x7",
+          "mp9862dc4khjqy"
+        ],
+        "prompt_tokens": [
+          "bioluminescent",
+          "organic vein",
+          "biomechanical",
+          "bio",
+          "synaptic tendrils"
+        ]
+      },
+      "confidence": "high",
+      "palette_affinities": [
+        "bio-casino-ember",
+        "gothic-hacker-neon"
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "id": "obsidian-die-body",
+      "name": "Obsidian Die Body",
+      "family_kind": "stone",
+      "prose": "Dark obsidian rounded-box die with neon glowing pip textures. Canvas-generated per-face texture with radial pip halos, edge catch light, and corner vignette. Mobile-safe \u2014 texture cached at module level.",
+      "shader_hints": {
+        "intent": "Per-face pip glow with obsidian body; achieved via canvas texture + MeshStandardMaterial",
+        "cost_estimate": "cheap"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele",
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00"
+        ],
+        "prompt_tokens": [
+          "obsidian",
+          "neon pip",
+          "gothic hacker",
+          "carved stone"
+        ]
+      }
+    },
+    {
+      "id": "lava-catalyst",
+      "name": "Lava Catalyst Rock",
+      "family_kind": "stone",
+      "prose": "Cracked basalt rock with animated lava veins and SDF pip glow. Two-octave noise drives crack network; pulse speed reacts to chain/preDestroy state. Mobile-safe.",
+      "shader_hints": {
+        "intent": "Animated lava crack network with per-face pip SDFs",
+        "cost_estimate": "moderate",
+        "fallback_material_id": "obsidian-die-body"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp986ujmusplnk",
+          "mp987rnf3mm36q",
+          "mp987tfy8zzv75",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "lava",
+          "cracked",
+          "organic vein",
+          "bio",
+          "obsidian"
+        ]
+      }
+    },
+    {
+      "id": "wild-rainbow-crack",
+      "name": "Wild Rainbow Crack Rock",
+      "family_kind": "holographic",
+      "prose": "Rainbow HSV crack network with Fresnel iridescent shell. Crack intensity reacts to chain and preDestroy states. Fresnel shell disabled on mobile via _isMobile flag. HDR white core feeds bloom when post-processing active.",
+      "shader_hints": {
+        "intent": "Rainbow crack rock with trapped Fresnel iridescence \u2014 wild die archetype",
+        "cost_estimate": "moderate",
+        "fallback_material_id": "obsidian-die-body"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp982qasj2s3x7",
+          "mp9849grejy0q4",
+          "mp984y470cx57g"
+        ],
+        "prompt_tokens": [
+          "rainbow",
+          "holographic",
+          "electric magenta",
+          "neon cyan",
+          "wild"
+        ]
+      }
+    },
+    {
+      "id": "ice-stone-sss",
+      "name": "Ice Stone SSS",
+      "family_kind": "wet_glass",
+      "prose": "Crystalline blue-grey with layered noise grain, internal SSS crack glow, and Fresnel ice-white rim. Three-octave noise for realism. SSS brightens on chain state. Mobile-safe.",
+      "shader_hints": {
+        "intent": "Sub-surface scatter crystal with Fresnel rim \u2014 ice blocker archetype",
+        "cost_estimate": "moderate",
+        "fallback_material_id": "obsidian-die-body"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp9849grejy0q4",
+          "mp984y470cx57g",
+          "mp9854h7uuz88j",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "crystal",
+          "ice",
+          "cyan",
+          "neon cyan",
+          "crystalline"
+        ]
+      }
+    },
+    {
+      "id": "dark-granite-blocker",
+      "name": "Dark Granite Void-Glow",
+      "family_kind": "stone",
+      "prose": "Two-octave granite with neon cyan Fresnel rim on chain state and magenta health-crack glow. Rim pulse synced to chain timer. Mobile-safe.",
+      "shader_hints": {
+        "intent": "Granite with reactive neon rim and health crack indicator",
+        "cost_estimate": "cheap",
+        "fallback_material_id": "obsidian-die-body"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "obsidian",
+          "granite",
+          "void",
+          "neon cyan",
+          "gothic"
+        ]
+      }
+    },
+    {
+      "id": "bio-bomb-membrane",
+      "name": "Bio Bomb Membrane",
+      "family_kind": "bioluminescent",
+      "prose": "Obsidian bomb body with pulsing neon-red organic veins. Three-octave noise for vein network; Fresnel rim; pulse speed increases pre-destroy. Pre-destroy state shifts vein color to bright magenta. Mobile-safe.",
+      "shader_hints": {
+        "intent": "Pulsing bio-organic vein network for bomb tile \u2014 danger escalation through pulse speed",
+        "cost_estimate": "moderate",
+        "fallback_material_id": "obsidian-die-body"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp986ujmusplnk",
+          "mp987rnf3mm36q",
+          "mp987tfy8zzv75",
+          "mp982qasj2s3x7",
+          "mp9849grejy0q4"
+        ],
+        "prompt_tokens": [
+          "bioluminescent",
+          "organic vein",
+          "bio",
+          "pulsing",
+          "biomechanical"
+        ]
+      }
+    },
+    {
+      "id": "plasma-orb-octahedron",
+      "name": "Plasma Orb Octahedron",
+      "family_kind": "plasma",
+      "prose": "Octahedron with MeshStandardMaterial emissive purple and lineSegments arc discharge. Arcs update at 12fps to avoid per-frame heap allocation. Glow shell via BackSide meshBasicMaterial. Mobile-safe.",
+      "evidence": {
+        "image_ids": [
+          "mp982qasj2s3x7",
+          "mp9849grejy0q4",
+          "mp984y470cx57g",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "plasma",
+          "electric magenta",
+          "oscilloscope",
+          "neon",
+          "magenta bloom"
+        ]
+      }
+    },
+    {
+      "id": "holographic-lattice-surface",
+      "name": "Holographic Lattice Board Surface",
+      "family_kind": "holographic",
+      "prose": "The board floor as a holographic lattice grid. Currently a flat MeshStandardMaterial \u2014 target is a shader-driven node-graph surface with flowing cyan connections between column cells, matching the Unified Lattice vocabulary from the corpus.",
+      "shader_hints": {
+        "intent": "Board floor that reads as the Unified Lattice \u2014 flowing synaptic connections between columns",
+        "cost_estimate": "moderate"
+      },
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "unified lattice",
+          "neural lattice",
+          "node graph",
+          "synaptic",
+          "lattice"
+        ]
+      }
+    }
+  ],
+  "lighting_moods": [
+    {
+      "id": "cathedral-key-skeletal-rim",
+      "recipe_name": "Cathedral Key \u2014 Skeletal Rim",
+      "description": "Strong warm key light from upper-right with cool blue fill and cyan rim. Reads as torch-lit gothic interior \u2014 warm dominant, cool shadow. Current production lighting in VoxelPileScene but missing HDRI environment and with ambient too high (2.0 flattens depth; target 0.5-0.7).",
+      "key_light": {
+        "color_hex": "#fff8e0",
+        "energy": 2.8,
+        "angle_degrees": 45,
+        "shadow": true
+      },
+      "fill_light": {
+        "color_hex": "#c8dde8",
+        "energy": 0.9
+      },
+      "rim_light": {
+        "color_hex": "#00e5ff",
+        "energy": 1.2
+      },
+      "ambient_color_hex": "#0d1a26",
+      "post_processing_notes": "Bloom on emissive pips. Vignette to reinforce void center-dark. No SSAO on mobile.",
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele",
+          "mp99wicwxre5ci",
+          "mp99wtoufqi30a"
+        ],
+        "prompt_tokens": [
+          "gothic hacker",
+          "carved stone",
+          "skeletal gold",
+          "void black",
+          "gold filigree"
+        ]
+      }
+    },
+    {
+      "id": "neural-deep-void",
+      "recipe_name": "Neural Deep Void",
+      "description": "Minimal ambient with strong cyan rim lights simulating bioluminescent lattice nodes. Board surface glows as if internally lit by the network. Suitable for multiplayer sync state screens where data flow must be visually dominant.",
+      "key_light": {
+        "color_hex": "#e8f4ff",
+        "energy": 1.8
+      },
+      "fill_light": {
+        "color_hex": "#001833",
+        "energy": 0.4
+      },
+      "rim_light": {
+        "color_hex": "#3388ff",
+        "energy": 2.0
+      },
+      "ambient_color_hex": "#050008",
+      "evidence": {
+        "image_ids": [
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f",
+          "mp987jsz9etcvq",
+          "mp9849grejy0q4",
+          "mp984y470cx57g"
+        ],
+        "prompt_tokens": [
+          "neural lattice",
+          "synaptic",
+          "neon cyan",
+          "unified lattice",
+          "electric blue"
+        ]
+      }
+    }
+  ],
+  "compositions": [
+    {
+      "id": "orthographic-infographic",
+      "archetype_name": "Orthographic Infographic \u2014 The Unified Lattice",
+      "description": "Top-down or 3/4 orthographic view of a system diagram with annotated nodes, edge labels, and radial hub-and-spoke layout. Most common composition type in corpus (approx 420 instances).",
+      "recurring_elements": [
+        "central hub node",
+        "radial spokes",
+        "edge label typography",
+        "color-coded node types",
+        "filigree borders"
+      ],
+      "evidence_image_ids": [
+        "mp981u89x1c8wg",
+        "mp981zicd0eh00",
+        "mp9820yo8vbyvu"
+      ]
+    },
+    {
+      "id": "cinematic-wide-board",
+      "archetype_name": "Cinematic Wide \u2014 Active Board Play",
+      "description": "Low-angle wide shot of the board during active play with particle chain visible. Dice in motion, column overflow indicators, chain line connecting matched dice. Approximately 130 corpus instances.",
+      "recurring_elements": [
+        "column grid lines",
+        "particle chain arc",
+        "overflow danger tint",
+        "board floor reflection"
+      ],
+      "evidence_image_ids": [
+        "mp983z5hddxml1",
+        "mp9852jj2zsek9",
+        "mp98566unhdgnf",
+        "mp982qasj2s3x7",
+        "mp9862dc4khjqy"
+      ]
+    },
+    {
+      "id": "macro-die-specimen",
+      "archetype_name": "Macro Close-Up \u2014 Die Specimen on Pedestal",
+      "description": "Extreme close-up of a single die specimen on an obsidian pedestal with HDRI reflections and neon pip glow visible. Approximately 95 corpus instances, primarily in prompt text referencing 'specimen on obsidian pedestal'.",
+      "recurring_elements": [
+        "die body detail",
+        "pip glow halo",
+        "reflection on pedestal",
+        "void background"
+      ],
+      "evidence_image_ids": [
+        "mp982qasj2s3x7",
+        "mp9862dc4khjqy",
+        "mp98742mc3ukl9",
+        "mp981pc1oj760u",
+        "mp983ctn30wp34"
+      ]
+    },
+    {
+      "id": "gothic-triptych",
+      "archetype_name": "Gothic Triptych \u2014 Three-Panel System View",
+      "description": "Three-panel composition showing different game modules side by side in gothic arch frames. Evidence from prompts referencing 'gothic-hacker triptych'. Approximately 55 corpus instances.",
+      "recurring_elements": [
+        "arch frame borders",
+        "filigree dividers",
+        "per-panel color accent",
+        "shared void background"
+      ],
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele",
+        "mp99wicwxre5ci",
+        "mp99wtoufqi30a"
+      ]
+    }
+  ],
+  "motion_language": [
+    {
+      "id": "ritual-rise",
+      "principle_name": "Ritual Rise",
+      "description": "Slow deliberate entrance with overshoot settle \u2014 like a stone mechanism engaging. Used for modal appearances, score reveal panels, and win screen elements.",
+      "easing_curve": "cubic-bezier(0.12, 0.76, 0.24, 1)",
+      "duration_range_ms": [
+        180,
+        320
+      ],
+      "applies_to": [
+        "modal_in",
+        "win_screen_reveal",
+        "score_panel"
+      ],
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele"
+      ]
+    },
+    {
+      "id": "snap-confirm",
+      "principle_name": "Snap Confirm",
+      "description": "Instant-fast tap response with micro-bounce \u2014 under 85ms total. Used for all chain start, chain extend, and button tap confirmations.",
+      "easing_curve": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "duration_range_ms": [
+        55,
+        85
+      ],
+      "applies_to": [
+        "chain_start",
+        "chain_extend",
+        "button_tap",
+        "tile_lock"
+      ],
+      "evidence_image_ids": [
+        "mp982qasj2s3x7",
+        "mp9862dc4khjqy"
+      ]
+    },
+    {
+      "id": "danger-cut",
+      "principle_name": "Danger Cut",
+      "description": "Abrupt entrance with no ease-in \u2014 the visual equivalent of an alarm. Used for Farkle collapse, bomb pre-destroy, and sync loss warnings.",
+      "easing_curve": "cubic-bezier(0.72, 0, 0.84, 0.22)",
+      "duration_range_ms": [
+        110,
+        160
+      ],
+      "applies_to": [
+        "farkle_collapse",
+        "bomb_pre_destroy",
+        "desync_warning"
+      ],
+      "evidence_image_ids": [
+        "mp986ujmusplnk",
+        "mp987rnf3mm36q",
+        "mp987tfy8zzv75"
+      ]
+    }
+  ],
+  "discovered_vocabulary": [
+    {
+      "term": "Phantasmagoric Chain",
+      "coined_from_prompt_tokens": [
+        "phantasmagoric chain",
+        "match-3 tier 4"
+      ],
+      "definition": "The match chain visualized as a spectral neon ribbon connecting matched dice \u2014 not a geometric line but a living thread of charged light that persists for the chain duration and dissolves on commit or break.",
+      "proposed_use": "Replace current ChainLine `lineBasicMaterial color='#ffd700'` with a glowing ribbon shader or Fresnel tube that reads as the Phantasmagoric Chain. Priority P1 for the vertical slice.",
+      "evidence": {
+        "image_ids": [
+          "mp982qasj2s3x7",
+          "mp9862dc4khjqy",
+          "mp9849grejy0q4",
+          "mp984y470cx57g"
+        ],
+        "prompt_tokens": [
+          "phantasmagoric chain",
+          "match-3 tier",
+          "neon",
+          "chain module"
+        ]
+      },
+      "confidence": "high"
+    },
+    {
+      "term": "Unified Lattice",
+      "coined_from_prompt_tokens": [
+        "unified lattice",
+        "hub radiates",
+        "node graph"
+      ],
+      "definition": "The game board conceptualized as a living neural-network organism with columns as data channels and dice as active nodes. The Unified Lattice is not background \u2014 it is the primary character of the visual space.",
+      "proposed_use": "Board floor shader that renders flowing node-to-node connections between column cells. Animate connection brightness based on active chain state. Replaces current flat MeshStandardMaterial '#0d2040' board floor.",
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "unified lattice",
+          "hub radiates",
+          "fractal tendril",
+          "neural lattice",
+          "node graph"
+        ]
+      },
+      "confidence": "high"
+    },
+    {
+      "term": "Facet Sigil",
+      "coined_from_prompt_tokens": [
+        "facet sigil",
+        "scoring modifier glyph",
+        "facet mutation"
+      ],
+      "definition": "The die face number glyph recontextualized as a carved ritual sigil that animates during chain-lock. The sigil dissolves and reforms on face-match to signal scoring confirmation, not just a static number.",
+      "proposed_use": "Animated canvas texture update on die face during chain confirm \u2014 the pip arrangement morphs or brightens with a brief flash animation timed to the chain lock event from FarkleStore.",
+      "evidence": {
+        "image_ids": [
+          "mp981pc1oj760u",
+          "mp983ctn30wp34",
+          "mp983wq679kele"
+        ],
+        "prompt_tokens": [
+          "facet sigil",
+          "scoring modifier glyph",
+          "facet mutation",
+          "sigil mid-flip",
+          "facet mutations"
+        ]
+      },
+      "confidence": "high"
+    },
+    {
+      "term": "Void Resonance Layer",
+      "coined_from_prompt_tokens": [
+        "void resonance",
+        "void",
+        "resonant pulse"
+      ],
+      "definition": "A fullscreen atmospheric layer behind the 3D scene that pulses in harmony with the game's emotional/tension state \u2014 nearly invisible at low tension, visibly alive during Frenzy state. Not a background color but a reactive shader plane.",
+      "proposed_use": "Fullscreen quad behind Canvas with a low-frequency noise shader (uTime, uFrenzyIntensity) that reads frenzy state from FarkleStore via a React bridge. Already partially implemented in FarkleHUD as VoidResonanceLayer CSS \u2014 extend to 3D layer.",
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp981pc1oj760u",
+          "mp983ctn30wp34"
+        ],
+        "prompt_tokens": [
+          "void resonance",
+          "resonant pulse",
+          "void",
+          "void-black",
+          "oscilloscope"
+        ]
+      },
+      "confidence": "high"
+    },
+    {
+      "term": "Dream-Core Pulse",
+      "coined_from_prompt_tokens": [
+        "dream-core",
+        "pulses like a heart",
+        "central hub"
+      ],
+      "definition": "The center column of the board acts as the Dream-Core hub \u2014 the pulsing origin point from which all game energy radiates. The center column should have heightened visual energy: brighter candle, sharper rim, faster particle emission.",
+      "proposed_use": "Increase center CandleLight intensity by 30% relative to flanking candles. Add a subtle <Sparkles> halo at column 3 (center). Tie pulse rate to current multiplier level from FarkleStore.",
+      "evidence": {
+        "image_ids": [
+          "mp981u89x1c8wg",
+          "mp981zicd0eh00",
+          "mp9820yo8vbyvu",
+          "mp98742mc3ukl9",
+          "mp987g0hb95b5f"
+        ],
+        "prompt_tokens": [
+          "dream-core",
+          "central hub",
+          "hub radiates",
+          "pulses like a heart",
+          "central"
+        ]
+      },
+      "confidence": "high"
+    }
+  ],
+  "cross_motif_relationships": [
+    {
+      "type": "blend",
+      "source_motif_id": "skeletal-gold",
+      "target_motif_id": "neural-neon",
+      "description": "The primary aesthetic blend of the game: gothic ceremonial structure overlaid with living neural network energy. Every screen should have both gold filigree structure and neon lattice pulse.",
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele",
+        "mp98742mc3ukl9",
+        "mp987g0hb95b5f"
+      ]
+    },
+    {
+      "type": "contrast",
+      "source_motif_id": "obsidian-membrane",
+      "target_motif_id": "magenta-bloom",
+      "description": "Maximum contrast pair: void absorbs all light; magenta bloom erupts from it as reward confirmation. The contrast makes both more powerful \u2014 magenta needs obsidian to read as exceptional.",
+      "evidence_image_ids": [
+        "mp981u89x1c8wg",
+        "mp981zicd0eh00",
+        "mp9820yo8vbyvu",
+        "mp982qasj2s3x7",
+        "mp9849grejy0q4"
+      ]
+    },
+    {
+      "type": "transition",
+      "source_motif_id": "casino-glint",
+      "target_motif_id": "bio-organic",
+      "description": "Casino Glint escalates to Bio Organic as game pressure increases \u2014 gold specular gives way to red vein pulsing as Farkle risk rises. This transition should be visible in the board lighting.",
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele",
+        "mp986ujmusplnk",
+        "mp987rnf3mm36q"
+      ]
+    }
+  ],
+  "creative_director_notes": [
+    {
+      "id": "canvas-config-critical",
+      "topic": "Canvas Configuration \u2014 Missing ACESFilmic and Shadows",
+      "prose": "The current VoxelPileScene Canvas uses `flat` prop (disables tone mapping) and `antialias: false`. The `flat` flag overrides any tone mapping setting, so ACESFilmicToneMapping and SRGBColorSpace are not applied. The result is a scene where emissive materials look mathematically correct but aesthetically flat \u2014 bloom cannot build properly, HDR values in the wild-die and orb shaders do not tonemap to the target look. The immediate fix is to remove `flat`, add `gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1, outputColorSpace: THREE.SRGBColorSpace }}`, and add `shadows` prop. Ambient intensity should drop from 2.0 to 0.6 to restore depth under the new tonemap.",
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele"
+      ],
+      "recommendations": [
+        {
+          "label": "implement_now",
+          "text": "Remove `flat` prop, add ACESFilmic tonemap, SRGBColorSpace, shadows, cap dpr at 2. Reduce ambient from 2.0 to 0.6. Add <Environment preset='city'> as baseline HDRI."
+        }
+      ]
+    },
+    {
+      "id": "post-processing-missing",
+      "topic": "Post-Processing Chain \u2014 EffectComposer Not Present",
+      "prose": "No @react-three/postprocessing EffectComposer exists in the codebase. The wild-die shader emits HDR values (vec3(2.5,2.5,2.5)) explicitly to feed bloom \u2014 but without an EffectComposer Bloom effect, those values simply clamp to white with no glow. The multiplier orb emissiveIntensity=3.2 similarly has no bloom receiver. The minimum viable fix is Bloom + Vignette only (MC-2 Option A), which is mobile-safe and recovers the emissive budget already authored in the shaders.",
+      "evidence_image_ids": [
+        "mp982qasj2s3x7",
+        "mp9849grejy0q4",
+        "mp984y470cx57g"
+      ],
+      "recommendations": [
+        {
+          "label": "implement_now",
+          "text": "Install @react-three/postprocessing. Add EffectComposer with Bloom(luminanceThreshold=0.6, intensity=0.8) + Vignette(darkness=0.42). Mobile: same chain with reduced Bloom intensity=0.5."
+        }
+      ]
+    },
+    {
+      "id": "multiplayer-palette-wrong",
+      "topic": "MultiplayerLobby.tsx \u2014 Wrong Palette",
+      "prose": "MultiplayerLobby.tsx uses '#0a1628', '#7ecfff', '#1a4060' \u2014 a completely different palette from the Gothic Hacker Neon system. This creates a jarring visual discontinuity when the player navigates to multiplayer. The palette needs to be unified to OV / GH tokens before the vertical slice ships. The cyan value '#7ecfff' is close to OV.cyan but at the wrong lightness, and '#0a1628' is a mid-blue rather than the correct '#050008' void.",
+      "evidence_image_ids": [
+        "mp98742mc3ukl9",
+        "mp987g0hb95b5f",
+        "mp987jsz9etcvq"
+      ],
+      "recommendations": [
+        {
+          "label": "implement_now",
+          "text": "Retheme MultiplayerLobby.tsx to use GH palette (void, neural, bone, gold, cyan, acidLime) matching HomeScreen. Replace all hardcoded blues with OV token values."
+        }
+      ]
+    },
+    {
+      "id": "tokens-missing-acids",
+      "topic": "tokens.ts \u2014 Missing acidLime and syncBlue Keys",
+      "prose": "The design_tokens.json requires acidLime (#c8d400) as the primary action color and syncBlue (#3388ff) as the network sync color. Both are present in local GH palette objects inside each component (HomeScreen, FarkleHUD, WinLoseScreen) but are absent from the canonical tokens.ts OV export. This means each component hardcodes the values independently, preventing the single-source-of-truth requirement. tokens.ts needs acidLime, syncBlue, and the full motion/typography token set from design_tokens.json.",
+      "evidence_image_ids": [
+        "mp981pc1oj760u",
+        "mp983ctn30wp34",
+        "mp983wq679kele"
+      ],
+      "recommendations": [
+        {
+          "label": "implement_now",
+          "text": "Add to tokens.ts: acidLime, syncBlue, full motion durations, easing curves, spacing scale, radius scale. Export CSS custom properties at :root from main.tsx."
+        }
+      ]
+    },
+    {
+      "id": "chain-line-placeholder",
+      "topic": "ChainLine \u2014 Placeholder lineBasicMaterial Gold",
+      "prose": "The current ChainLine renders as lineBasicMaterial color='#ffd700' \u2014 a flat gold line with no glow, no width, and no visual connection to the Phantasmagoric Chain vocabulary from the corpus (87 prompt references). This is the most visible placeholder in the game scene during active play. The chain is the primary interaction feedback element and must be upgraded to slice quality.",
+      "evidence_image_ids": [
+        "mp982qasj2s3x7",
+        "mp9862dc4khjqy"
+      ],
+      "recommendations": [
+        {
+          "label": "implement_now",
+          "text": "Replace ChainLine with a tube-mesh or screen-space glow line using OV.cyan color, bloom-fed emissive value, and opacity pulse tied to chain length. Use useRef for positions to avoid React re-renders."
+        }
+      ]
+    }
+  ],
+  "coverage_report": {
+    "per_motif": [
+      {
+        "motif_id": "skeletal-gold",
+        "sample_count": 854,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "neural-neon",
+        "sample_count": 789,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "obsidian-membrane",
+        "sample_count": 536,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "cyan-lattice",
+        "sample_count": 517,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "magenta-bloom",
+        "sample_count": 546,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "cyber-terminal",
+        "sample_count": 743,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "casino-glint",
+        "sample_count": 284,
+        "confidence_flag": "high"
+      },
+      {
+        "motif_id": "bio-organic",
+        "sample_count": 436,
+        "confidence_flag": "high"
+      }
+    ],
+    "low_confidence_motifs": [],
+    "unused_corpus_count": 1080,
+    "coverage_percentage": 3.1,
+    "notes": "Coverage percentage reflects only evidence_image_ids cited in this manifest (35 IDs), not semantic coverage. Semantically all 8 motifs are supported by corpus-wide keyword matching covering 100% of the 1115 prompts. The 3.1% figure counts only the sample IDs explicitly listed in evidence blocks; the full motif support spans 284-854 samples each."
+  }
+}

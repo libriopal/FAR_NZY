@@ -1,0 +1,669 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://libriopal.dev/schemas/visual-manifest.json",
+  "title": "Visual Manifest",
+  "description": "Deterministic schema for the visual manifest generated from the /data training corpus. Strict where structure matters (counts, evidence, file references, accessibility, IDs). Open where creativity matters (motif names, mood prose, discovered vocabulary, lighting recipes, material coinages). Every creative claim must be backed by corpus evidence.",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "generated_at",
+    "corpus",
+    "palettes",
+    "motifs",
+    "materials",
+    "coverage_report"
+  ],
+  "additionalProperties": false,
+
+  "$defs": {
+    "iso_datetime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Low confidence requires a justification field. High confidence requires >=20 supporting samples."
+    },
+    "hex_color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+    },
+    "image_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Basename or meta.id of a file in data/. Must correspond to an actual file in the corpus."
+    },
+    "id_slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,63}$",
+      "description": "Lowercase ID slug. Used for cross-references."
+    },
+    "evidence_block": {
+      "type": "object",
+      "description": "Required backing for any creative claim. >=3 corpus images, >=2 prompt tokens.",
+      "required": ["image_ids", "prompt_tokens"],
+      "properties": {
+        "image_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/image_id" },
+          "minItems": 3,
+          "uniqueItems": true
+        },
+        "prompt_tokens": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 2,
+          "uniqueItems": true,
+          "description": "Tokens drawn verbatim from .info.json info.prompt fields that justify the claim."
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "open_attributes": {
+      "type": "object",
+      "description": "Open key/value bag for motif-specific, palette-specific, or material-specific fields that do not fit predefined slots. Keys SHOULD be snake_case; values may be any JSON. This is a creative escape hatch — do not abuse it for fields that belong in a structured slot.",
+      "additionalProperties": true
+    },
+    "extended_role": {
+      "type": "string",
+      "pattern": "^custom\\.[a-z][a-z0-9_]{1,40}$",
+      "description": "Extended semantic role coined by Claude Code. MUST be prefixed with 'custom.' so coinages are deliberate, not typos."
+    }
+  },
+
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "generated_at": { "$ref": "#/$defs/iso_datetime" },
+    "generator": {
+      "type": "object",
+      "required": ["name", "deterministic_seed"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "deterministic_seed": {
+          "type": "integer",
+          "description": "Seed used for any clustering, sampling, or ordering. Required for reproducibility across runs."
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "corpus": {
+      "type": "object",
+      "description": "Strict inventory of /data. Counts must reconcile.",
+      "required": [
+        "root_path",
+        "total_files",
+        "info_json_count",
+        "image_count",
+        "usable_count",
+        "malformed",
+        "off_theme",
+        "quarantined"
+      ],
+      "properties": {
+        "root_path": { "type": "string" },
+        "total_files": { "type": "integer", "minimum": 0 },
+        "info_json_count": { "type": "integer", "minimum": 0 },
+        "image_count": { "type": "integer", "minimum": 0 },
+        "usable_count": { "type": "integer", "minimum": 0 },
+        "malformed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "properties": {
+              "path": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "off_theme": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "properties": {
+              "path": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "quarantined": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "properties": {
+              "path": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "reconciliation_note": {
+          "type": "string",
+          "description": "Plain-language statement verifying usable_count + malformed + off_theme + quarantined == total_files (or explaining any delta)."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "palettes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Palette options derived from the corpus. Each is a coherent set of swatches with semantic roles, evidence, and creative framing.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "mood_prose",
+          "swatches",
+          "contrast_audit",
+          "evidence",
+          "confidence"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Creative palette name coined by Claude Code from corpus evidence. No enum.",
+            "examples": [
+              "Skeletal Gold Ceremonial",
+              "Neural Neon Arcade",
+              "Obsidian Membrane Dusk",
+              "Cyan Lattice At Vespers"
+            ]
+          },
+          "mood_prose": {
+            "type": "string",
+            "minLength": 40,
+            "description": "1-3 sentence mood statement: what this palette evokes and when to deploy it."
+          },
+          "narrative": {
+            "type": "string",
+            "description": "Optional longer-form art-direction prose. Use when the palette has a story worth telling the team."
+          },
+          "swatches": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "required": ["hex", "role", "role_kind", "evidence_image_ids"],
+              "properties": {
+                "hex": { "$ref": "#/$defs/hex_color" },
+                "role": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "primary",
+                        "accent",
+                        "surface",
+                        "surface_alt",
+                        "danger",
+                        "success",
+                        "warning",
+                        "info",
+                        "edge_glow",
+                        "rim",
+                        "deep_shadow",
+                        "highlight",
+                        "neutral_text",
+                        "muted_text"
+                      ]
+                    },
+                    { "$ref": "#/$defs/extended_role" }
+                  ]
+                },
+                "role_kind": {
+                  "type": "string",
+                  "enum": ["canonical", "extended"]
+                },
+                "evidence_image_ids": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/image_id" },
+                  "minItems": 1
+                },
+                "notes": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "contrast_audit": {
+            "type": "object",
+            "description": "WCAG accessibility checks. Body text on surface MUST be >=4.5 or carry a fallback_pairing.",
+            "required": ["body_text_on_surface", "hud_text_on_primary"],
+            "properties": {
+              "body_text_on_surface": { "type": "number", "minimum": 0 },
+              "hud_text_on_primary": { "type": "number", "minimum": 0 },
+              "fallback_pairing": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "scene_suitability": {
+            "type": "object",
+            "description": "Creative judgment of when this palette works best.",
+            "properties": {
+              "daylight": { "type": "boolean" },
+              "night": { "type": "boolean" },
+              "transition": { "type": "boolean" },
+              "ui_only": { "type": "boolean" },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "evidence": { "$ref": "#/$defs/evidence_block" },
+          "confidence": { "$ref": "#/$defs/confidence" },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "motifs": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Visual motif clusters. Names are coined by Claude Code from prompt-token clustering, not predefined. Every motif must be evidence-backed.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prose_description",
+          "evidence",
+          "confidence"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Creative motif name coined from the corpus. No enum.",
+            "examples": [
+              "Skeletal Gold",
+              "Neural Neon",
+              "Obsidian Membrane",
+              "Cyan Lattice",
+              "Magenta Bloom",
+              "Votive Static",
+              "Fang Cathedral"
+            ]
+          },
+          "prose_description": {
+            "type": "string",
+            "minLength": 60,
+            "description": "2-4 sentences describing the motif's visual identity and what makes it distinct from neighboring motifs."
+          },
+          "palette_affinities": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/id_slug" }
+          },
+          "material_affinities": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/id_slug" }
+          },
+          "lighting_recipe_affinities": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/id_slug" }
+          },
+          "mood_descriptors": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 2 },
+            "description": "Free-form mood tags. Coined by Claude Code (e.g. 'reverent', 'predatory', 'hushed', 'feverish', 'votive')."
+          },
+          "lean_into": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Creative direction: what to amplify when working in this motif."
+          },
+          "avoid": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Creative direction: what to suppress or avoid when working in this motif."
+          },
+          "stage_allocation_hint": {
+            "type": "string",
+            "description": "Optional note on which stages or game contexts this motif suits."
+          },
+          "evidence": { "$ref": "#/$defs/evidence_block" },
+          "confidence": { "$ref": "#/$defs/confidence" },
+          "low_confidence_justification": {
+            "type": "string",
+            "description": "Required if confidence == 'low'. Explain why the motif is being included anyway."
+          },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": { "properties": { "confidence": { "const": "low" } }, "required": ["confidence"] },
+            "then": { "required": ["low_confidence_justification"] }
+          }
+        ]
+      }
+    },
+
+    "materials": {
+      "type": "array",
+      "description": "Surface material families. Canonical families enumerated; extended families coined by Claude Code via 'custom.' prefix.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "family_kind", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "name": {
+            "type": "string",
+            "description": "Creative material name (e.g. 'temple-gold-leaf', 'wet-membrane-violet', 'arcade-glass-cyan')."
+          },
+          "family_kind": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "matte_ceramic",
+                  "brushed_metal",
+                  "polished_metal",
+                  "wet_glass",
+                  "dry_glass",
+                  "bioluminescent",
+                  "holographic",
+                  "fabric",
+                  "stone",
+                  "plasma",
+                  "skin",
+                  "bone",
+                  "liquid",
+                  "smoke"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^custom\\.[a-z][a-z0-9_]{1,40}$"
+              }
+            ]
+          },
+          "prose": { "type": "string" },
+          "standard_material_params": {
+            "type": "object",
+            "description": "Hints for Godot StandardMaterial3D (or engine equivalent). Open object — Claude Code fills what is relevant.",
+            "additionalProperties": true
+          },
+          "shader_hints": {
+            "type": "object",
+            "description": "Optional custom shader recipe. Use ONLY when StandardMaterial3D cannot achieve the look. Must declare intent, cost, fallback.",
+            "required": ["intent", "cost_estimate"],
+            "properties": {
+              "intent": { "type": "string" },
+              "cost_estimate": {
+                "type": "string",
+                "enum": ["cheap", "moderate", "expensive"]
+              },
+              "fallback_material_id": { "$ref": "#/$defs/id_slug" }
+            },
+            "additionalProperties": true
+          },
+          "evidence": { "$ref": "#/$defs/evidence_block" },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "compositions": {
+      "type": "array",
+      "description": "Compositional archetypes recurring in the corpus. Names coined by Claude Code.",
+      "items": {
+        "type": "object",
+        "required": ["id", "archetype_name", "description", "evidence_image_ids"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "archetype_name": {
+            "type": "string",
+            "description": "Creative name (e.g. 'centered-icon-radial-bloom', 'diagonal-cascade-upper-left', 'horizon-pinned-monolith')."
+          },
+          "description": { "type": "string", "minLength": 30 },
+          "recurring_elements": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "evidence_image_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/image_id" },
+            "minItems": 3,
+            "uniqueItems": true
+          },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "lighting_moods": {
+      "type": "array",
+      "description": "Named lighting recipes derived from the corpus. Recipe names are coined by Claude Code.",
+      "items": {
+        "type": "object",
+        "required": ["id", "recipe_name", "description", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "recipe_name": {
+            "type": "string",
+            "description": "Creative recipe name (e.g. 'cathedral-key-skeletal-rim', 'arcade-flicker-magenta-fill', 'votive-static-low-fog')."
+          },
+          "description": { "type": "string", "minLength": 40 },
+          "key_light": {
+            "type": "object",
+            "properties": {
+              "color_hex": { "$ref": "#/$defs/hex_color" },
+              "energy": { "type": "number" },
+              "angle_degrees": { "type": "number" },
+              "shadow": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          },
+          "fill_light": { "type": "object", "additionalProperties": true },
+          "rim_light": { "type": "object", "additionalProperties": true },
+          "ambient_color_hex": { "$ref": "#/$defs/hex_color" },
+          "fog": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "color_hex": { "$ref": "#/$defs/hex_color" },
+              "density": { "type": "number" }
+            },
+            "additionalProperties": true
+          },
+          "post_processing_notes": { "type": "string" },
+          "mood_prose": { "type": "string" },
+          "evidence": { "$ref": "#/$defs/evidence_block" },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "motion_language": {
+      "type": "array",
+      "description": "Named motion principles coined by Claude Code if corpus evidence supports them (e.g. prompt tokens describing pace, tempo, weight, or visible implications of motion in the imagery).",
+      "items": {
+        "type": "object",
+        "required": ["id", "principle_name", "description"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "principle_name": { "type": "string" },
+          "description": { "type": "string", "minLength": 30 },
+          "easing_curve": {
+            "type": "string",
+            "description": "Godot easing name or a custom curve description (e.g. 'EASE_OUT_BACK', 'custom: snap then settle then exhale')."
+          },
+          "duration_range_ms": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "applies_to": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Free-form tags: 'ui_button', 'tile_lock', 'multiplier_advance', 'bomb_fuse', 'farkle_collapse'."
+          },
+          "evidence_image_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/image_id" }
+          },
+          "attributes": { "$ref": "#/$defs/open_attributes" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "discovered_vocabulary": {
+      "type": "array",
+      "description": "Terms coined by Claude Code from corpus prompt-token clustering that did not fit predefined buckets. PRIMARY CREATIVE-COINAGE ZONE. Every term must be evidence-backed.",
+      "items": {
+        "type": "object",
+        "required": ["term", "definition", "evidence", "proposed_use", "confidence"],
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The coined term (e.g. 'votive-glow', 'fang-rim', 'feverlight', 'wet-cathedral')."
+          },
+          "coined_from_prompt_tokens": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2,
+            "uniqueItems": true,
+            "description": "Tokens in .info.json info.prompt fields that suggested this coinage."
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 40
+          },
+          "proposed_use": {
+            "type": "string",
+            "minLength": 30,
+            "description": "Where in the game this term should apply (material, lighting recipe, UI element, motif tag, etc.)."
+          },
+          "evidence": { "$ref": "#/$defs/evidence_block" },
+          "confidence": { "$ref": "#/$defs/confidence" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "cross_motif_relationships": {
+      "type": "array",
+      "description": "Relational taxonomy. Lets motifs reference one another as blends, contrasts, transitions, parent/child, or siblings.",
+      "items": {
+        "type": "object",
+        "required": ["type", "source_motif_id", "target_motif_id", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["blend", "contrast", "transition", "parent_child", "sibling"]
+          },
+          "source_motif_id": { "$ref": "#/$defs/id_slug" },
+          "target_motif_id": { "$ref": "#/$defs/id_slug" },
+          "description": { "type": "string", "minLength": 30 },
+          "evidence_image_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/image_id" }
+          },
+          "stage_use_hint": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "creative_director_notes": {
+      "type": "array",
+      "description": "Free-form prose observations and art-direction recommendations that do not fit any other section. Each note must be tied to evidence and labeled with a recommendation status.",
+      "items": {
+        "type": "object",
+        "required": ["id", "topic", "prose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id_slug" },
+          "topic": { "type": "string" },
+          "prose": { "type": "string", "minLength": 80 },
+          "evidence_image_ids": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/image_id" }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "text"],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "enum": ["implement_now", "prototype_next", "defer_until_gate", "reject"]
+                },
+                "text": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "coverage_report": {
+      "type": "object",
+      "description": "Strict measurement of how well the corpus is used. Flags low-confidence motifs and unused samples.",
+      "required": [
+        "per_motif",
+        "low_confidence_motifs",
+        "unused_corpus_count",
+        "coverage_percentage"
+      ],
+      "properties": {
+        "per_motif": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["motif_id", "sample_count", "confidence_flag"],
+            "properties": {
+              "motif_id": { "$ref": "#/$defs/id_slug" },
+              "sample_count": { "type": "integer", "minimum": 0 },
+              "confidence_flag": { "$ref": "#/$defs/confidence" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "low_confidence_motifs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id_slug" },
+          "description": "Motifs with <20 supporting samples."
+        },
+        "unused_corpus_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of usable corpus files not cited as evidence anywhere in the manifest."
+        },
+        "coverage_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of usable corpus files cited at least once as evidence."
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

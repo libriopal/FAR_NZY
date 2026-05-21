@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────
 
 import React, { useCallback, useEffect, useRef, useState, Component, type ErrorInfo, type ReactNode } from 'react';
+import { OV, TYPE } from '../theme/tokens.js';
 import { useGameStore } from '../store/gameStore.js';
 import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
@@ -45,9 +46,9 @@ function ChapterBanner({ banked, winScore, accentColor, levelName }: { banked: n
       padding: '0 10px', position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${pct * 100}%`, background: `linear-gradient(90deg, ${accentColor}22, ${accentColor}44)`, transition: 'width 0.5s ease' }} />
-      <div style={{ fontSize: 7, fontFamily: 'monospace', color: accentColor, letterSpacing: 2, zIndex: 1, textShadow: `0 0 6px ${accentColor}` }}>{chapter}</div>
-      <div style={{ fontSize: 7, fontFamily: 'monospace', color: 'rgba(232,213,163,0.4)', letterSpacing: 1, zIndex: 1 }}>{levelName}</div>
-      <div style={{ fontSize: 7, fontFamily: 'monospace', color: 'rgba(232,213,163,0.4)', letterSpacing: 1, zIndex: 1 }}>{Math.round(pct * 100)}%</div>
+      <div style={{ fontSize: 7, fontFamily: TYPE.fontCode, color: accentColor, letterSpacing: 2, zIndex: 1, textShadow: `0 0 6px ${accentColor}` }}>{chapter}</div>
+      <div style={{ fontSize: 7, fontFamily: TYPE.fontCode, color: OV.boneDim, letterSpacing: 1, zIndex: 1 }}>{levelName}</div>
+      <div style={{ fontSize: 7, fontFamily: TYPE.fontCode, color: OV.boneDim, letterSpacing: 1, zIndex: 1 }}>{Math.round(pct * 100)}%</div>
     </div>
   );
 }
@@ -78,15 +79,15 @@ function GravityFlipCinematic({ onDone }: { onDone: () => void }) {
         animation: phase === 'flip' ? 'gravityFlipBoard 0.6s ease-in-out forwards' : 'none',
       }}>
         <div style={{
-          fontSize: 11, fontFamily: 'monospace', letterSpacing: 6,
-          color: '#c9a84c', textShadow: '0 0 18px rgba(201,168,76,0.9)',
+          fontSize: 11, fontFamily: TYPE.fontCode, letterSpacing: 6,
+          color: OV.gold, textShadow: `0 0 18px ${OV.goldGlow}`,
           textTransform: 'uppercase',
         }}>
           ⟳ GRAVITY FLIP ⟳
         </div>
         <div style={{
-          fontSize: 9, fontFamily: 'monospace', letterSpacing: 2,
-          color: 'rgba(201,168,76,0.55)',
+          fontSize: 9, fontFamily: TYPE.fontCode, letterSpacing: 2,
+          color: OV.boneDim,
         }}>
           opposite faces · rows reversed
         </div>
@@ -116,16 +117,16 @@ class GameErrorBoundary extends Component<{ children: ReactNode }, { error: stri
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100dvh', background: '#0a1628', color: '#ef4444', fontFamily: 'monospace',
+          height: '100dvh', background: OV.void, color: OV.magenta, fontFamily: TYPE.fontCode,
           padding: 24, gap: 16, textAlign: 'center',
         }}>
           <div style={{ fontSize: 20, fontWeight: 700 }}>Unexpected Error</div>
-          <div style={{ fontSize: 11, color: '#94a3b8', maxWidth: 300, wordBreak: 'break-all' }}>
+          <div style={{ fontSize: 11, color: OV.boneDim, maxWidth: 300, wordBreak: 'break-all' }}>
             {this.state.error}
           </div>
           <button onClick={this._goHome} style={{
-            background: '#1e40af', border: 'none', color: '#fff',
-            borderRadius: 8, padding: '10px 20px', fontFamily: 'monospace', cursor: 'pointer',
+            background: OV.cyan, border: 'none', color: OV.void,
+            borderRadius: 8, padding: '10px 20px', fontFamily: TYPE.fontCode, cursor: 'pointer',
           }}>
             ← Back to Home
           </button>
@@ -347,23 +348,23 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100dvh', background: 'var(--ba-surface-bg)', color: 'var(--ba-danger)', fontFamily: 'monospace',
+        height: '100dvh', background: OV.void, color: OV.magenta, fontFamily: TYPE.fontCode,
         padding: 24, gap: 16, textAlign: 'center',
       }}>
         <div style={{ fontSize: 20, fontWeight: 700 }}>Physics Init Failed</div>
-        <div style={{ fontSize: 11, color: 'var(--ba-marble-800)', maxWidth: 300, wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 11, color: OV.boneDim, maxWidth: 300, wordBreak: 'break-all' }}>
           {initError}
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onRetry} style={{
-            background: 'var(--ba-accent)', border: 'none', color: '#fff',
-            borderRadius: 8, padding: '10px 20px', fontFamily: 'monospace', cursor: 'pointer',
+            background: OV.cyan, border: 'none', color: OV.void,
+            borderRadius: 8, padding: '10px 20px', fontFamily: TYPE.fontCode, cursor: 'pointer',
           }}>
             ↺ Retry
           </button>
           <button onClick={() => setActiveScreen('home')} style={{
-            background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
-            borderRadius: 8, padding: '10px 20px', fontFamily: 'monospace', cursor: 'pointer',
+            background: 'transparent', border: `1px solid ${OV.goldDim}`, color: OV.boneDim,
+            borderRadius: 8, padding: '10px 20px', fontFamily: TYPE.fontCode, cursor: 'pointer',
           }}>
             ← Back
           </button>
@@ -376,17 +377,17 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100dvh', background: 'var(--ba-surface-bg)', color: 'var(--ba-accent)', fontFamily: 'monospace', gap: 16,
+        height: '100dvh', background: OV.void, color: OV.cyan, fontFamily: TYPE.fontCode, gap: 16,
       }}>
         <div style={{
-          width: 40, height: 40, border: '3px solid var(--ba-card-border)', borderTopColor: 'var(--ba-accent)',
+          width: 40, height: 40, border: `3px solid ${OV.goldDim}`, borderTopColor: OV.cyan,
           borderRadius: '50%', animation: 'spin 0.8s linear infinite',
         }} />
-        <div style={{ fontSize: 14 }}>Loading physics...</div>
+        <div style={{ fontSize: 14 }}>Loading physics…</div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <button onClick={() => setActiveScreen('home')} style={{
-          background: 'transparent', border: '1px solid var(--ba-card-border)', color: 'var(--ba-marble-500)',
-          borderRadius: 8, padding: '8px 20px', fontFamily: 'monospace', cursor: 'pointer',
+          background: 'transparent', border: `1px solid ${OV.goldDim}`, color: OV.boneDim,
+          borderRadius: 8, padding: '8px 20px', fontFamily: TYPE.fontCode, cursor: 'pointer',
           fontSize: 12, marginTop: 8,
         }}>
           ← Back
@@ -407,7 +408,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
         borderBottom: '1px solid rgba(201,168,76,0.3)',
       }}>
         <button onClick={() => setActiveScreen('home')} style={{ background: 'none', border: 'none', color: 'rgba(201,168,76,0.8)', fontSize: 18, cursor: 'pointer', padding: 4, textShadow: '0 0 8px rgba(201,168,76,0.5)' }}>&#8592;</button>
-        <div style={{ color: '#c9a84c', fontSize: 10, fontWeight: 700, letterSpacing: 4, fontFamily: 'monospace', textShadow: '0 0 10px rgba(201,168,76,0.6)' }}>
+        <div style={{ color: OV.gold, fontSize: 10, fontWeight: 700, letterSpacing: 4, fontFamily: TYPE.fontCode, textShadow: `0 0 10px ${OV.goldGlow}` }}>
           ✦ {modeName} ✦
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -418,7 +419,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
               border: debugMode ? '1px solid #a855f7' : '1px solid transparent',
               color: debugMode ? '#a855f7' : 'rgba(201,168,76,0.4)',
               borderRadius: 4, fontSize: 13, cursor: 'pointer', padding: '2px 6px',
-              fontFamily: 'monospace', lineHeight: 1,
+              fontFamily: TYPE.fontCode, lineHeight: 1,
             }}
             title="Debug spawn mode"
           >⚙</button>
@@ -467,7 +468,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
                     width: 36, height: 36, borderRadius: 6, border: active ? `2px solid ${color}` : '2px solid #374151',
                     background: active ? `${color}33` : 'rgba(55,65,81,0.5)',
                     color: active ? color : '#6b7280',
-                    fontFamily: 'monospace', fontWeight: 700, fontSize: 16,
+                    fontFamily: TYPE.fontCode, fontWeight: 700, fontSize: 16,
                     cursor: 'pointer', boxShadow: active ? `0 0 8px ${color}88` : 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'all 0.15s',
@@ -486,7 +487,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
             background: 'rgba(5,0,18,0.88)', border: '1px solid rgba(168,85,247,0.4)',
             borderRadius: 8, padding: '5px 8px', alignItems: 'center',
           }}>
-            <span style={{ fontSize: 8, color: 'rgba(168,85,247,0.7)', fontFamily: 'monospace', marginRight: 3 }}>ERK</span>
+            <span style={{ fontSize: 8, color: 'rgba(168,85,247,0.7)', fontFamily: TYPE.fontCode, marginRight: 3 }}>ERK</span>
             {([
               { state: null,           label: 'AUTO', color: '#6b7280' },
               { state: 'calm'        , label: 'CALM', color: '#22d3ee' },
@@ -500,7 +501,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
                   key={label}
                   onPointerDown={e => { e.stopPropagation(); handleMusicForce(state); }}
                   style={{
-                    padding: '3px 7px', borderRadius: 4, fontSize: 9, fontFamily: 'monospace',
+                    padding: '3px 7px', borderRadius: 4, fontSize: 9, fontFamily: TYPE.fontCode,
                     fontWeight: 700, cursor: 'pointer', letterSpacing: 1,
                     border: active ? `1px solid ${color}` : '1px solid #374151',
                     background: active ? `${color}22` : 'rgba(55,65,81,0.5)',
@@ -563,22 +564,22 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
                 ))}
               </div>
               <div style={{
-                color: 'rgba(201,168,76,0.55)', fontSize: 9, fontFamily: 'monospace',
+                color: OV.boneDim, fontSize: 9, fontFamily: TYPE.fontCode,
                 letterSpacing: 5, textTransform: 'uppercase',
               }}>
                 {levelDef.id.replace('_', ' ').toUpperCase()}
               </div>
               <div style={{
-                color: '#e8d5a3', fontSize: 26, fontWeight: 900, fontFamily: 'monospace',
+                color: OV.bone, fontSize: 26, fontWeight: 900, fontFamily: TYPE.fontCode,
                 letterSpacing: 3, textAlign: 'center', lineHeight: 1.2,
-                textShadow: '0 0 18px rgba(201,168,76,0.7), 0 0 40px rgba(201,168,76,0.3)',
+                textShadow: `0 0 18px ${OV.goldGlow}, 0 0 40px rgba(201,168,76,0.3)`,
               }}>
                 {levelDef.name.toUpperCase()}
               </div>
-              <div style={{ height: 1, width: 120, background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.6), transparent)' }} />
+              <div style={{ height: 1, width: 120, background: `linear-gradient(90deg, transparent, ${OV.gold}, transparent)` }} />
               {/* Goal sentence — immediate-understanding gate */}
               <div style={{
-                color: theme.accentColor, fontSize: 11, fontFamily: 'monospace',
+                color: theme.accentColor, fontSize: 11, fontFamily: TYPE.fontCode,
                 letterSpacing: 1, textAlign: 'center', maxWidth: 260, lineHeight: 1.5,
                 textShadow: `0 0 12px ${theme.accentColor}88`,
                 padding: '0 16px',
@@ -586,14 +587,14 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
                 {theme.introText}
               </div>
               <div style={{
-                color: '#00e5ff', fontSize: 13, fontFamily: 'monospace', fontWeight: 700,
-                letterSpacing: 2, textShadow: '0 0 10px rgba(0,229,255,0.6)',
+                color: OV.cyan, fontSize: 13, fontFamily: TYPE.fontCode, fontWeight: 700,
+                letterSpacing: 2, textShadow: `0 0 10px ${OV.cyanGlow}`,
               }}>
                 TARGET: {levelDef.winScore.toLocaleString()}
               </div>
               {levelDef.timeLimitSec && (
                 <div style={{
-                  color: 'rgba(255,114,0,0.85)', fontSize: 10, fontFamily: 'monospace',
+                  color: OV.amberHot, fontSize: 10, fontFamily: TYPE.fontCode,
                   letterSpacing: 2,
                 }}>
                   ⏱ {Math.floor(levelDef.timeLimitSec / 60)}:{String(levelDef.timeLimitSec % 60).padStart(2, '0')} LIMIT

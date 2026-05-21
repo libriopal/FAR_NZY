@@ -37,49 +37,60 @@ export default function App() {
   const kycModalOpen = useKYCStore(s => s.modalOpen);
 
   useEffect(() => {
-    _bootstrap();
+    // Fallback: if _bootstrap hangs or throws, always navigate after 6s
+    const safetyTimer = window.setTimeout(() => {
+      console.warn('[App] bootstrap timeout — forcing age_gate');
+      setActiveScreen('age_gate');
+    }, 6000);
+
+    _bootstrap().finally(() => window.clearTimeout(safetyTimer));
   }, []);
 
   async function _bootstrap() {
-    if (SUPABASE_URL) {
-      initSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      try {
-        const user = await signInAnonymous();
-        if (user) {
-          setUserId(user.id);
-          const sessionId = uuidv4();
+    try {
+      if (SUPABASE_URL) {
+        initSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        try {
+          const user = await signInAnonymous();
+          if (user) {
+            setUserId(user.id);
+            const sessionId = uuidv4();
 
-          analytics.configure({
-            userId: user.id,
-            sessionId,
-            platform: _detectPlatform(),
-            appVersion: '1.0.0',
-            flushFn: flushAnalyticsEvents,
-          });
-          analytics.startAutoFlush();
-          analytics.track({ name: 'session_start', props: { userId: user.id, platform: _detectPlatform(), appVersion: '1.0.0' } });
+            analytics.configure({
+              userId: user.id,
+              sessionId,
+              platform: _detectPlatform(),
+              appVersion: '1.0.0',
+              flushFn: flushAnalyticsEvents,
+            });
+            analytics.startAutoFlush();
+            analytics.track({ name: 'session_start', props: { userId: user.id, platform: _detectPlatform(), appVersion: '1.0.0' } });
 
-          blockchainQueue.setRelayFunction(async (entries: Parameters<typeof relayBlockchainEntries>[0]) => {
-            await relayBlockchainEntries(entries);
-            return [];
-          });
-          blockchainQueue.startAutoFlush();
+            blockchainQueue.setRelayFunction(async (entries: Parameters<typeof relayBlockchainEntries>[0]) => {
+              await relayBlockchainEntries(entries);
+              return [];
+            });
+            blockchainQueue.startAutoFlush();
 
-          const save = await loadPlayerData(user.id);
-          if (save?.meta_resources) {
-            updateResources(save.meta_resources as unknown as Parameters<typeof updateResources>[0]);
+            const save = await loadPlayerData(user.id);
+            if (save?.meta_resources) {
+              updateResources(save.meta_resources as unknown as Parameters<typeof updateResources>[0]);
+            }
           }
+        } catch (e) {
+          console.warn('[App] Auth failed, continuing as guest:', e);
         }
-      } catch (e) {
-        console.warn('[App] Auth failed, continuing as guest:', e);
       }
-    }
 
-    // Skip age gate in dev if already approved
-    const approved = sessionStorage.getItem('compliance_approved');
-    if (approved) {
-      setActiveScreen('home');
-    } else {
+      // Skip age gate if already approved
+      const approved = sessionStorage.getItem('compliance_approved');
+      if (approved) {
+        setActiveScreen('home');
+      } else {
+        setActiveScreen('age_gate');
+      }
+    } catch (e) {
+      console.error('[App] bootstrap error:', e);
       setActiveScreen('age_gate');
     }
   }
@@ -120,12 +131,35 @@ function SplashScreen() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: '#0a1628', color: '#7ecfff', fontFamily: 'monospace',
-      flexDirection: 'column', gap: 16,
+      height: '100vh',
+      background: '#050008',
+      backgroundImage: 'radial-gradient(ellipse at 50% 30%, rgba(201,168,76,0.06) 0%, transparent 60%)',
+      flexDirection: 'column', gap: 14,
     }}>
-      <div style={{ fontSize: 48 }}>🌿</div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>The Living Blueprint</div>
-      <div style={{ color: '#1a4060', fontSize: 13 }}>Initializing...</div>
+      {/* Filigree */}
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        {[3,5,8,5,3].map((s,i) => (
+          <div key={i} style={{
+            width: s, height: s,
+            background: i === 2 ? '#c9a84c' : 'rgba(201,168,76,0.25)',
+            transform: 'rotate(45deg)',
+            boxShadow: i === 2 ? '0 0 6px rgba(201,168,76,0.55)' : 'none',
+          }} />
+        ))}
+      </div>
+      <div style={{
+        fontSize: 20, fontWeight: 900, color: '#f0c860', letterSpacing: 4,
+        fontFamily: '"Cinzel", Georgia, serif',
+        textShadow: '0 0 20px rgba(201,168,76,0.55)',
+      }}>
+        FARKLE FRENZY
+      </div>
+      <div style={{
+        color: 'rgba(232,213,163,0.35)', fontSize: 10,
+        fontFamily: '"JetBrains Mono", monospace', letterSpacing: 3,
+      }}>
+        INITIALIZING…
+      </div>
     </div>
   );
 }
@@ -134,9 +168,12 @@ function LoadingScreen() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: '#0a1628', color: '#7ecfff', fontFamily: 'monospace',
+      height: '100vh', background: '#050008',
+      color: 'rgba(232,213,163,0.35)',
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: 11, letterSpacing: 3,
     }}>
-      Loading level...
+      LOADING…
     </div>
   );
 }

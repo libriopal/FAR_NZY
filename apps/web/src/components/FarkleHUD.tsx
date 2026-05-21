@@ -1925,6 +1925,7 @@ export function VoidResonanceLayer() {
       const t = setTimeout(() => setDischarging(false), 700);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [energy]);
 
   if (!isResonant && !discharging) return null;

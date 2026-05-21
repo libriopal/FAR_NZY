@@ -6,6 +6,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useTrayStore, TRAY_MAX_SLOTS } from '../store/trayStore.js';
 import type { TraySlot } from '../store/trayStore.js';
+import { OV, TYPE } from '../theme/tokens.js';
 
 const FACE_COLOR: Record<number, string> = {
   1: '#f43f5e', 2: '#f97316', 3: '#fbbf24',
@@ -38,7 +39,7 @@ function SlotCell({ slot }: { slot: TraySlot | null }) {
       : slot.entityType === 'wild' ? '#a21caf'
       : slot.entityType === 'bomb' ? '#0a0808'
       : slot.entityType === 'rainbow_bomb' ? '#f0ede0'
-      : (FACE_COLOR[slot.face ?? 1] ?? '#4f46e5')
+      : (FACE_COLOR[slot.face ?? 1] ?? OV.cyan)
     : 'transparent';
 
   return (
@@ -47,9 +48,9 @@ function SlotCell({ slot }: { slot: TraySlot | null }) {
       style={{
         width: 36, height: 36, borderRadius: 6,
         background: slot ? bgColor : 'rgba(255,255,255,0.04)',
-        border: slot ? `1px solid ${bgColor}88` : '1px dashed #2d1f5e',
+        border: slot ? `1px solid ${bgColor}88` : `1px dashed ${OV.goldDim}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'monospace',
+        fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: TYPE.fontCode,
         transition: slot?.state === 'falling' ? 'transform 0.3s ease-out' : 'none',
         position: 'relative', overflow: 'hidden',
       }}
@@ -108,13 +109,13 @@ export function TrayDisplay() {
   return (
     <div style={{
       height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      gap: 6, padding: '0 12px', background: '#07041a', borderTop: '1px solid #1e1b4b',
+      gap: 6, padding: '0 12px', background: OV.neural, borderTop: `1px solid ${OV.goldDim}`,
       flexShrink: 0,
     }}>
       {display.map((slot, i) => (
         <SlotCell key={slot?.id ?? `empty-${i}`} slot={slot} />
       ))}
-      <div style={{ marginLeft: 8, color: '#4f46e5', fontSize: 10, fontFamily: 'monospace', letterSpacing: 1, minWidth: 28, textAlign: 'center' }}>
+      <div style={{ marginLeft: 8, color: OV.cyan, fontSize: 10, fontFamily: TYPE.fontCode, letterSpacing: 1, minWidth: 28, textAlign: 'center' }}>
         {emptyCount}/{TRAY_MAX_SLOTS}
       </div>
       <style>{`@keyframes ember { from { opacity: 0.4; } to { opacity: 0.9; } }`}</style>

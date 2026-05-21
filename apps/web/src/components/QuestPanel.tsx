@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import type { QuestTheme } from '@match3d/ai-quests';
 import { useQuests } from '../hooks/useQuests.js';
+import { OV, TYPE } from '../theme/tokens.js';
 
 export function QuestPanel() {
   const { quests, loading, acceptQuest } = useQuests();
@@ -14,19 +15,34 @@ export function QuestPanel() {
 
   if (loading) {
     return (
-      <div style={{ color: '#1a4060', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
+      <div style={{
+        color: OV.boneDim, fontSize: 12, fontFamily: TYPE.fontCode,
+        textAlign: 'center', padding: '16px 0',
+      }}>
         Loading quests...
       </div>
     );
   }
 
-  if (quests.length === 0) return null;
+  if (quests.length === 0) {
+    return (
+      <div style={{
+        color: OV.boneDim, fontSize: 11, fontFamily: TYPE.fontCode,
+        textAlign: 'center', padding: '20px 0',
+        borderTop: `1px solid ${OV.goldDim}`,
+        marginTop: 8,
+      }}>
+        No active quests — check back soon.
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%', maxWidth: 360 }}>
       <div style={{
-        color: '#2a6a4a', fontSize: 11, textTransform: 'uppercase',
-        letterSpacing: 1, marginBottom: 10,
+        color: OV.gold, fontSize: 11, fontFamily: TYPE.fontCode,
+        textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10,
+        textShadow: `0 0 6px ${OV.goldGlow}`,
       }}>
         Active Quests
       </div>
@@ -56,45 +72,61 @@ function QuestCard({ quest, isAccepted, onAccept }: {
 
   return (
     <div style={{
-      background: 'rgba(13,42,20,0.7)', border: '1px solid #1a3a2a',
-      borderRadius: 10, padding: '12px 14px',
+      background: `rgba(13,0,24,0.88)`,
+      border: `1px solid ${isAccepted ? OV.goldDim : OV.cyanGlow}`,
+      borderRadius: 8,
+      padding: '12px 14px',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span style={{ color: '#5de58a', fontWeight: 700, fontSize: 13 }}>{quest.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <span style={{
+              color: OV.bone, fontWeight: 700, fontSize: 13,
+              fontFamily: TYPE.fontBody,
+            }}>
+              {quest.name}
+            </span>
             {quest.generatedBy === 'llm' && (
               <span style={{
-                fontSize: 9, background: '#0a2a18', color: '#2a7a4a',
-                borderRadius: 4, padding: '1px 5px',
+                fontSize: 9, background: OV.neural,
+                color: OV.cyanBright, borderRadius: 4, padding: '1px 5px',
+                fontFamily: TYPE.fontCode, border: `1px solid ${OV.cyanGlow}`,
               }}>AI</span>
             )}
-            <span style={{ color: '#1a4a2a', fontSize: 9, marginLeft: 'auto' }}>
+            <span style={{ color: OV.boneDim, fontSize: 9, marginLeft: 'auto', fontFamily: TYPE.fontCode }}>
               {timeLeft > 0 ? `${timeLeft}h left` : 'Expiring soon'}
             </span>
           </div>
-          <div style={{ color: '#2a6a3a', fontSize: 11, lineHeight: 1.4, marginBottom: 6 }}>
+          <div style={{
+            color: OV.bone, opacity: 0.7, fontSize: 11,
+            fontFamily: TYPE.fontBody, lineHeight: 1.4, marginBottom: 6,
+          }}>
             {quest.flavorText}
           </div>
           {quest.objectives.map(obj => (
-            <div key={obj.id} style={{ color: '#1a4a2a', fontSize: 11 }}>
-              • {obj.label}
+            <div key={obj.id} style={{ color: OV.cyanBright, fontSize: 11, fontFamily: TYPE.fontCode }}>
+              ▸ {obj.label}
             </div>
           ))}
-          <div style={{ color: '#ffd700', fontSize: 10, marginTop: 4 }}>
-            ×{quest.rewardMultiplier.toFixed(1)} reward multiplier
+          <div style={{
+            color: OV.goldBright, fontSize: 10,
+            fontFamily: TYPE.fontCode, marginTop: 4,
+            textShadow: `0 0 4px ${OV.goldGlow}`,
+          }}>
+            ×{quest.rewardMultiplier.toFixed(1)} reward
           </div>
         </div>
         <button
           onClick={onAccept}
           disabled={isAccepted}
           style={{
-            background: isAccepted ? 'transparent' : '#1a6fd4',
-            border: isAccepted ? '1px solid #1a4a2a' : 'none',
-            color: isAccepted ? '#2a4a2a' : '#fff',
-            borderRadius: 8, padding: '8px 12px',
+            background: isAccepted ? 'transparent' : OV.cyan,
+            border: isAccepted ? `1px solid ${OV.goldDim}` : 'none',
+            color: isAccepted ? OV.gold : OV.void,
+            borderRadius: 6, padding: '8px 12px',
             fontSize: 11, cursor: isAccepted ? 'default' : 'pointer',
-            fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap',
+            fontFamily: TYPE.fontCode, fontWeight: 700, whiteSpace: 'nowrap',
+            boxShadow: isAccepted ? 'none' : `0 0 8px ${OV.cyan}60`,
           }}
         >
           {isAccepted ? '✓ Active' : 'Accept'}
