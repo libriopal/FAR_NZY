@@ -162,11 +162,15 @@ export class VoxelPhysicsSystem {
 
     const bodyDesc = R.RigidBodyDesc.dynamic()
       .setTranslation(spawnX, SPAWN_Y, 0)
+      .setRotation({ x: 0, y: 0, z: 0, w: 1 })
       .setLinearDamping(entityType === 'ghost' ? 0.2 : 1.2)
       .setAngularDamping(entityType === 'ghost' ? 0.8 : 8.0)
       .setCcdEnabled(true);
 
     const body = this.world.createRigidBody(bodyDesc);
+    // Zero out any residual velocity from WASM pool reuse
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
 
     const isSphereShape = entityType === 'sphere' || entityType === 'multiplier_orb' || entityType === 'ghost';
     const collider = isSphereShape
