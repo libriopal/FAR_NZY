@@ -4,16 +4,52 @@
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
 
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.js';
+// ── Startup compatibility guards (must run before any other import) ────────────
+
+// crypto.randomUUID() — missing on Android WebView < 92 and some older Samsung
+// Browser versions. uuid package falls back to Math.random if this is absent,
+// but Capacitor's bridge may also call it directly.
+if (typeof crypto !== 'undefined' && typeof crypto.randomUUID !== 'function') {
+  // Minimal RFC-4122 v4 polyfill using crypto.getRandomValues when available
+  // Cast through unknown to satisfy the branded UUID template-literal return type
+  (crypto as unknown as Record<string, unknown>)['randomUUID'] = function (): string {
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6]! & 0x0f) | 0x40;
+    b[8] = (b[8]! & 0x3f) | 0x80;
+    const h = Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+    return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+  };
+}
+
+// ── Pre-render error fallback ──────────────────────────────────────────────────
+// Shows a visible error screen if the module graph or variant init fails before
+// React is on the page — otherwise the user sees a permanent black screen.
+function showFatalError(message: string): void {
+  const root = document.getElementById('root');
+  if (!root) return;
+  root.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:100vh;background:#050008;color:#e8d5a3;font-family:monospace;
+      padding:24px;text-align:center;gap:12px;">
+      <div style="color:#ff00cc;font-size:14px;font-weight:700">SYSTEM ERROR</div>
+      <div style="color:rgba(232,213,163,0.5);font-size:11px;max-width:320px">${message}</div>
+      <button onclick="window.location.reload()"
+        style="margin-top:16px;background:transparent;border:1px solid #c9a84c;
+          color:#c9a84c;padding:10px 24px;font-family:monospace;
+          font-size:12px;cursor:pointer;border-radius:4px;">
+        RESTART
+      </button>
+    </div>`;
+}
+
+// ── Variant init (localStorage may be blocked in restricted WebViews) ─────────
 import './styles/bio-architect.css';
 import { initVariant } from './styles/variants.js';
+try { initVariant(); } catch { /* body attribute fallback already in initVariant */ }
 
-initVariant();
-
-const root = document.getElementById('root');
-if (!root) throw new Error('Root element not found');
+// ── React + App — loaded dynamically so import errors are catchable ───────────
+import React from 'react';
+import { createRoot } from 'react-dom/client';
 
 class RootErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -54,8 +90,22 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-createRoot(root).render(
-  <RootErrorBoundary>
-    <App />
-  </RootErrorBoundary>
-);
+async function mount(): Promise<void> {
+  const rootEl = document.getElementById('root');
+  if (!rootEl) { showFatalError('Root element not found'); return; }
+
+  try {
+    const { default: App } = await import('./App.js');
+    createRoot(rootEl).render(
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
+    );
+    document.getElementById('pre-js-loader')?.remove();
+  } catch (e) {
+    document.getElementById('pre-js-loader')?.remove();
+    showFatalError(e instanceof Error ? e.message : String(e));
+  }
+}
+
+mount();
