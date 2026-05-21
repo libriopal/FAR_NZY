@@ -95,11 +95,12 @@ export default defineConfig({
   build: {
     target: 'es2020',
     minify: 'esbuild',
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('react-dom') || id.includes('react/')) return 'react-vendor';
-          if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
+          // Merged to avoid circular chunk warning (react ↔ three-vendor cross-dependency)
+          if (id.includes('react') || id.includes('three') || id.includes('@react-three')) return 'vendor';
           if (id.includes('@dimforge/rapier3d-compat') || id.includes('rapier.es')) return 'rapier';
           if (id.includes('packages/game-core')) return 'game-core';
         },

@@ -90,6 +90,25 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
+// ── Debug console bridge (active when VITE_DEBUG_URL is set in .env.local) ────
+const DEBUG_URL = (import.meta.env.VITE_DEBUG_URL as string | undefined)?.replace(/\/$/, '');
+if (DEBUG_URL) {
+  const send = (level: string, args: unknown[]) => {
+    const message = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    fetch(`${DEBUG_URL}/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ level, message }),
+    }).catch(() => {});
+  };
+  const orig = { log: console.log.bind(console), warn: console.warn.bind(console), error: console.error.bind(console) };
+  console.log   = (...a) => { orig.log(...a);   send('log',   a); };
+  console.warn  = (...a) => { orig.warn(...a);  send('warn',  a); };
+  console.error = (...a) => { orig.error(...a); send('error', a); };
+  window.addEventListener('error', e => send('error', [e.message, `${e.filename}:${e.lineno}`]));
+  window.addEventListener('unhandledrejection', e => send('error', ['unhandled:', String(e.reason)]));
+}
+
 async function mount(): Promise<void> {
   const rootEl = document.getElementById('root');
   if (!rootEl) { showFatalError('Root element not found'); return; }
@@ -102,6 +121,12 @@ async function mount(): Promise<void> {
       </RootErrorBoundary>
     );
     document.getElementById('pre-js-loader')?.remove();
+
+    // Hide native splash as soon as React is on screen
+    try {
+      const { SplashScreen } = await import('@capacitor/splash-screen');
+      await SplashScreen.hide({ fadeOutDuration: 200 });
+    } catch { /* not in Capacitor context */ }
   } catch (e) {
     document.getElementById('pre-js-loader')?.remove();
     showFatalError(e instanceof Error ? e.message : String(e));

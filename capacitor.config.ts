@@ -37,6 +37,7 @@ const config: CapacitorConfig = {
       releaseType: 'APK',
     },
     minWebViewVersion: 87,
+    loggingBehavior: 'none',
   },
   ios: {
     contentInset: 'automatic',
