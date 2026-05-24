@@ -1,13 +1,16 @@
 {
   "name": "@match3d/game-core",
   "version": "1.0.0",
+  "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --external @match3d/farkle-shared --external @match3d/farkle-engine",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch --external @match3d/farkle-shared --external @match3d/farkle-engine",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "node --import ../../node_modules/.pnpm/tsx@4.22.0/node_modules/tsx/dist/esm/index.mjs --test src/replay/__tests__/replay.test.ts",
+    "test:replay": "node --import ../../node_modules/.pnpm/tsx@4.22.0/node_modules/tsx/dist/esm/index.mjs --test src/replay/__tests__/replay.test.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.12.0",
