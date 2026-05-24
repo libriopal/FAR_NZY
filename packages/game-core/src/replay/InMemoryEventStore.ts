@@ -45,6 +45,18 @@ export class InMemoryEventStore {
   private events: GameEvent[] = [];
   private snapshots: EventSnapshot[] = [];
 
+  constructor() {
+    const env = process.env['NODE_ENV'];
+    const testRuntime = process.env['TEST_RUNTIME'];
+    if (env === 'production' || (env !== 'test' && testRuntime !== 'true')) {
+      throw new Error(
+        'InMemoryEventStore must not run in production. ' +
+        'Set NODE_ENV=test or TEST_RUNTIME=true for test environments. ' +
+        'Use SupabaseEventStore or PostgresEventStore in production (T4 scope).'
+      );
+    }
+  }
+
   async write(
     event: Omit<GameEvent, 'event_id' | 'predecessor_hash' | 'signature' | 'created_at'>
   ): Promise<GameEvent> {
