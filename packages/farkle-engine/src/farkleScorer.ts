@@ -31,7 +31,7 @@ export interface FarkleResult {
 
 export function scoreFarkle(
   faces: DieFace[],
-  multiplier: number = 1
+  multiplierQ: number = 1000  // Q×1000: 1000 = 1.0×, 1150 = 1.15×, 2500 = 2.5×
 ): FarkleResult {
   const table = getTable();
   const score = lookupScore(faces, table);
@@ -46,7 +46,7 @@ export function scoreFarkle(
 
   return {
     score,
-    scaledScore: Math.round(score * multiplier),
+    scaledScore: Math.round(score * multiplierQ / 1000),
     isFarkle,
     combo,
     triggersBomb,
