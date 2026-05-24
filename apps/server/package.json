@@ -10,6 +10,7 @@
   "dependencies": {
     "@match3d/farkle-shared": "workspace:*",
     "@match3d/farkle-engine": "workspace:*",
+    "@match3d/compliance": "workspace:*",
     "express": "^5.2.1",
     "ws": "^8.19.0",
     "nanoid": "^5.0.0"

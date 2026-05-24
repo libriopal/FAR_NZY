@@ -72,7 +72,11 @@ import { GAME_CONSTANTS, RALLY_MILESTONES, ENERGY_CONSTANTS, getMultiplier, HEIS
 import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, RTP_CONFIGS, applyEventHorizon, resolveComboBreaker, EVENT_HORIZON_EARN_THRESHOLD, MAX_TOKENS, applyGravityFlip, seededRng, applyFlowMultiplier, tickRhythmAccuracy, INITIAL_RHYTHM_STATE, computeSlipstream, applyFacetToScore, startFacetDraft, pickFacet as _pickFacet, skipFacetDraft, tickFacetRound, INITIAL_FACET_STATE, applyActiveRuleShard, activateShard, tickShard, tryEarnShard, INITIAL_SHARD_STATE } from '@match3d/farkle-engine';
 import type { BeatAccuracy, RhythmState, SlipstreamState, FacetState, FacetId, FacetContext, RuleShardState, ShardId, ShardContext } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession, insertWalletTransaction } from './analytics.js';
+import { verifyPlayIntegrity, checkGeofence } from './playIntegrity.js';
+import { ComplianceService } from '@match3d/compliance';
 import { nanoid } from 'nanoid';
+
+const _complianceService = new ComplianceService();
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -170,6 +174,9 @@ export class GameRoom {
   private bankCycleCount: number = 0;  // total banks across all players; every 5 triggers Gravity Flip
   private antesPaidByPlayer: Map<string, number> = new Map(); // playerId → cumulative ante paid this session
   private anteTotalCollected: number = 0; // sum of all antes from all players this session
+  // T2: per-player compliance profile and attestation token for PDX gate
+  private playerComplianceProfile: Map<string, import('@match3d/compliance').ComplianceProfile> = new Map();
+  private playerAttestationToken: Map<string, string> = new Map();
 
   // ── constructor ─────────────────────────────────────────────────────────────
   // Called once when CREATE_ROOM arrives. Grid is seeded and hash committed here
@@ -240,6 +247,33 @@ export class GameRoom {
         this.broadcast({ type: 'ENERGY_UPDATE', playerId: id, energy: p.energy });
       }
     }, TICK_MS);
+  }
+
+  setPlayerCompliance(
+    playerId: string,
+    profile: import('@match3d/compliance').ComplianceProfile,
+    attestationToken: string,
+  ) {
+    this.playerComplianceProfile.set(playerId, profile);
+    this.playerAttestationToken.set(playerId, attestationToken);
+  }
+
+  private async checkPdxEligibility(playerId: string): Promise<{ allowed: boolean; reason?: string }> {
+    const profile = this.playerComplianceProfile.get(playerId);
+    if (!profile) return { allowed: false, reason: 'KYC_PROFILE_MISSING' };
+
+    const kycResult = _complianceService.fullCheck(profile);
+    if (!kycResult.allowed) return { allowed: false, reason: `KYC_BLOCKED: ${kycResult.reason}` };
+
+    if (!checkGeofence(profile.state)) {
+      return { allowed: false, reason: `GEOFENCE_BLOCKED: ${profile.state}` };
+    }
+
+    const token = this.playerAttestationToken.get(playerId);
+    const attestResult = await verifyPlayIntegrity(token);
+    if (!attestResult.allowed) return { allowed: false, reason: attestResult.reason };
+
+    return { allowed: true };
   }
 
   addPlayer(ws: WebSocket, playerId: string, playerName: string) {
@@ -1008,32 +1042,75 @@ export class GameRoom {
       fee_removed_reason: isCasino ? 'VS_CASINO_PLATFORM_FEE_REMOVED_v2' : undefined,
     });
 
-    // Wallet award transactions — fire-and-forget compliance writes
+    // Wallet award transactions — T2: PDX path requires attestation + KYC + geofence
     if (isCasino && playerPayout > 0) {
-      insertWalletTransaction({
-        player_id: triggeringPlayerId,
-        session_id: this.sessionId,
-        type: this.settings.currencyMode === 'PDX' ? 'PDX_AWARD' : 'FD_AWARD',
-        currency: this.settings.currencyMode,
-        amount: playerPayout,
-        balance_after: 0, // caller supplies real balance; 0 = in-game untracked
-        notes: `${this.gameMode} session payout (netRTP=${netRTP})`,
-      });
+      if (this.settings.currencyMode === 'PDX') {
+        // Async gate — do not await in hot path; fire eligibility check and block on result
+        void this.checkPdxEligibility(triggeringPlayerId).then(eligibility => {
+          if (!eligibility.allowed) {
+            this.send(
+              this.players.get(triggeringPlayerId)!.ws,
+              { type: 'PDX_BLOCKED', reason: eligibility.reason, amount: playerPayout },
+            );
+            return;
+          }
+          insertWalletTransaction({
+            player_id: triggeringPlayerId,
+            session_id: this.sessionId,
+            type: 'PDX_AWARD',
+            currency: this.settings.currencyMode,
+            amount: playerPayout,
+            balance_after: 0,
+            notes: `${this.gameMode} session payout (netRTP=${netRTP})`,
+          });
+        });
+      } else {
+        insertWalletTransaction({
+          player_id: triggeringPlayerId,
+          session_id: this.sessionId,
+          type: 'FD_AWARD',
+          currency: this.settings.currencyMode,
+          amount: playerPayout,
+          balance_after: 0,
+          notes: `${this.gameMode} session payout (netRTP=${netRTP})`,
+        });
+      }
     }
     // For Rally, write awards to every player
     if (this.gameMode === 'RALLY_CASINO') {
       for (const [pid, amt] of payouts) {
         if (pid === triggeringPlayerId) continue; // already written above
         if (amt > 0) {
-          insertWalletTransaction({
-            player_id: pid,
-            session_id: this.sessionId,
-            type: this.settings.currencyMode === 'PDX' ? 'PDX_AWARD' : 'FD_AWARD',
-            currency: this.settings.currencyMode,
-            amount: amt,
-            balance_after: 0,
-            notes: `RALLY_CASINO cooperative split (netRTP=${netRTP})`,
-          });
+          if (this.settings.currencyMode === 'PDX') {
+            void this.checkPdxEligibility(pid).then(eligibility => {
+              if (!eligibility.allowed) {
+                this.send(
+                  this.players.get(pid)!.ws,
+                  { type: 'PDX_BLOCKED', reason: eligibility.reason, amount: amt },
+                );
+                return;
+              }
+              insertWalletTransaction({
+                player_id: pid,
+                session_id: this.sessionId,
+                type: 'PDX_AWARD',
+                currency: this.settings.currencyMode,
+                amount: amt,
+                balance_after: 0,
+                notes: `RALLY_CASINO cooperative split (netRTP=${netRTP})`,
+              });
+            });
+          } else {
+            insertWalletTransaction({
+              player_id: pid,
+              session_id: this.sessionId,
+              type: 'FD_AWARD',
+              currency: this.settings.currencyMode,
+              amount: amt,
+              balance_after: 0,
+              notes: `RALLY_CASINO cooperative split (netRTP=${netRTP})`,
+            });
+          }
         }
       }
     }
