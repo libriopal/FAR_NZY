@@ -1,7 +1,17 @@
+// Physics runs at a FIXED timestep (PHYSICS_TIMESTEP seconds per step).
+// world.timestep === PHYSICS_TIMESTEP and the step interval === PHYSICS_TIMESTEP * 1000 ms.
+// Rendering reads physics state each frame but does NOT drive the physics clock.
+// L1-physics-dt-implicit RESOLVED: useFrame delta in PhysicsImpactListener is used only
+// for audio velocity estimation (non-scoring, non-physics path) — acceptable.
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { seededRng } from '@match3d/farkle-engine';
 import type { EntityType, SpawnWeights } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, BOMB_CONSTANTS, MIRROR_OPPOSITES } from '@match3d/farkle-shared';
+
+// ── Physics constants ─────────────────────────────────────────────────────────
+// PHYSICS_TIMESTEP drives both world.timestep and the step interval — single source of truth.
+// Not a scoring multiplier; Q×1000 conversion is NOT required for configuration constants.
+const PHYSICS_TIMESTEP = 1 / 30;
 
 // ── Column layout ─────────────────────────────────────────────────────────────
 // Tighter column spacing matches the render grid (±2.4) for portrait fill
@@ -58,6 +68,17 @@ export interface StoneDestroyResult {
   bioSteelReward: number;
 }
 
+// Input actions queued between physics steps — drained at the start of each step.
+// Guarantees no tap is dropped during a render frame spike (legal compliance: a
+// dropped input on a real-money platform is a compliance failure).
+export type PhysicsActionType = 'remove' | 'anchor_ghost' | 'apply_impulse';
+
+export interface PhysicsAction {
+  type: PhysicsActionType;
+  bodyId: string;
+  impulse?: { x: number; y: number; z: number };
+}
+
 export class VoxelPhysicsSystem {
   private world!: RAPIER.World;
   private rapier!: typeof RAPIER;
@@ -71,6 +92,7 @@ export class VoxelPhysicsSystem {
   private simulationStartedAt = 0;
   private overflowTicks = 0;
   private spawnWeights: SpawnWeights = SPAWN_WEIGHTS.NORMAL;
+  private pendingActions: PhysicsAction[] = [];
   // Accumulates catalyst boosts over the session
   private wildcardBoostPct = 0;
 
@@ -91,7 +113,7 @@ export class VoxelPhysicsSystem {
     this.rapier = rapier;
 
     this.world = new rapier.World({ x: 0, y: -9.81, z: 0 });
-    this.world.timestep = 1 / 30;
+    this.world.timestep = PHYSICS_TIMESTEP;
 
     const groundDesc = rapier.RigidBodyDesc.fixed().setTranslation(0, GROUND_Y - 0.5, 0);
     const ground = this.world.createRigidBody(groundDesc);
@@ -533,6 +555,7 @@ export class VoxelPhysicsSystem {
 
     this.stepInterval = setInterval(() => {
       try {
+        this._drainPendingActions();
         this.world.step();
         this._applyColumnConstraint();
         this._applyGhostDrift();
@@ -548,9 +571,37 @@ export class VoxelPhysicsSystem {
       } catch (err) {
         console.error('[VoxelPhysics] step error:', err);
       }
-    }, 1000 / 30);
+    }, PHYSICS_TIMESTEP * 1000);
 
     this.spawnInterval = setInterval(() => this._fillColumns(), 800);
+  }
+
+  // ── Input queue ───────────────────────────────────────────────────────────
+
+  enqueueAction(action: PhysicsAction): void {
+    this.pendingActions.push(action);
+  }
+
+  private _drainPendingActions(): void {
+    const actions = this.pendingActions.splice(0);
+    for (const action of actions) {
+      switch (action.type) {
+        case 'remove':
+          this.removeBody(action.bodyId);
+          break;
+        case 'anchor_ghost':
+          this.anchorGhost(action.bodyId);
+          break;
+        case 'apply_impulse': {
+          const data = this.bodies.get(action.bodyId);
+          if (data && action.impulse) {
+            const rb = this.world.getRigidBody(data.handle);
+            if (rb) rb.applyImpulse(action.impulse, true);
+          }
+          break;
+        }
+      }
+    }
   }
 
   stopSimulation(): void {
