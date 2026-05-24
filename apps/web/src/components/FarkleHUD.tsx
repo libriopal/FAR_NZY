@@ -793,10 +793,10 @@ function HiddenPocket() {
 // Module-level beat phase — sampled by getCurrentBeatAccuracy() on chain commit.
 let _currentBeatPhase = 0;
 
-export function getCurrentBeatAccuracy(windowFactor = 1.0): 'PERFECT' | 'GOOD' | 'MISS' {
+export function getCurrentBeatAccuracy(windowFactorQ = 1000): 'PERFECT' | 'GOOD' | 'MISS' {
   const dist = Math.abs(_currentBeatPhase - PERFECT_ZONE);
   if (dist === 0) return 'PERFECT';
-  if (dist <= Math.max(1, Math.round(windowFactor * 1.5))) return 'GOOD';
+  if (dist <= Math.max(1, Math.round(windowFactorQ * 3 / 2000))) return 'GOOD';
   return 'MISS';
 }
 
@@ -1740,13 +1740,13 @@ function RuleShardChip({
 // VS and Heist only. Shows player rank and window multiplier.
 
 function SlipstreamIndicator({
-  position, totalPlayers, windowFactor,
+  position, totalPlayers, windowFactorQ,
 }: {
   position: number | null;
   totalPlayers: number;
-  windowFactor: number | null;
+  windowFactorQ: number | null;
 }) {
-  if (position === null || windowFactor === null || totalPlayers <= 1) return null;
+  if (position === null || windowFactorQ === null || totalPlayers <= 1) return null;
 
   const isLeader  = position === 1;
   const isTrailer = position === totalPlayers;
@@ -1764,7 +1764,7 @@ function SlipstreamIndicator({
         {label}
       </div>
       <div style={{ fontSize: 6, fontFamily: 'monospace', color: GH.boneDim, letterSpacing: 0 }}>
-        ×{windowFactor.toFixed(2)} WIN
+        ×{(windowFactorQ / 1000).toFixed(2)} WIN
       </div>
     </div>
   );
@@ -1852,7 +1852,7 @@ export function FarkleHUD({
         <SlipstreamIndicator
           position={slipstreamPosition}
           totalPlayers={slipstreamTotalPlayers ?? 2}
-          windowFactor={slipstreamWindowFactor ?? null}
+          windowFactorQ={slipstreamWindowFactor ?? null}
         />
       )}
       {showShard && (

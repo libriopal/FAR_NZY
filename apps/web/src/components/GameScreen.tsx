@@ -539,7 +539,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isMultiplayer && mpState.mySlipstream ? {
             slipstreamPosition: mpState.mySlipstream.position,
             slipstreamTotalPlayers: mpState.mySlipstream.totalPlayers,
-            slipstreamWindowFactor: mpState.mySlipstream.windowFactor,
+            slipstreamWindowFactor: mpState.mySlipstream.windowFactorQ,
           } : {})}
         />
 

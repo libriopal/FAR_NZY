@@ -612,10 +612,10 @@ export class GameRoom {
     const beatAcc = (msg as { beatAccuracy?: BeatAccuracy }).beatAccuracy ?? 'MISS';
     const rhythmState = this.playerRhythm.get(playerId) ?? { ...INITIAL_RHYTHM_STATE };
     const slipState = this.playerSlipstream.get(playerId);
-    const flowCap = slipState?.flowCap ?? 2.0;
-    const newRhythm = tickRhythmAccuracy(rhythmState, beatAcc, flowCap);
+    const flowCapQ = slipState?.flowCapQ ?? 2000;  // Q×1000: default 2.0×
+    const newRhythm = tickRhythmAccuracy(rhythmState, beatAcc, flowCapQ);
     this.playerRhythm.set(playerId, newRhythm);
-    scaled = applyFlowMultiplier(scaled, newRhythm, flowCap);
+    scaled = applyFlowMultiplier(scaled, newRhythm, flowCapQ);
 
     // Step 5b: Update unbanked + advance multiplierStep.
     // multiplierStep advances ONLY on full 6-chain; any shorter chain resets it to 0.
@@ -1063,7 +1063,7 @@ export class GameRoom {
           // Genre state (H/A/I/G)
           flowMultiplier: rhythm.flowMultiplier,
           slipstreamPosition: slip?.position ?? null,
-          slipstreamWindowFactor: slip?.windowFactor ?? null,
+          slipstreamWindowFactor: slip?.windowFactorQ ?? null,
           facetId: facet.equipped,
           facetTier: facet.tier,
           shardHeld: shard.held,

@@ -20,7 +20,7 @@ export function useMultiplayer() {
     joinRoom: (roomCode: string, playerName: string) => mpActions.joinRoom(roomCode, playerName),
     startGame: () => mpActions.startGame(),
     submitChain: (chain: { row: number; col: number }[]) => {
-      const wf = state.mySlipstream?.windowFactor ?? 1.0;
+      const wf = state.mySlipstream?.windowFactorQ ?? 1000;  // Q×1000
       mpActions.submitChain(chain, getCurrentBeatAccuracy(wf));
     },
     bank: () => mpActions.bank(),

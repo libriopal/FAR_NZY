@@ -58,7 +58,7 @@ export const SHARD_POOL: ShardDef[] = [
     id: 'FEVER',
     name: 'FEVER',
     description: '×1.25 on every chain for 30s',
-    apply: (s) => Math.round(s * 1.25),
+    apply: (s) => (s * 5 + 2) >> 2,  // Q×4: round(s × 5/4) — no float literals
   },
   {
     id: 'SURGE_SHARD',
@@ -70,25 +70,26 @@ export const SHARD_POOL: ShardDef[] = [
     id: 'UNDERDOG',
     name: 'UNDERDOG',
     description: 'Score ≤250 → ×2.5 · Score >250 → ×1.0',
-    apply: (s) => s > 0 && s <= 250 ? Math.round(s * 2.5) : s,
+    apply: (s) => s > 0 && s <= 250 ? (s * 5 + 1) >> 1 : s,  // round(s × 5/2)
   },
   {
     id: 'RESONANCE',
     name: 'RESONANCE',
     description: 'Frenzy → ×1.5 · Prime → ×1.0',
-    apply: (s, ctx) => ctx.isFrenzy ? Math.round(s * 1.5) : s,
+    apply: (s, ctx) => ctx.isFrenzy ? (s * 3 + 1) >> 1 : s,  // round(s × 3/2)
   },
   {
     id: 'MOMENTUM',
     name: 'MOMENTUM',
     description: '×(1 + streak×0.08) capped at ×1.4',
-    apply: (s, ctx) => Math.round(s * Math.min(1.4, 1.0 + ctx.consecutiveBanks * 0.08)),
+    // Q×100: multQ in [100, 140]; round(s × multQ / 100) via +50 trick
+    apply: (s, ctx) => (s * Math.min(140, 100 + ctx.consecutiveBanks * 8) + 50) / 100 | 0,
   },
   {
     id: 'ECHO_SHARD',
     name: 'ECHO',
-    description: '3-die chains → ×2.0 · other → ×1.0',
-    apply: (s, ctx) => ctx.chainLength === 3 ? Math.round(s * 2.0) : s,
+    description: '3-die chains → ×2 · other → ×1',
+    apply: (s, ctx) => ctx.chainLength === 3 ? s * 2 : s,
   },
 ];
 

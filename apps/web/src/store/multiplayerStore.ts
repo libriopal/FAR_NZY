@@ -80,7 +80,7 @@ const INITIAL: MultiplayerStoreState = {
   heistActive: false, heistInitiatorId: null, heistExpiresAt: null,
   myDraft: null, myFacetId: null, myFacetTier: 1,
   myShardHeld: null, myShardActive: null, myShardExpiresAt: null,
-  mySlipstream: null, myFlowMultiplier: 1.0,
+  mySlipstream: null, myFlowMultiplier: 1000,  // Q×1000: 1.0×
 };
 
 export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...INITIAL }));
@@ -110,7 +110,7 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
           gravityFlipPending: false,
           myFlowMultiplier: myPlayer?.flowMultiplier ?? prev.myFlowMultiplier,
           mySlipstream: myPlayer?.slipstreamPosition != null
-            ? { position: myPlayer.slipstreamPosition!, totalPlayers: rs.players?.length ?? 1, windowFactor: myPlayer.slipstreamWindowFactor ?? 1.0, flowCap: 2.0 }
+            ? { position: myPlayer.slipstreamPosition!, totalPlayers: rs.players?.length ?? 1, windowFactorQ: myPlayer.slipstreamWindowFactor ?? 1000, flowCapQ: 2000 }
             : prev.mySlipstream,
           myFacetId: myPlayer?.facetId ?? prev.myFacetId,
           myFacetTier: myPlayer?.facetTier ?? prev.myFacetTier,
