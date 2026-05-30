@@ -69,6 +69,10 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, activePlayerId: msg.activePlayerId as string };
       case 'DISRUPTION_INCOMING':
         return { ...next, lastDisruption: msg.disruption as DisruptionEvent };
+      case 'BOARD_UPDATE':
+        // Server recovered a dead board. lastMessage is set via the spread above;
+        // GameScreen reacts via the mpState.lastMessage effect.
+        return next;
       case 'ERROR':
         return { ...next, error: msg.message as string };
       default:

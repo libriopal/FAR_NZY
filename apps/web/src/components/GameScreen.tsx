@@ -170,6 +170,14 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       else if (outcome === 'pass') rallyPass();
       else if (outcome === 'continue') rallyContinue();
       useFarkleStore.getState().clearRallyVotes();
+    } else if (msg.type === 'BOARD_UPDATE') {
+      // Server recovered a dead board after P1 dead-state fix. Resync client physics
+      // so the player's board reflects the server's recovered state.
+      const p = physicsRef.current;
+      if (p) {
+        p.reshuffleBoard();
+        if (p.isDeadBoard()) p.injectScoringDie();
+      }
     }
   }, [mpState.lastMessage]);
 
