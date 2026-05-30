@@ -15,6 +15,7 @@ import type { DieFace, LevelDef, GameMode } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, CATALYST_WILD_BOOST, CATALYST_MAX_BOOST, GAME_CONSTANTS, HEIST_CONSTANTS } from '@match3d/farkle-shared';
 import type { VoxelPhysicsSystem } from '@match3d/game-core';
 import { useFarkleStore, MAX_CHAIN, WILD_PRIME_ENERGY, WILD_FRENZY_ENERGY } from '../store/farkleStore.js';
+import { mpActions } from '../store/multiplayerStore.js';
 import { useExplosionStore } from '../store/explosionStore.js';
 import { useTrayStore } from '../store/trayStore.js';
 
@@ -41,6 +42,7 @@ export function useFarkleGame(
   physicsRef: MutableRefObject<VoxelPhysicsSystem | null>,
   levelDef?: LevelDef,
   gameMode?: GameMode,
+  isMultiplayer?: boolean,
 ) {
   const store = useFarkleStore;
   const explosionStore = useExplosionStore;
@@ -270,6 +272,16 @@ export function useFarkleGame(
     const result = store.getState().commitChain();
     if (store.getState().chainFaces !== resolvedFaces) {
       // commitChain cleared it; restore nothing
+    }
+
+    // In multiplayer, submit resolved faces to server for authoritative scoring.
+    // Server reconciles multiplierStep on every chain and banked/unbanked on farkle
+    // via CHAIN_RESULT → syncFromServer. Solo path is unchanged.
+    if (isMultiplayer && resolvedFaces.length > 0) {
+      mpActions.submitChainFaces(
+        resolvedFaces as import('@match3d/farkle-shared').DieFace[],
+        chainIds.length,
+      );
     }
 
     // Wild energy bonus: +WILD_PRIME_ENERGY per wild in PRIME, +WILD_FRENZY_ENERGY per wild in FRENZY (B17/B18)

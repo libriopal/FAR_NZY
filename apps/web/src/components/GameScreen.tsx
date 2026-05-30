@@ -79,10 +79,10 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const [musicDebug, setMusicDebug] = useState<EmotionalState | null>(null);
   const levelDef = LEVELS.find(l => l.id === selectedLevelId) ?? DEFAULT_LEVEL;
   const gameMode = useGameStore(s => s.gameMode);
-  const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined);
-  useGameAudio(audioSettings);
   const { state: mpState, sendDisruption, sendRallyVote, sendRallyDecisionStart } = useMultiplayer();
   const isMultiplayer = !!mpState.roomCode;
+  const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined, isMultiplayer);
+  useGameAudio(audioSettings);
   const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
     || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
   const isRallyMode = gameMode === 'RALLY_FREE' || gameMode === 'RALLY_CASINO';

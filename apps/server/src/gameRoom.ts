@@ -198,6 +198,34 @@ export class GameRoom {
         this.processChain(playerId, chain);
         break;
       }
+      case 'SUBMIT_CHAIN_FACES': {
+        if (playerId !== this.activePlayerId) {
+          this.send(player.ws, { type: 'ERROR', message: 'Not your turn' });
+          return;
+        }
+        const lastAt2 = this.lastActionAt.get(playerId) ?? 0;
+        if (Date.now() - lastAt2 < this.INPUT_LOCK_MS) {
+          this.send(player.ws, { type: 'ERROR', message: 'Too fast' });
+          return;
+        }
+        this.lastActionAt.set(playerId, Date.now());
+        const faces = msg.faces as number[];
+        const chainLength = msg.chainLength as number;
+        if (!Array.isArray(faces) || faces.length < 1 || faces.length > 6) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid chain' });
+          return;
+        }
+        if (!faces.every((f: unknown) => Number.isInteger(f) && (f as number) >= 1 && (f as number) <= 6)) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid face values' });
+          return;
+        }
+        this.processChainFaces(
+          playerId,
+          faces as import('@match3d/farkle-shared').DieFace[],
+          typeof chainLength === 'number' ? chainLength : faces.length,
+        );
+        break;
+      }
       case 'BANK':
         this.handleBank(playerId);
         break;
@@ -267,7 +295,7 @@ export class GameRoom {
     if (result.isFarkle) {
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
-      this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
+      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' });
       // Analytics: log farkle decision (fire-and-forget)
       insertChainDecision({
         id: nanoid(), session_id: this.sessionId, player_id: playerId,
@@ -317,7 +345,71 @@ export class GameRoom {
       }
     }
 
-    this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
+    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep });
+    this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
+    this.startTurnTimer();
+  }
+
+  private processChainFaces(
+    playerId: string,
+    faces: import('@match3d/farkle-shared').DieFace[],
+    chainLength: number,
+  ): void {
+    const result = scoreFarkle(faces);
+    this.totalChains++;
+
+    if (result.isFarkle) {
+      const lost = this.state.unbanked;
+      this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
+      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' });
+      insertChainDecision({
+        id: nanoid(), session_id: this.sessionId, player_id: playerId,
+        chain_number: this.totalChains, faces_played: faces as number[],
+        score_result: 0, multiplier_at: 1,
+        unbanked_before: lost, decision: 'FARKLE', was_optimal: false,
+        timestamp: new Date().toISOString(),
+      });
+      setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
+      this._checkAndRecoverDeadBoard();
+      return;
+    }
+
+    this.scoringChains++;
+    const scaled = Math.round(result.score * [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)]);
+    this.state = {
+      ...this.state,
+      unbanked: this.state.unbanked + scaled,
+      multiplierStep: chainLength === 6 ? Math.min(this.state.multiplierStep + 1, 5) : 0,
+    };
+
+    const farkleRisk = estimateFarkleRisk(
+      faces.filter(f => f === 1).length,
+      faces.filter(f => f === 5).length,
+      faces.length,
+    );
+    const decision = chainLength < 6 ? 'BANK' : 'CONTINUE';
+    insertChainDecision({
+      id: nanoid(), session_id: this.sessionId, player_id: playerId,
+      chain_number: this.totalChains, faces_played: faces as number[],
+      score_result: result.score,
+      multiplier_at: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      unbanked_before: this.state.unbanked, decision,
+      was_optimal: isOptimalDecision(decision, this.state.unbanked, this.state.multiplierStep, farkleRisk),
+      timestamp: new Date().toISOString(),
+    });
+
+    if (chainLength < 6) {
+      this.state.banked += this.state.unbanked;
+      this.state.unbanked = 0;
+      this.banksTaken++;
+      this.checkMilestones(playerId, this.state.banked);
+      if (this.state.banked >= WIN_SCORE) {
+        void this.endSession(playerId);
+        return;
+      }
+    }
+
+    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
     this.startTurnTimer();
   }
@@ -373,7 +465,7 @@ export class GameRoom {
       this.state.unbanked = 0;
       this.checkMilestones(playerId, this.state.banked);
     }
-    this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
+    this.broadcast({ type: 'CHAIN_RESULT', isFarkle: false, banked: this.state.banked, unbanked: 0, multiplierStep: 0 });
     if (this.state.banked >= WIN_SCORE) {
       void this.endSession(playerId);
       return;

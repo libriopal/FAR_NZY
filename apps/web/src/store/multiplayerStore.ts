@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import type { DisruptionEvent, RallyRole } from '@match3d/farkle-shared';
+import type { DisruptionEvent, RallyRole, DieFace } from '@match3d/farkle-shared';
+import { useFarkleStore } from './farkleStore.js';
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:3001';
 
@@ -63,8 +64,20 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         const myRole = myId ? (roleMap[myId] ?? null) : null;
         return { ...next, status: 'playing' as const, myRole };
       }
-      case 'CHAIN_RESULT':
-        return { ...next, banked: (msg.banked as number) ?? prev.banked, unbanked: (msg.unbanked as number) ?? prev.unbanked };
+      case 'CHAIN_RESULT': {
+        const isFarkle = !!(msg.isFarkle as boolean | undefined);
+        const multiplierStep = (msg.multiplierStep as number | undefined) ?? 0;
+        const banked = (msg.banked as number) ?? prev.banked;
+        const unbanked = (msg.unbanked as number) ?? prev.unbanked;
+        // Sync multiplierStep on every chain; banked/unbanked only on farkle
+        // (non-farkle: client bonus mechanics must not be overwritten).
+        if (isFarkle) {
+          useFarkleStore.getState().syncFromServer(multiplierStep, banked, 0);
+        } else {
+          useFarkleStore.getState().syncFromServer(multiplierStep);
+        }
+        return { ...next, banked, unbanked };
+      }
       case 'TURN_CHANGE':
         return { ...next, activePlayerId: msg.activePlayerId as string };
       case 'DISRUPTION_INCOMING':
@@ -113,6 +126,9 @@ export const mpActions = {
   bank() { _send({ type: 'BANK' }); },
   sendDisruption(disruptType: string, targetColumns: number[]) {
     _send({ type: 'DISRUPT', disruptType, targetColumns });
+  },
+  submitChainFaces(faces: DieFace[], chainLength: number) {
+    _send({ type: 'SUBMIT_CHAIN_FACES', faces, chainLength });
   },
   leaveRoom() {
     _send({ type: 'LEAVE_ROOM' });
