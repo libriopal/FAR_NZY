@@ -12,7 +12,7 @@
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
 import { GAME_CONSTANTS, RALLY_MILESTONES } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision } from '@match3d/farkle-engine';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, hasValidChain } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
 
@@ -277,6 +277,7 @@ export class GameRoom {
         timestamp: new Date().toISOString(),
       });
       setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
+      this._checkAndRecoverDeadBoard();
       return;
     }
     this.scoringChains++;
@@ -471,6 +472,37 @@ export class GameRoom {
       activePlayerId: this.activePlayerId,
       players: [...this.players.values()].map(p => ({ ...p.profile, energy: p.energy })),
     };
+  }
+
+  private _checkAndRecoverDeadBoard(attempt = 0): void {
+    if (hasValidChain(this.state.grid)) return;
+    if (attempt >= 3) {
+      this.broadcast({ type: 'BOARD_DEAD_RECOVERY_FAILED' });
+      void this.endSession(this.activePlayerId ?? '');
+      return;
+    }
+    this.pool.reshuffle();
+    this.state.grid = this._reshuffleGridFaces(this.state.grid);
+    this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid, recoveryAttempt: attempt + 1 });
+    this._checkAndRecoverDeadBoard(attempt + 1);
+  }
+
+  private _reshuffleGridFaces(grid: import('@match3d/farkle-shared').Cell[][]): import('@match3d/farkle-shared').Cell[][] {
+    const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+    for (let r = 0; r < newGrid.length; r++) {
+      for (let c = 0; c < (newGrid[0]?.length ?? 0); c++) {
+        const cell = newGrid[r]?.[c];
+        if (!cell) continue;
+        // Preserve blockers and structural states unchanged
+        if (cell.type === 'STONE' || cell.state === 'EMPTY') continue;
+        if (cell.state === 'FROZEN' || cell.state === 'LOCKED') continue;
+        // Redraw face from pool for normal die/wild cells
+        const d = this.pool.drawDie();
+        const face = (d >= 1 && d <= 6 ? d : 1) as import('@match3d/farkle-shared').DieFace;
+        newGrid[r]![c] = { ...cell, face };
+      }
+    }
+    return newGrid;
   }
 
   isEmpty(): boolean {

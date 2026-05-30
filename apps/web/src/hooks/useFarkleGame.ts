@@ -571,10 +571,9 @@ export function useFarkleGame(
     if (deadBoardAttemptsRef.current <= 3) {
       physics.reshuffleBoard();
     } else {
-      const bodies = store.getState().bodies;
-      for (const b of bodies) {
-        if (b.entityType === 'die') physics.setDieFace(b.id, 1);
-      }
+      // reshuffleBoard() exhausted 5 attempts and still dead.
+      // Inject one seeded scoring die via faceRng — never hardcode face=1.
+      physics.injectScoringDie();
       deadBoardAttemptsRef.current = 0;
     }
   }
@@ -732,6 +731,11 @@ function _doCasinoChain(physicsRef: MutableRefObject<VoxelPhysicsSystem | null>)
       for (const id of ids) physics?.removeBody(id);
       physics?.thawAdjacentIce(ids);
       physics?.damageLockInColumns(ids);
+      // Casino auto-chain removes bodies without player input — recover dead boards directly.
+      if (physics?.isDeadBoard()) {
+        physics.reshuffleBoard();
+        if (physics.isDeadBoard()) physics.injectScoringDie();
+      }
     }, 500);
     return; // one chain per interval tick
   }
