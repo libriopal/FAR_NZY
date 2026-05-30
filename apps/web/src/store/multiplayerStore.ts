@@ -65,19 +65,25 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, status: 'playing' as const, myRole };
       }
       case 'CHAIN_RESULT': {
-        const isFarkle = !!(msg.isFarkle as boolean | undefined);
         const multiplierStep = (msg.multiplierStep as number | undefined) ?? 0;
         const banked = (msg.banked as number) ?? prev.banked;
-        const unbanked = (msg.unbanked as number) ?? prev.unbanked;
-        // Sync multiplierStep on every chain; banked/unbanked only on farkle
-        // (non-farkle: client bonus mechanics must not be overwritten).
-        if (isFarkle) {
-          useFarkleStore.getState().syncFromServer(multiplierStep, banked, 0);
-        } else {
-          useFarkleStore.getState().syncFromServer(multiplierStep);
-        }
+        const unbanked = (msg.unbanked as number | undefined) ?? prev.unbanked;
+        const vaultPts = msg.vaultPts as number | undefined;
+        // P2.6: server applies all bonuses (orb, doubler, ARCHIVIST, heist vault).
+        // Always sync banked/unbanked — server total is now authoritative including bonuses.
+        useFarkleStore.getState().syncFromServer(multiplierStep, banked, unbanked, vaultPts);
         return { ...next, banked, unbanked };
       }
+      case 'DOUBLER_SPAWNED': {
+        const col = msg.column as number;
+        const expiresAt = msg.expiresAt as number;
+        const duration = Math.max(0, expiresAt - Date.now());
+        useFarkleStore.getState().spawnDoublerCell(col, duration);
+        return next;
+      }
+      case 'ORB_COLLECTED':
+        // Server confirmed orb collection — lastMessage set; no additional state change needed.
+        return next;
       case 'TURN_CHANGE':
         return { ...next, activePlayerId: msg.activePlayerId as string };
       case 'DISRUPTION_INCOMING':
@@ -127,8 +133,14 @@ export const mpActions = {
   sendDisruption(disruptType: string, targetColumns: number[]) {
     _send({ type: 'DISRUPT', disruptType, targetColumns });
   },
-  submitChainFaces(faces: DieFace[], chainLength: number) {
-    _send({ type: 'SUBMIT_CHAIN_FACES', faces, chainLength });
+  submitChainFaces(faces: DieFace[], chainLength: number, chainColumns: number[]) {
+    _send({ type: 'SUBMIT_CHAIN_FACES', faces, chainLength, chainColumns });
+  },
+  collectOrb(bodyId: string) {
+    _send({ type: 'COLLECT_ORB', bodyId });
+  },
+  claimVault() {
+    _send({ type: 'CLAIM_VAULT' });
   },
   leaveRoom() {
     _send({ type: 'LEAVE_ROOM' });
