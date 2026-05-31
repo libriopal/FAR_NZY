@@ -69,9 +69,12 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         const banked = (msg.banked as number) ?? prev.banked;
         const unbanked = (msg.unbanked as number | undefined) ?? prev.unbanked;
         const vaultPts = msg.vaultPts as number | undefined;
+        const orbBonus = msg.orbBonus as number | undefined;
+        const doublerBonus = msg.doublerBonus as number | undefined;
+        const archivistBonus = msg.archivistBonus as number | undefined;
         // P2.6: server applies all bonuses (orb, doubler, ARCHIVIST, heist vault).
         // Always sync banked/unbanked — server total is now authoritative including bonuses.
-        useFarkleStore.getState().syncFromServer(multiplierStep, banked, unbanked, vaultPts);
+        useFarkleStore.getState().syncFromServer(multiplierStep, banked, unbanked, vaultPts, orbBonus, doublerBonus, archivistBonus);
         return { ...next, banked, unbanked };
       }
       case 'DOUBLER_SPAWNED': {

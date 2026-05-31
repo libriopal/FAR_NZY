@@ -116,7 +116,7 @@ export interface FarkleGameState {
   setRallyVotes: (votes: Record<string, string>) => void;
   clearRallyVotes: () => void;
   // P2.6: server authority reconciliation — all fields synced; server applies bonuses
-  syncFromServer: (multiplierStep: number, banked?: number, unbanked?: number, vaultPts?: number) => void;
+  syncFromServer: (multiplierStep: number, banked?: number, unbanked?: number, vaultPts?: number, orbBonus?: number, doublerBonus?: number, archivistBonus?: number) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

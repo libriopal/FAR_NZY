@@ -393,7 +393,7 @@ export class GameRoom {
     if (result.isFarkle) {
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, orbActive: false, phase: 'FARKLE_ANIM' };
-      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, vaultPts: this.state.vaultPts, phase: 'FARKLE_ANIM' });
+      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, vaultPts: this.state.vaultPts, phase: 'FARKLE_ANIM', orbBonus: 0, doublerBonus: 0, archivistBonus: 0 });
       insertChainDecision({
         id: nanoid(), session_id: this.sessionId, player_id: playerId,
         chain_number: this.totalChains, faces_played: faces as number[],
@@ -491,8 +491,7 @@ export class GameRoom {
       timestamp: new Date().toISOString(),
     });
 
-    void (orbBonus + doublerBonus + archivistBonus); // surfaced in CHAIN_RESULT for client audit
-    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep, vaultPts: this.state.vaultPts });
+    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep, vaultPts: this.state.vaultPts, orbBonus, doublerBonus, archivistBonus });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
     this.startTurnTimer();
   }
