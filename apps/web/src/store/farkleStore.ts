@@ -362,7 +362,7 @@ export const useFarkleStore = create<FarkleGameState>()(
     setRallyVotes: (votes) => set({ rallyVotes: votes }),
     clearRallyVotes: () => set({ rallyVotes: {} }),
 
-    syncFromServer: (multiplierStep, banked, unbanked, vaultPts) =>
+    syncFromServer: (multiplierStep, banked, unbanked, vaultPts, _orbBonus, _doublerBonus, _archivistBonus) =>
       set(() => ({
         multiplierStep,
         ...(banked !== undefined ? { banked } : {}),

@@ -132,8 +132,10 @@ export function useFarkleGame(
       (mode, prev) => {
         if (mode === 'FRENZY' && prev !== 'FRENZY' && !frenzyDoublerSpawnedRef.current) {
           frenzyDoublerSpawnedRef.current = true;
-          const cols = _randomColumns(2);
-          for (const col of cols) store.getState().spawnDoublerCell(col, 12_000);
+          if (!isMultiplayer) {
+            const cols = _randomColumns(2);
+            for (const col of cols) store.getState().spawnDoublerCell(col, 12_000);
+          }
         }
       },
     );
