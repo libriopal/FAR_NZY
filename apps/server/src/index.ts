@@ -7,7 +7,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { sandboxRouter } from './sandbox.js';
+import { sandboxRouter, handleSandboxWS } from './sandbox.js';
 import { GameRoom } from './gameRoom.js';
 import { DEFAULT_SETTINGS } from '@match3d/farkle-shared';
 import { nanoid } from 'nanoid';
@@ -16,7 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+app.use('/', sandboxRouter);
 app.use('/api/sandbox', sandboxRouter);
 
 const server = createServer(app);
@@ -44,7 +46,13 @@ setInterval(() => {
 
 // ── WebSocket handler ─────────────────────────────────────────────────────────
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req) => {
+  // Route /sandbox-ws connections to the sandbox session handler
+  if (req.url === '/sandbox-ws') {
+    handleSandboxWS(ws);
+    return;
+  }
+
   let roomCode: string | null = null;
   let playerId: string | null = null;
 

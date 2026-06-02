@@ -7,7 +7,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": false,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx"
   },
-  "include": ["packages/**/*", "apps/**/*"]
+  "include": ["packages/**/*", "apps/**/*"],
+  "exclude": ["apps/web/**/*"]
 }

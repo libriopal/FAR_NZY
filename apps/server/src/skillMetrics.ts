@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────
 
 export interface SessionAnalytics {
+  id?: string;
   player_id: string;
   mode: string;
   seed_hash: string;
@@ -22,6 +23,7 @@ export interface SessionAnalytics {
 }
 
 export interface ChainDecision {
+  id?: string;
   session_id?: string;
   player_id: string;
   chain_number: number;
