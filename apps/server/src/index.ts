@@ -99,5 +99,5 @@ wss.on('connection', (ws: WebSocket, req) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[match3d-server] listening on port ${PORT} (HTTP + WS)`);
+  process.stderr.write(`[match3d-server] listening on port ${PORT} (HTTP + WS)\n`);
 });

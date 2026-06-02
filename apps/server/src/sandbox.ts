@@ -111,7 +111,7 @@ Respond ONLY with a JSON object in this exact shape:
       const json = text.match(/\{[\s\S]*\}/)?.[0];
       if (json) return JSON.parse(json);
     } catch (e) {
-      console.error('Gemini analysis failed, falling back to deterministic:', e);
+      process.stderr.write(`Gemini analysis failed, falling back to deterministic: ${String(e)}\n`);
     }
   }
 
@@ -157,7 +157,7 @@ router.post('/simulate', async (req, res) => {
     const results = await runMonteCarloSimulation(patch, sessions);
     res.json({ success: true, results });
   } catch (error) {
-    console.error('Simulation error:', error);
+    process.stderr.write(`Simulation error: ${String(error)}\n`);
     res.status(500).json({ error: 'Simulation failed' });
   }
 });
@@ -169,7 +169,7 @@ router.post('/analyze', async (req, res) => {
     const analysis = await analyzeRTPImpact(input);
     res.json({ success: true, analysis });
   } catch (error) {
-    console.error('Analysis error:', error);
+    process.stderr.write(`Analysis error: ${String(error)}\n`);
     res.status(500).json({ error: 'Analysis failed' });
   }
 });
@@ -290,7 +290,7 @@ router.post('/simulate-v2', async (req, res) => {
       _note:                      'Batch A pending — RTP contribution fields are placeholder values',
     });
   } catch (error) {
-    console.error('simulate-v2 error:', error);
+    process.stderr.write(`simulate-v2 error: ${String(error)}\n`);
     res.status(500).json({ error: 'Simulation failed', details: String(error) });
   }
 });
@@ -330,7 +330,7 @@ router.post('/rtp-audit', async (req, res) => {
       _note: 'Batch A pending — gate values are placeholder',
     });
   } catch (error) {
-    console.error('rtp-audit error:', error);
+    process.stderr.write(`rtp-audit error: ${String(error)}\n`);
     res.status(500).json({ error: 'Audit failed', details: String(error) });
   }
 });
@@ -347,7 +347,7 @@ router.post('/role-audit', async (req, res) => {
       _note: 'Batch A pending — role data unavailable until monteCarlo V2',
     });
   } catch (error) {
-    console.error('role-audit error:', error);
+    process.stderr.write(`role-audit error: ${String(error)}\n`);
     res.status(500).json({ error: 'Role audit failed', details: String(error) });
   }
 });
