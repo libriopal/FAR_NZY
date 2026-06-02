@@ -5,11 +5,12 @@
 // ─────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { readFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import type { WebSocket } from 'ws';
-import { runMonteCarlo } from '@match3d/farkle-engine';
+import { runMonteCarlo, runMonteCarloV2 } from '@match3d/farkle-engine';
+import type { MonteCarloResultV2, PlayerModel, SimConfig } from '@match3d/farkle-engine';
 import type { GameMode } from '@match3d/farkle-shared';
 import { MULTIPLIER_LADDER } from '@match3d/farkle-shared';
 import * as store from './sandbox/sessionStore.js';
@@ -250,85 +251,86 @@ function parseChecklist(content: string): CoverageReport {
 router.post('/simulate-v2', async (req, res) => {
   try {
     const {
-      mode       = 'SOLO_CASINO',
+      mode        = 'SOLO_CASINO',
       playerModel = 'AVERAGE',
-      seed       = 42,
-      sessions   = 100_000,
+      seed        = Date.now(),
+      sessions    = 100_000,
     } = req.body as { mode?: string; playerModel?: string; seed?: number; sessions?: number };
 
-    const raw = runMonteCarlo(mode as GameMode, Math.min(sessions, 10_000));
-
-    res.json({
-      averageScore:               Math.round(raw.averageScore),
-      farkleRate:                 Number(raw.farkleRate.toFixed(4)),
-      normalizer:                 Number(raw.normalizer.toFixed(4)),
-      sessionsRun:                raw.sessionsRun,
-      p95Score:                   0,
-      p5Score:                    0,
-      variance:                   0,
-      stdDev:                     0,
-      baseChainRTP:               0.60,
-      multiplierContributionRTP:  0.20,
-      orbContributionRTP:         0.05,
-      doublerContributionRTP:     0.05,
-      archivistContributionRTP:   0.02,
-      bombStandardRTP:            0.04,
-      bombRainbowRTP:             0.04,
-      milestonePayout:            0,
-      bombStandardRate:           0,
-      bombRainbowRate:            0,
-      orbActivationRate:          0,
-      doublerTriggerRate:         0,
-      deadBoardRecoveryRate:      0,
-      multiplierStepDistribution: { 0: 0.40, 1: 0.25, 2: 0.15, 3: 0.10, 4: 0.06, 5: 0.04 },
-      roleContribution:           {} as Record<string, number>,
-      milestoneHitRate:           {} as Record<number, number>,
-      voteOutcomeDistribution:    { continue: 0.50, bank: 0.40, pass: 0.10 },
-      playerModel:                playerModel as 'OPTIMAL' | 'AVERAGE' | 'WEAK',
+    const config: SimConfig = {
+      mode:           mode as GameMode,
+      sessions:       Math.min(sessions, 100_000),
+      maxTurns:       30,
+      playerModel:    playerModel as PlayerModel,
+      blockerDensity: 'MEDIUM',
+      playerCount:    1,
+      rolesActive:    false,
+      roles:          [],
       seed,
-      config:                     JSON.stringify({ mode, playerModel, seed, sessions }),
-      _note:                      'Batch A pending — RTP contribution fields are placeholder values',
-    });
+    };
+
+    const result = await runMonteCarloV2(config);
+    res.json(result);
   } catch (error) {
     process.stderr.write(`simulate-v2 error: ${String(error)}\n`);
     res.status(500).json({ error: 'Simulation failed', details: String(error) });
   }
 });
 
+function sumRTP(r: MonteCarloResultV2): number {
+  return Number((
+    r.baseChainRTP + r.multiplierContributionRTP + r.orbContributionRTP +
+    r.doublerContributionRTP + r.archivistContributionRTP +
+    r.bombStandardRTP + r.bombRainbowRTP
+  ).toFixed(4));
+}
+
 router.post('/rtp-audit', async (req, res) => {
   try {
-    const { seed = 42, sessions = 100_000 } = req.body as { seed?: number; sessions?: number };
-    const modes   = ['SOLO_CASINO', 'VS_CASINO', 'RALLY_CASINO'] as const;
-    const models  = ['OPTIMAL', 'AVERAGE', 'WEAK'] as const;
-    const results: Record<string, unknown> = {};
-    const placeholderRTP = 0.60 + 0.20 + 0.05 + 0.05 + 0.02 + 0.04 + 0.04;
+    const { seed = Date.now(), sessions = 100_000 } = req.body as { seed?: number; sessions?: number };
+    const modes  = ['SOLO_CASINO', 'VS_CASINO', 'RALLY_CASINO'] as const;
+    const models = ['OPTIMAL', 'AVERAGE', 'WEAK'] as const;
+    const results: Record<string, MonteCarloResultV2> = {};
 
     for (const m of modes) {
       for (const p of models) {
-        const raw = runMonteCarlo(m as GameMode, Math.min(sessions, 5_000));
-        results[`${m}_${p}`] = {
-          mode: m, playerModel: p, seed,
-          totalRTP: Number(placeholderRTP.toFixed(4)),
-          averageScore: Math.round(raw.averageScore),
-          farkleRate: Number(raw.farkleRate.toFixed(4)),
-          _note: 'Batch A pending',
+        const config: SimConfig = {
+          mode:           m,
+          sessions:       Math.min(sessions, 100_000),
+          maxTurns:       30,
+          playerModel:    p,
+          blockerDensity: 'MEDIUM',
+          playerCount:    m === 'SOLO_CASINO' ? 1 : 4,
+          rolesActive:    m === 'RALLY_CASINO',
+          roles:          m === 'RALLY_CASINO' ? ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'] : [],
+          seed:           seed ^ (modes.indexOf(m) * 31) ^ (models.indexOf(p) * 7),
         };
+        results[`${m}_${p}`] = await runMonteCarloV2(config);
       }
     }
 
-    res.json({
-      seed, sessions,
-      gates: {
-        Gate1: { status: 'PASS', metric: 'completions',  threshold: '≥1' },
-        Gate2: { status: 'PASS', metric: 'rtp_band',     threshold: 'SOLO 82–102%' },
-        Gate3: { status: 'PASS', metric: 'skill_gap',    threshold: '≥5%' },
-        Gate4: { status: 'PASS', metric: 'farkle_rate',  threshold: '10–30%' },
-        Gate5: { status: 'PASS', metric: 'p5_score',     threshold: '>0' },
-        Gate6: { status: 'PASS', metric: 'normalizer',   threshold: '>0' },
-      },
-      results,
-      _note: 'Batch A pending — gate values are placeholder',
-    });
+    const soloOpt  = results['SOLO_CASINO_OPTIMAL']!;
+    const soloWeak = results['SOLO_CASINO_WEAK']!;
+    const soloRTP  = sumRTP(soloOpt);
+    const weakRTP  = sumRTP(soloWeak);
+    const skillGap = Number((soloRTP - weakRTP).toFixed(4));
+
+    const gates = {
+      Gate1: { status: soloOpt.sessionsRun >= 1         ? 'PASS' : 'FAIL', metric: 'completions',  value: soloOpt.sessionsRun,         threshold: '≥1' },
+      Gate2: { status: soloRTP >= 0.82 && soloRTP <= 1.02 ? 'PASS' : 'FAIL', metric: 'rtp_band',  value: soloRTP,                     threshold: 'SOLO 0.82–1.02' },
+      Gate3: { status: skillGap >= 0.05                 ? 'PASS' : 'FAIL', metric: 'skill_gap',    value: skillGap,                    threshold: '≥0.05' },
+      Gate4: { status: soloOpt.farkleRate >= 0.10 && soloOpt.farkleRate <= 0.30 ? 'PASS' : 'FAIL', metric: 'farkle_rate', value: soloOpt.farkleRate, threshold: '0.10–0.30' },
+      Gate5: { status: soloOpt.p5Score > 0              ? 'PASS' : 'FAIL', metric: 'p5_score',     value: soloOpt.p5Score,             threshold: '>0' },
+      Gate6: { status: soloOpt.normalizer > 0            ? 'PASS' : 'FAIL', metric: 'normalizer',  value: soloOpt.normalizer,          threshold: '>0' },
+    };
+
+    const date     = new Date().toISOString().slice(0, 10);
+    const outPath  = resolve(__dirnameCompat, '../../../art/profiling', `rtp_audit_${date}_${seed}.json`);
+    mkdirSync(dirname(outPath), { recursive: true });
+    const report   = { seed, sessions, gates, results };
+    writeFileSync(outPath, JSON.stringify(report, null, 2));
+
+    res.json(report);
   } catch (error) {
     process.stderr.write(`rtp-audit error: ${String(error)}\n`);
     res.status(500).json({ error: 'Audit failed', details: String(error) });
@@ -337,15 +339,43 @@ router.post('/rtp-audit', async (req, res) => {
 
 router.post('/role-audit', async (req, res) => {
   try {
-    const { seed = 42, sessions = 50_000 } = req.body as { seed?: number; sessions?: number };
-    const raw = runMonteCarlo('RALLY_CASINO' as GameMode, Math.min(sessions, 5_000));
-    res.json({
-      mode: 'RALLY_CASINO', seed, sessions: raw.sessionsRun,
-      roleContribution: {},
-      averageScore: Math.round(raw.averageScore),
-      farkleRate: Number(raw.farkleRate.toFixed(4)),
-      _note: 'Batch A pending — role data unavailable until monteCarlo V2',
-    });
+    const { seed = Date.now(), sessions = 50_000 } = req.body as { seed?: number; sessions?: number };
+    const models  = ['OPTIMAL', 'AVERAGE', 'WEAK'] as const;
+    const results: Record<string, MonteCarloResultV2> = {};
+
+    for (const p of models) {
+      const config: SimConfig = {
+        mode:           'RALLY_CASINO',
+        sessions:       Math.min(sessions, 50_000),
+        maxTurns:       30,
+        playerModel:    p,
+        blockerDensity: 'MEDIUM',
+        playerCount:    4,
+        rolesActive:    true,
+        roles:          ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'],
+        seed:           seed ^ (models.indexOf(p) * 13),
+      };
+      results[`RALLY_CASINO_${p}`] = await runMonteCarloV2(config);
+    }
+
+    const avg = results['RALLY_CASINO_AVERAGE']!;
+    const roleContrib = avg.roleContribution as Partial<Record<string, number>>;
+    const contribValues = Object.values(roleContrib).filter((v): v is number => v !== undefined);
+    const maxContrib    = contribValues.length ? Math.max(...contribValues) : 0;
+    const minContrib    = contribValues.length ? Math.min(...contribValues) : 0;
+    const gate6Status   = minContrib > 0 && maxContrib / minContrib <= 2.0 ? 'PASS' : 'FAIL';
+
+    const date    = new Date().toISOString().slice(0, 10);
+    const outPath = resolve(__dirnameCompat, '../../../art/profiling', `role_audit_${date}_${seed}.json`);
+    mkdirSync(dirname(outPath), { recursive: true });
+    const report  = {
+      seed, sessions, mode: 'RALLY_CASINO',
+      Gate6: { status: gate6Status, metric: 'role_balance', value: Number((maxContrib / (minContrib || 1)).toFixed(4)), threshold: 'max/min ≤ 2.0' },
+      results,
+    };
+    writeFileSync(outPath, JSON.stringify(report, null, 2));
+
+    res.json(report);
   } catch (error) {
     process.stderr.write(`role-audit error: ${String(error)}\n`);
     res.status(500).json({ error: 'Role audit failed', details: String(error) });
@@ -435,10 +465,10 @@ export function handleSandboxWS(ws: WebSocket): void {
           payload: { sessionsComplete: 0, totalSessions: sessions, percentComplete: 0, elapsedMs: 0 },
         }));
 
-        // Run synchronously in a setImmediate to yield to the event loop first
-        setImmediate(() => {
+        // Yield to the event loop before the synchronous simulation run
+        setTimeout(() => {
           try {
-            const raw = runMonteCarlo(mode, Math.min(sessions, 10_000)); // cap until Batch A
+            const raw = runMonteCarlo(mode, Math.min(sessions, 10_000));
             // Build MonteCarloResultV2-shaped result (placeholder fields until Batch A)
             const result = {
               averageScore:               Math.round(raw.averageScore),
