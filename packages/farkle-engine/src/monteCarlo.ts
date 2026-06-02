@@ -515,7 +515,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
 
     // Yield event loop between chunks (non-blocking)
     if (end < sessions) {
-      await new Promise<void>(resolve => setImmediate(resolve));
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
   }
 
