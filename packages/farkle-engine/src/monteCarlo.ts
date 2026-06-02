@@ -522,7 +522,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
   // ── Aggregate results ─────────────────────────────────────────────────────
 
   const averageScore = totalScore / sessions;
-  const farkleRate   = totalFarkles / sessions;
+  const farkleRate   = totalFarkles / (totalTurns || 1);
   const normalizer   = averageScore / (RTP_CONFIGS[mode]?.targetRTP ?? 0.92);
 
   // p5/p95: sort once at end (not per-session)
@@ -536,8 +536,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
   const variance = Math.round(varAccum / sessions);
   const stdDev   = Math.round(Math.sqrt(variance));
 
-  // RTP attribution as fractions of total score
-  const denom = totalScore || 1;
+  // RTP attribution: wagered stake per session (fallback 1 for zero-stake test runs)
+  const denom = (stakeAmount > 0 ? stakeAmount : 1) * sessions;
   const toRTP = (n: number) => Number((n / denom).toFixed(4));
 
   // Multiplier step distribution
