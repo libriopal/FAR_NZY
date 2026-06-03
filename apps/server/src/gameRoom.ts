@@ -127,6 +127,13 @@ export class GameRoom {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg));
   }
 
+  private creditPlayerBanked(playerId: string, amount: number) {
+    if (amount <= 0) return;
+    const player = this.players.get(playerId);
+    if (!player) return;
+    player.profile.banked += amount;
+  }
+
   private startTurnTimer() {
     if (this.turnTimer) clearTimeout(this.turnTimer);
     this.turnTimer = setTimeout(() => {
@@ -202,6 +209,29 @@ export class GameRoom {
           this.send(player.ws, { type: 'ERROR', message: 'Chain too short' });
           return;
         }
+        if (chain.length > 6) {
+          this.send(player.ws, { type: 'ERROR', message: 'Chain too long' });
+          return;
+        }
+        // Validate 4-way adjacency: each consecutive pair must share exactly one edge;
+        // no duplicate cells. Guards against non-adjacent face injection attacks.
+        const seenCells = new Set<string>();
+        let adjacencyOk = true;
+        for (let i = 0; i < chain.length; i++) {
+          const cell = chain[i]!;
+          const key = `${cell.row},${cell.col}`;
+          if (seenCells.has(key)) { adjacencyOk = false; break; }
+          seenCells.add(key);
+          if (i > 0) {
+            const prev = chain[i - 1]!;
+            const dist = Math.abs(prev.row - cell.row) + Math.abs(prev.col - cell.col);
+            if (dist !== 1) { adjacencyOk = false; break; }
+          }
+        }
+        if (!adjacencyOk) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid chain: non-adjacent tiles' });
+          return;
+        }
         this.processChain(playerId, chain);
         break;
       }
@@ -229,10 +259,26 @@ export class GameRoom {
         const chainColumns = Array.isArray(msg.chainColumns)
           ? (msg.chainColumns as number[]).filter((c: unknown) => Number.isInteger(c) && (c as number) >= 0 && (c as number) <= 6)
           : [];
+        // Column adjacency: consecutive tiles must be in the same or adjacent column.
+        // Best validation available without full grid state (BUG-01 pending).
+        if (chainColumns.length === faces.length && chainColumns.length > 1) {
+          let colsOk = true;
+          for (let i = 1; i < chainColumns.length; i++) {
+            if (Math.abs(chainColumns[i]! - chainColumns[i - 1]!) > 1) { colsOk = false; break; }
+          }
+          if (!colsOk) {
+            this.send(player.ws, { type: 'ERROR', message: 'Invalid chain: non-adjacent columns' });
+            return;
+          }
+        }
+        // Clamp chainLength to the valid face range to prevent banking-bypass exploits.
+        const validatedChainLength = typeof chainLength === 'number' && chainLength >= 1 && chainLength <= 6
+          ? chainLength
+          : faces.length;
         this.processChainFaces(
           playerId,
           faces as import('@match3d/farkle-shared').DieFace[],
-          typeof chainLength === 'number' ? chainLength : faces.length,
+          validatedChainLength,
           chainColumns,
         );
         break;
@@ -275,6 +321,7 @@ export class GameRoom {
       }
       case 'CLAIM_VAULT': {
         if (this.state.vaultPts > 0) {
+          this.creditPlayerBanked(playerId, this.state.vaultPts);
           this.state = {
             ...this.state,
             banked: this.state.banked + this.state.vaultPts,
@@ -428,6 +475,7 @@ export class GameRoom {
 
     // ── Banking for chain < 6 ─────────────────────────────────────────────────
     if (chainLength < 6) {
+      this.creditPlayerBanked(playerId, this.state.unbanked);
       this.state.banked += this.state.unbanked;
       this.state.unbanked = 0;
       this.banksTaken++;
@@ -442,6 +490,7 @@ export class GameRoom {
     let orbBonus = 0;
     if (this.state.orbActive && this.state.unbanked > 0) {
       orbBonus = Math.round(this.state.unbanked * 0.5);
+      this.creditPlayerBanked(playerId, orbBonus);
       this.state = { ...this.state, banked: this.state.banked + orbBonus, orbActive: false };
     } else {
       this.state = { ...this.state, orbActive: false };
@@ -456,6 +505,9 @@ export class GameRoom {
     if (activeDoubler) {
       // Double the base score contribution (scaled) — same semantics as client delta doubling
       doublerBonus = scaled + orbBonus;
+      if (chainLength < 6) {
+        this.creditPlayerBanked(playerId, doublerBonus);
+      }
       this.state = {
         ...this.state,
         banked: this.state.banked + (chainLength < 6 ? doublerBonus : 0),
@@ -543,6 +595,7 @@ export class GameRoom {
 
   private handleBank(playerId: string) {
     if (this.state.unbanked > 0) {
+      this.creditPlayerBanked(playerId, this.state.unbanked);
       this.state.banked += this.state.unbanked;
       this.state.unbanked = 0;
       this.checkMilestones(playerId, this.state.banked);
@@ -610,7 +663,7 @@ export class GameRoom {
     } else if (this.gameMode === 'SOLO_CASINO') {
       // C6: payout = (banked / WIN_SCORE) × stakeAmount × targetRTP(0.92)
       const player = this.players.get(triggeringPlayerId);
-      const banked = player?.profile.banked ?? 0;
+      const banked = player?.profile.banked ?? this.state.banked;
       payout = Math.round((banked / WIN_SCORE) * this.settings.stakeAmount * 0.92);
       winnerId = triggeringPlayerId;
     }
@@ -624,7 +677,7 @@ export class GameRoom {
     });
 
     // Analytics: insert session record (fire-and-forget)
-    const finalBanked = this.state.banked;
+    const finalBanked = this.players.get(triggeringPlayerId)?.profile.banked ?? this.state.banked;
     void insertSession({
       id: this.sessionId,
       player_id: triggeringPlayerId,
