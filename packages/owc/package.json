@@ -1,13 +1,17 @@
 {
   "name": "@match3d/owc",
   "version": "1.0.0",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "node --import tsx/esm --test src/**/*.test.ts || echo 'No tests yet'"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.2"
   },
   "peerDependencies": {

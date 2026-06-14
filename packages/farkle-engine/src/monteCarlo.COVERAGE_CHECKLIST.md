@@ -163,7 +163,7 @@ monteCarlo.ts directly (deferred — authorization needed).
 - [x] OWCParams accepted by POST /simulate → owcParams field
 - [x] computeWeights() called with mode, playerRank, currentRTP, farkleRate
 - [x] spawnWeightAdjustments merged with manual patch weights (manual wins)
-- [x] owcContributionRtp returned in simulation result
+- [x] owcContributionRTP returned in simulation result
 - [x] owcReason string returned for logging/debugging
 - [x] POST /owc-weights endpoint — direct weight computation without simulation
 
@@ -187,9 +187,11 @@ monteCarlo.ts directly (deferred — authorization needed).
 - [x] Farkle rate > 22%: reduce face_2/face_3 bias (easier grid)
 - [x] Farkle rate < 8% (after 5 turns): increase face_2 bias (harder grid)
 
-### PENDING — SACRED FILE INTEGRATION (requires authorization)
-- [ ] SimConfig extended with `owcParams?: OWCParams` in types.ts (SACRED)
-- [ ] runMonteCarloV2() accepts OWCConfig and applies per-turn weight adjustment
-- [ ] owcContributionRTP field added to MonteCarloResultV2 (SACRED)
-- [ ] CSPRNG lineage: OWC weight sampling must not use Math.random()
-- [ ] All 6 gate thresholds re-validated after OWC integration
+### SACRED FILE INTEGRATION (complete — merged PR #3, 2026-06-14)
+- [x] SimConfig extended with `owcParams?: OWCConfig` in types.ts (SACRED) → types.ts:266
+- [x] runMonteCarloV2() accepts OWCConfig and applies per-turn weight adjustment → monteCarlo.ts:366
+- [x] owcContributionRTP field added to MonteCarloResultV2 (SACRED) → monteCarlo.ts:83
+- [x] owcErrorCount field added — systemic errors observable in audit output → monteCarlo.ts:84
+- [x] CSPRNG lineage: biasedFaceDraw() uses one diceRng() call per die (same as uniform) → monteCarlo.ts:205
+- [x] OWC param bounds clamped: playerCount [1,4], playerRank [1,playerCount] → monteCarlo.ts:252
+- [x] All 6 gate thresholds re-validated after OWC integration (seed=42, 50k sessions: PASS)

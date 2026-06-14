@@ -116,7 +116,7 @@ async function runMonteCarloSimulation(patch: unknown, sessions: number, owcPara
 
   // Compute OWC adjustments on top of any manual spawn weights
   let owcWeights: Record<string, number> = {};
-  let owcContributionRtp = 0;
+  let owcContributionRTP = 0;
   let owcReason = 'DISABLED';
 
   if (owcParams?.enabled) {
@@ -124,14 +124,14 @@ async function runMonteCarloSimulation(patch: unknown, sessions: number, owcPara
       mode,
       playerRank:         owcParams.playerRank ?? 1,
       playerCount:        owcParams.playerCount ?? 1,
-      turnsElapsed:       owcParams.turnsElapsed ?? 10,
+      turnsElapsed:       owcParams.turnsElapsed ?? 10, // default to mid-game for representative weight preview; monteCarlo uses actual turn
       currentRTP,
       targetRTP:          owcParams.targetRTP ?? modeTargetRTP,
       sessionFarkleRate:  result.farkleRate,
     };
     const owcOut = owc.computeWeights(input);
     owcWeights = owcOut.spawnWeightAdjustments as unknown as Record<string, number>;
-    owcContributionRtp = owcOut.owcContributionRtp;
+    owcContributionRTP = owcOut.owcContributionRTP;
     owcReason = owcOut.reason;
   }
 
@@ -144,7 +144,7 @@ async function runMonteCarloSimulation(patch: unknown, sessions: number, owcPara
     farkleRate: Number(result.farkleRate.toFixed(3)),
     multiplierDistribution: buildMultiplierDistribution(result.farkleRate),
     sessionsRun: result.sessionsRun,
-    owc: { enabled: owcParams?.enabled ?? false, contributionRtp: owcContributionRtp, reason: owcReason },
+    owc: { enabled: owcParams?.enabled ?? false, contributionRTP: owcContributionRTP, reason: owcReason },
   };
 }
 
@@ -368,7 +368,7 @@ function sumRTP(r: MonteCarloResultV2): number {
   return Number((
     r.baseChainRTP + r.multiplierContributionRTP + r.orbContributionRTP +
     r.doublerContributionRTP + r.archivistContributionRTP +
-    r.bombStandardRTP + r.bombRainbowRTP
+    r.bombStandardRTP + r.bombRainbowRTP + r.owcContributionRTP
   ).toFixed(4));
 }
 

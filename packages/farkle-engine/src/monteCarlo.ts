@@ -78,7 +78,7 @@ export interface MonteCarloResultV2 {
   orbActivationRate:          number;
   doublerTriggerRate:         number;
   deadBoardRecoveryRate:      number;
-  owcContributionRtp:         number;
+  owcContributionRTP:         number;
   owcErrorCount:              number;
   multiplierStepDistribution: Record<0|1|2|3|4|5, number>;
   roleContribution:           Partial<Record<RallyRole, number>>;
@@ -382,10 +382,11 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
             owcAdj.face_4 = owcOut.spawnWeightAdjustments.face_4;
             owcAdj.face_5 = owcOut.spawnWeightAdjustments.face_5;
             owcAdj.face_6 = owcOut.spawnWeightAdjustments.face_6;
-            sessOwcContrib += owcOut.owcContributionRtp;
-          } catch {
+            sessOwcContrib += owcOut.owcContributionRTP;
+          } catch (err) {
             owcAdj.face_1 = owcAdj.face_2 = owcAdj.face_3 = owcAdj.face_4 = owcAdj.face_5 = owcAdj.face_6 = 0;
             totalOwcErrors++;
+            if (process.env.DEBUG_OWC) process.stderr.write(`OWC error turn ${turn}: ${String(err)}\n`);
           }
         }
 
@@ -652,7 +653,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
     orbActivationRate:          Number((totalOrbActivations  / sessions).toFixed(4)),
     doublerTriggerRate:         Number((totalDoublerTriggers / sessions).toFixed(4)),
     deadBoardRecoveryRate:      Number((totalDeadBoardRecov  / sessions).toFixed(4)),
-    owcContributionRtp:         Number((totalOwcContribRtp / sessions).toFixed(4)),
+    owcContributionRTP:         Number((totalOwcContribRtp / sessions).toFixed(4)),
     owcErrorCount:              totalOwcErrors,
     multiplierStepDistribution,
     roleContribution,

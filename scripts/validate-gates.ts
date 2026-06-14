@@ -31,7 +31,7 @@ async function main() {
       process.stdout.write(`  ${m}/${p}... `);
       const r = await runMonteCarloV2(config);
       results[`${m}_${p}`] = r;
-      console.log(`avgScore=${r.averageScore} farkleRate=${r.farkleRate} owcRTP=${r.owcContributionRtp}`);
+      console.log(`avgScore=${r.averageScore} farkleRate=${r.farkleRate} owcRTP=${r.owcContributionRTP}`);
     }
   }
 

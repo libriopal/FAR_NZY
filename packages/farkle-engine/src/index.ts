@@ -22,3 +22,9 @@ export * from './rtpConfig.js';
 export * from './floodFill.js';
 export * from './skillMetrics.js';
 export * from './avatar.js';
+
+// OWC types re-exported so consumers of farkle-engine don't need a direct @match3d/owc dependency
+// NOTE: FaceBiasWeights (owc) differs from SpawnWeights (farkle-shared):
+//   FaceBiasWeights → { face_1..face_6 }  die face probability adjustments
+//   SpawnWeights    → { die, sphere, ice.. } entity spawn weights
+export type { OWCInput, OWCOutput, SpawnWeights as FaceBiasWeights } from '@match3d/owc';

@@ -25,7 +25,7 @@ export interface OWCInput {
 export interface OWCOutput {
   spawnWeightAdjustments: SpawnWeights; // face_1..face_6 delta from base probability
   slipstreamFactor: number;             // trailing-player boost multiplier (1.0 = no boost)
-  owcContributionRtp: number;           // estimated RTP contribution of OWC adjustments
+  owcContributionRTP: number;           // estimated RTP contribution of OWC adjustments
   reason: string;                       // human-readable explanation of active adjustments
 }
 
@@ -134,7 +134,7 @@ export function computeWeights(input: OWCInput): OWCOutput {
   return {
     spawnWeightAdjustments: weights,
     slipstreamFactor,
-    owcContributionRtp: Number(owcContributionRtp.toFixed(4)),
+    owcContributionRTP: Number(owcContributionRtp.toFixed(4)),
     reason: reasons.length ? reasons.join('; ') : 'NO_ADJUSTMENT',
   };
 }

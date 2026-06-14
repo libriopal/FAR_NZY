@@ -269,6 +269,8 @@ export interface OWCConfig {
   enabled: boolean;
   playerRank: number;
   playerCount: number;
+  /** Preview/endpoint use only; monteCarlo simulation uses the actual turn counter. Defaults to 10 when omitted. */
+  turnsElapsed?: number;
   targetRTP?: number;
 }
 
