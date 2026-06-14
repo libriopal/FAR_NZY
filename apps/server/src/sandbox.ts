@@ -18,6 +18,8 @@ import { monteCarloAuditor } from './ai/auditors/monteCarloAuditor.js';
 import { spendTracker } from './ai/spend/spendTracker.js';
 import { budgetManager } from './ai/spend/budgetManager.js';
 import { AI_CONFIG } from './ai/config.js';
+import { owc, type OWCInput } from '@match3d/owc';
+import { z } from 'zod';
 
 // ESM-compatible __dirname
 const __dirnameCompat = dirname(fileURLToPath(import.meta.url));
@@ -48,19 +50,101 @@ function applyWeightBias(baseScore: number, weights: Record<string, number>): nu
   return Math.round(baseScore * (1 + highValueBias + lowValueBias));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runMonteCarloSimulation(patch: any, sessions: number) {
-  const mode: GameMode = (patch?.rtp_impact?.mode as GameMode) ?? 'SOLO_FREE';
-  const weights: Record<string, number> = patch?.rtp_impact?.spawn_weight_adjustments ?? {};
+// Typed shape for patch input — narrowed from unknown at the boundary.
+interface SimPatch {
+  rtp_impact?: {
+    mode?: string;
+    spawn_weight_adjustments?: Record<string, number>;
+  };
+}
+
+function parseSimPatch(raw: unknown): SimPatch {
+  if (!raw || typeof raw !== 'object') return {};
+  const p = raw as Record<string, unknown>;
+  const impact = p['rtp_impact'];
+  if (!impact || typeof impact !== 'object') return {};
+  const i = impact as Record<string, unknown>;
+  const weights = i['spawn_weight_adjustments'];
+  const rtp_impact: SimPatch['rtp_impact'] = {};
+  if (typeof i['mode'] === 'string') rtp_impact.mode = i['mode'];
+  if (weights && typeof weights === 'object') {
+    rtp_impact.spawn_weight_adjustments = weights as Record<string, number>;
+  }
+  return { rtp_impact };
+}
+
+// OWC parameters that can be set via sandbox config / CLI
+export interface OWCParams {
+  enabled: boolean;
+  playerRank?: number;        // 1=leader, 2+=trailing
+  playerCount?: number;
+  turnsElapsed?: number;
+  targetRTP?: number;         // override mode default; omit to use mode-derived value
+}
+
+// Zod schema for the /owc-weights endpoint — enforces bounds and rejects non-finite inputs.
+const GAME_MODES: [GameMode, ...GameMode[]] = [
+  'SOLO_FREE', 'SOLO_CASINO', 'VS_FREE', 'VS_CASINO',
+  'RALLY_FREE', 'RALLY_CASINO', 'HEIST_FREE', 'HEIST_CASINO',
+];
+const OWCInputSchema = z.object({
+  mode:               z.enum(GAME_MODES),
+  playerRank:         z.number().int().min(1),
+  playerCount:        z.number().int().min(1),
+  turnsElapsed:       z.number().int().min(0),
+  currentRTP:         z.number().min(0).finite(),
+  targetRTP:          z.number().positive().finite(),
+  sessionFarkleRate:  z.number().min(0).max(1).finite(),
+});
+
+async function runMonteCarloSimulation(patch: unknown, sessions: number, owcParams?: OWCParams) {
+  const parsed = parseSimPatch(patch);
+  const mode: GameMode = (parsed.rtp_impact?.mode as GameMode | undefined) ?? 'SOLO_FREE';
+  const manualWeights: Record<string, number> = parsed.rtp_impact?.spawn_weight_adjustments ?? {};
 
   const result = runMonteCarlo(mode, sessions);
-  const biasedScore = applyWeightBias(result.averageScore, weights);
+
+  // Derive the mode-correct targetRTP from the normalizer.
+  // normalizer = averageScore / RTP_CONFIGS[mode].targetRTP, so this inverts correctly.
+  const modeTargetRTP = result.averageScore / (result.normalizer || 1);
+
+  // currentRTP is computed from the manual-biased score so it can drift relative to
+  // targetRTP when callers supply spawn weight adjustments. Without manual weights this
+  // equals modeTargetRTP (no drift) and OWC correction correctly stays silent.
+  const manualBiasedScore = applyWeightBias(result.averageScore, manualWeights);
+  const currentRTP = manualBiasedScore / (result.normalizer || 1);
+
+  // Compute OWC adjustments on top of any manual spawn weights
+  let owcWeights: Record<string, number> = {};
+  let owcContributionRtp = 0;
+  let owcReason = 'DISABLED';
+
+  if (owcParams?.enabled) {
+    const input: OWCInput = {
+      mode,
+      playerRank:         owcParams.playerRank ?? 1,
+      playerCount:        owcParams.playerCount ?? 1,
+      turnsElapsed:       owcParams.turnsElapsed ?? 10,
+      currentRTP,
+      targetRTP:          owcParams.targetRTP ?? modeTargetRTP,
+      sessionFarkleRate:  result.farkleRate,
+    };
+    const owcOut = owc.computeWeights(input);
+    owcWeights = owcOut.spawnWeightAdjustments as unknown as Record<string, number>;
+    owcContributionRtp = owcOut.owcContributionRtp;
+    owcReason = owcOut.reason;
+  }
+
+  // Merge: manual weights take precedence over OWC adjustments
+  const mergedWeights: Record<string, number> = { ...owcWeights, ...manualWeights };
+  const biasedScore = applyWeightBias(result.averageScore, mergedWeights);
 
   return {
     avgScore: biasedScore,
     farkleRate: Number(result.farkleRate.toFixed(3)),
     multiplierDistribution: buildMultiplierDistribution(result.farkleRate),
     sessionsRun: result.sessionsRun,
+    owc: { enabled: owcParams?.enabled ?? false, contributionRtp: owcContributionRtp, reason: owcReason },
   };
 }
 
@@ -128,9 +212,13 @@ async function analyzeRTPImpact(input: {
 
 router.post('/simulate', async (req, res) => {
   try {
-    const { patch, sessions = 4000 } = req.body;
+    const { patch, sessions = 4000, owcParams } = req.body as {
+      patch: unknown;
+      sessions?: number;
+      owcParams?: OWCParams;
+    };
     if (!patch) { res.status(400).json({ error: 'Patch data is required' }); return; }
-    const results = await runMonteCarloSimulation(patch, sessions);
+    const results = await runMonteCarloSimulation(patch, sessions, owcParams);
     res.json({ success: true, results });
   } catch (error) {
     process.stderr.write(`Simulation error: ${String(error)}\n`);
@@ -159,6 +247,23 @@ router.get('/health', (_req, res) => {
     spend: spend.byCategory,
     budget,
   });
+});
+
+// ─── OWC endpoint ────────────────────────────────────────────────────────────
+
+router.post('/owc-weights', (req, res) => {
+  const parsed = OWCInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid OWC input', details: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const result = owc.computeWeights(parsed.data);
+    res.json({ success: true, result });
+  } catch (error) {
+    process.stderr.write(`OWC error: ${String(error)}\n`);
+    res.status(500).json({ error: 'OWC computation failed' });
+  }
 });
 
 // ─── Coverage checklist types ─────────────────────────────────────────────────

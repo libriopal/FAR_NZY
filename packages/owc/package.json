@@ -1,0 +1,16 @@
+{
+  "name": "@match3d/owc",
+  "version": "1.0.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2"
+  },
+  "peerDependencies": {
+    "@match3d/farkle-shared": "workspace:*"
+  }
+}
