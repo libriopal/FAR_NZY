@@ -54,6 +54,17 @@ const COOPERATIVE_MODES = new Set<GameMode>(['RALLY_FREE', 'RALLY_CASINO']);
 // ─── Core controller ─────────────────────────────────────────────────────────
 
 export function computeWeights(input: OWCInput): OWCOutput {
+  // Guard: non-finite numeric inputs produce NaN weights that appear valid but aren't.
+  const numericFields: (keyof OWCInput)[] = [
+    'playerRank', 'playerCount', 'turnsElapsed', 'currentRTP', 'targetRTP', 'sessionFarkleRate',
+  ];
+  for (const field of numericFields) {
+    const v = input[field] as number;
+    if (!Number.isFinite(v)) {
+      throw new RangeError(`OWC: input.${field} must be a finite number, got ${String(v)}`);
+    }
+  }
+
   const weights: SpawnWeights = { face_1: 0, face_2: 0, face_3: 0, face_4: 0, face_5: 0, face_6: 0 };
   const reasons: string[] = [];
   let slipstreamFactor = 1.0;

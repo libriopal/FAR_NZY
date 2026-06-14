@@ -19,6 +19,7 @@ import { spendTracker } from './ai/spend/spendTracker.js';
 import { budgetManager } from './ai/spend/budgetManager.js';
 import { AI_CONFIG } from './ai/config.js';
 import { owc, type OWCInput } from '@match3d/owc';
+import { z } from 'zod';
 
 // ESM-compatible __dirname
 const __dirnameCompat = dirname(fileURLToPath(import.meta.url));
@@ -49,21 +50,69 @@ function applyWeightBias(baseScore: number, weights: Record<string, number>): nu
   return Math.round(baseScore * (1 + highValueBias + lowValueBias));
 }
 
+// Typed shape for patch input — narrowed from unknown at the boundary.
+interface SimPatch {
+  rtp_impact?: {
+    mode?: string;
+    spawn_weight_adjustments?: Record<string, number>;
+  };
+}
+
+function parseSimPatch(raw: unknown): SimPatch {
+  if (!raw || typeof raw !== 'object') return {};
+  const p = raw as Record<string, unknown>;
+  const impact = p['rtp_impact'];
+  if (!impact || typeof impact !== 'object') return {};
+  const i = impact as Record<string, unknown>;
+  const weights = i['spawn_weight_adjustments'];
+  const rtp_impact: SimPatch['rtp_impact'] = {};
+  if (typeof i['mode'] === 'string') rtp_impact.mode = i['mode'];
+  if (weights && typeof weights === 'object') {
+    rtp_impact.spawn_weight_adjustments = weights as Record<string, number>;
+  }
+  return { rtp_impact };
+}
+
 // OWC parameters that can be set via sandbox config / CLI
 export interface OWCParams {
   enabled: boolean;
   playerRank?: number;        // 1=leader, 2+=trailing
   playerCount?: number;
   turnsElapsed?: number;
-  targetRTP?: number;         // override rtpConfig default
+  targetRTP?: number;         // override mode default; omit to use mode-derived value
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runMonteCarloSimulation(patch: any, sessions: number, owcParams?: OWCParams) {
-  const mode: GameMode = (patch?.rtp_impact?.mode as GameMode) ?? 'SOLO_FREE';
-  const manualWeights: Record<string, number> = patch?.rtp_impact?.spawn_weight_adjustments ?? {};
+// Zod schema for the /owc-weights endpoint — enforces bounds and rejects non-finite inputs.
+const GAME_MODES: [GameMode, ...GameMode[]] = [
+  'SOLO_FREE', 'SOLO_CASINO', 'VS_FREE', 'VS_CASINO',
+  'RALLY_FREE', 'RALLY_CASINO', 'HEIST_FREE', 'HEIST_CASINO',
+];
+const OWCInputSchema = z.object({
+  mode:               z.enum(GAME_MODES),
+  playerRank:         z.number().int().min(1),
+  playerCount:        z.number().int().min(1),
+  turnsElapsed:       z.number().int().min(0),
+  currentRTP:         z.number().min(0).finite(),
+  targetRTP:          z.number().positive().finite(),
+  sessionFarkleRate:  z.number().min(0).max(1).finite(),
+});
+
+async function runMonteCarloSimulation(patch: unknown, sessions: number, owcParams?: OWCParams) {
+  const parsed = parseSimPatch(patch);
+  const mode: GameMode = (parsed.rtp_impact?.mode as GameMode | undefined) ?? 'SOLO_FREE';
+  const manualWeights: Record<string, number> = parsed.rtp_impact?.spawn_weight_adjustments ?? {};
 
   const result = runMonteCarlo(mode, sessions);
+
+  // Derive the mode-correct targetRTP from the normalizer.
+  // normalizer = averageScore / RTP_CONFIGS[mode].targetRTP, so this inverts correctly.
+  const modeTargetRTP = result.averageScore / (result.normalizer || 1);
+
+  // currentRTP is computed from the manual-biased score so it can drift relative to
+  // targetRTP when callers supply spawn weight adjustments. Without manual weights this
+  // equals modeTargetRTP (no drift) and OWC correction correctly stays silent.
+  const manualBiasedScore = applyWeightBias(result.averageScore, manualWeights);
+  const currentRTP = manualBiasedScore / (result.normalizer || 1);
 
   // Compute OWC adjustments on top of any manual spawn weights
   let owcWeights: Record<string, number> = {};
@@ -73,12 +122,12 @@ async function runMonteCarloSimulation(patch: any, sessions: number, owcParams?:
   if (owcParams?.enabled) {
     const input: OWCInput = {
       mode,
-      playerRank:          owcParams.playerRank ?? 1,
-      playerCount:         owcParams.playerCount ?? 1,
-      turnsElapsed:        owcParams.turnsElapsed ?? 10,
-      currentRTP:          result.averageScore / (result.normalizer || 1),
-      targetRTP:           owcParams.targetRTP ?? 0.92,
-      sessionFarkleRate:   result.farkleRate,
+      playerRank:         owcParams.playerRank ?? 1,
+      playerCount:        owcParams.playerCount ?? 1,
+      turnsElapsed:       owcParams.turnsElapsed ?? 10,
+      currentRTP,
+      targetRTP:          owcParams.targetRTP ?? modeTargetRTP,
+      sessionFarkleRate:  result.farkleRate,
     };
     const owcOut = owc.computeWeights(input);
     owcWeights = owcOut.spawnWeightAdjustments as unknown as Record<string, number>;
@@ -203,10 +252,13 @@ router.get('/health', (_req, res) => {
 // ─── OWC endpoint ────────────────────────────────────────────────────────────
 
 router.post('/owc-weights', (req, res) => {
+  const parsed = OWCInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid OWC input', details: parsed.error.flatten() });
+    return;
+  }
   try {
-    const input = req.body as OWCInput;
-    if (!input?.mode) { res.status(400).json({ error: 'mode is required' }); return; }
-    const result = owc.computeWeights(input);
+    const result = owc.computeWeights(parsed.data);
     res.json({ success: true, result });
   } catch (error) {
     process.stderr.write(`OWC error: ${String(error)}\n`);
