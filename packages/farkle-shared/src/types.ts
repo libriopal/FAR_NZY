@@ -265,6 +265,13 @@ export interface RTPConfig {
   milestoneConfig?: ReadonlyArray<{ tier: number; points: number; multiplier: number }>;
 }
 
+export interface OWCConfig {
+  enabled: boolean;
+  playerRank: number;
+  playerCount: number;
+  targetRTP?: number;
+}
+
 export type TransactionType =
   | 'FD_PURCHASE' | 'PDX_GIFT' | 'FD_WAGER' | 'PDX_WAGER'
   | 'FD_AWARD' | 'PDX_AWARD' | 'PDX_DAILY_BONUS' | 'PDX_REDEEM' | 'PDX_PROMO';
