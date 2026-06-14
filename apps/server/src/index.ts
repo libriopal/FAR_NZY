@@ -11,6 +11,10 @@ import { sandboxRouter, handleSandboxWS } from './sandbox.js';
 import { GameRoom } from './gameRoom.js';
 import { DEFAULT_SETTINGS } from '@match3d/farkle-shared';
 import { nanoid } from 'nanoid';
+import { governanceRouter } from './ai/routes/governanceRouter.js';
+import { questRouter } from './ai/routes/questRouter.js';
+// Initialize AI provider registry at startup
+import './ai/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +24,8 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/', sandboxRouter);
 app.use('/api/sandbox', sandboxRouter);
+app.use('/api/governance', governanceRouter);
+app.use('/api/quests', questRouter);
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });

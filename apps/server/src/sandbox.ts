@@ -14,6 +14,10 @@ import type { MonteCarloResultV2, PlayerModel, SimConfig } from '@match3d/farkle
 import type { GameMode } from '@match3d/farkle-shared';
 import { MULTIPLIER_LADDER } from '@match3d/farkle-shared';
 import * as store from './sandbox/sessionStore.js';
+import { monteCarloAuditor } from './ai/auditors/monteCarloAuditor.js';
+import { spendTracker } from './ai/spend/spendTracker.js';
+import { budgetManager } from './ai/spend/budgetManager.js';
+import { AI_CONFIG } from './ai/config.js';
 
 // ESM-compatible __dirname
 const __dirnameCompat = dirname(fileURLToPath(import.meta.url));
@@ -74,46 +78,17 @@ async function analyzeRTPImpact(input: {
   riskLevel: 'low' | 'medium' | 'high';
   approved: boolean;
 }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (apiKey) {
-    try {
-      const prompt = `You are an RTP analyst for a dice game called Farkle Frenzy.
-
-Patch: ${input.patchName}
-Description: ${input.patchDescription}
-Baseline RTP: ${(input.baselineRTP * 100).toFixed(1)}%
-Simulation sessions: ${input.simulationResults.sessionsRun}
-Avg score with patch: ${input.simulationResults.avgScore}
-Farkle rate with patch: ${(input.simulationResults.farkleRate * 100).toFixed(1)}%
-Spawn weight adjustments: ${JSON.stringify(input.spawnWeightAdjustments)}
-
-Respond ONLY with a JSON object in this exact shape:
-{
-  "analysis": "<2-3 sentence plain English analysis>",
-  "recommendations": ["<rec1>", "<rec2>"],
-  "projectedRTP": <number between 0 and 1>,
-  "projectedRTPRange": [<low>, <high>],
-  "riskLevel": "<low|medium|high>",
-  "approved": <true|false>
-}`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        }
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = await res.json() as any;
-      const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      const json = text.match(/\{[\s\S]*\}/)?.[0];
-      if (json) return JSON.parse(json);
-    } catch (e) {
-      process.stderr.write(`Gemini analysis failed, falling back to deterministic: ${String(e)}\n`);
-    }
+  let aiAnalysis: string | null = null;
+  try {
+    const mcResult = {
+      averageScore: input.simulationResults.avgScore,
+      farkleRate:   input.simulationResults.farkleRate,
+      normalizer:   input.simulationResults.avgScore / (input.baselineRTP || 0.95),
+      sessionsRun:  input.simulationResults.sessionsRun,
+    };
+    aiAnalysis = await monteCarloAuditor.analyze(mcResult, input.baselineRTP);
+  } catch (e) {
+    process.stderr.write(`Monte Carlo auditor failed, falling back to deterministic: ${String(e)}\n`);
   }
 
   const { avgScore, farkleRate, sessionsRun } = input.simulationResults;
@@ -142,7 +117,7 @@ Respond ONLY with a JSON object in this exact shape:
   if (recs.length === 0) recs.push(`Patch looks balanced across ${sessionsRun} sessions. Approved for staging.`);
 
   return {
-    analysis: `Patch "${input.patchName}" projects an RTP of ${(projectedRTP * 100).toFixed(1)}% against a baseline of ${(input.baselineRTP * 100).toFixed(1)}% over ${sessionsRun} simulated sessions. Farkle rate is ${(farkleRate * 100).toFixed(1)}%, and the patch is ${approved ? 'within' : 'outside'} the approved RTP band.`,
+    analysis: aiAnalysis ?? `Patch "${input.patchName}" projects an RTP of ${(projectedRTP * 100).toFixed(1)}% against a baseline of ${(input.baselineRTP * 100).toFixed(1)}% over ${sessionsRun} simulated sessions. Farkle rate is ${(farkleRate * 100).toFixed(1)}%, and the patch is ${approved ? 'within' : 'outside'} the approved RTP band.`,
     recommendations: recs,
     projectedRTP,
     projectedRTPRange,
@@ -175,8 +150,15 @@ router.post('/analyze', async (req, res) => {
   }
 });
 
-router.get('/health', (req, res) => {
-  res.json({ ok: true, aiAvailable: !!process.env.GEMINI_API_KEY });
+router.get('/health', (_req, res) => {
+  const spend = spendTracker.getSpend();
+  const budget = budgetManager.getAllStatus();
+  res.json({
+    ok: true,
+    cohereConfigured: !!AI_CONFIG.cohereApiKey,
+    spend: spend.byCategory,
+    budget,
+  });
 });
 
 // ─── Coverage checklist types ─────────────────────────────────────────────────
