@@ -151,3 +151,45 @@
 When Batch A implementation begins, every checkbox above must be ticked
 with a line reference (e.g. monteCarlo.ts:142) before the sacred file
 authorization is granted.
+
+## OWC (Opportunity Weight Controller — P4)
+
+These paths are added by P4-OWC when `owcParams.enabled = true` in SimConfig.
+OWC is computed in packages/owc/src/index.ts and applied in sandbox.ts before
+the simulation run. The paths below require sacred file changes to be wired into
+monteCarlo.ts directly (deferred — authorization needed).
+
+### OWC SANDBOX LAYER (surface — implemented)
+- [x] OWCParams accepted by POST /simulate → owcParams field
+- [x] computeWeights() called with mode, playerRank, currentRTP, farkleRate
+- [x] spawnWeightAdjustments merged with manual patch weights (manual wins)
+- [x] owcContributionRtp returned in simulation result
+- [x] owcReason string returned for logging/debugging
+- [x] POST /owc-weights endpoint — direct weight computation without simulation
+
+### OWC SLIPSTREAM (VS / Heist — surface layer)
+- [x] Trailing player (rank ≥ 2) gets face_1 boost up to +12%
+- [x] face_5 boost = face_1 × 0.5
+- [x] slipstreamFactor = 1 + boost returned to caller
+- [x] Boost scales with trailingDepth × matchProgress (ramps over 20 turns)
+- [x] Leader (rank=1) gets zero adjustment
+
+### OWC RALLY BALANCE (cooperative — surface layer)
+- [x] If running RTP < targetRTP by >2%, face_1 bias applied
+- [x] Correction magnitude = shortfall × 0.15
+
+### OWC RTP DRIFT CORRECTION (all modes — surface layer)
+- [x] RTP running high (>3% above target): face_1 bias reduced
+- [x] RTP running low (>3% below target): face_5 bias increased
+- [x] Only active after 5+ turns to avoid early-session noise
+
+### OWC FARKLE RATE STABILISER (all modes — surface layer)
+- [x] Farkle rate > 22%: reduce face_2/face_3 bias (easier grid)
+- [x] Farkle rate < 8% (after 5 turns): increase face_2 bias (harder grid)
+
+### PENDING — SACRED FILE INTEGRATION (requires authorization)
+- [ ] SimConfig extended with `owcParams?: OWCParams` in types.ts (SACRED)
+- [ ] runMonteCarloV2() accepts OWCConfig and applies per-turn weight adjustment
+- [ ] owcContributionRTP field added to MonteCarloResultV2 (SACRED)
+- [ ] CSPRNG lineage: OWC weight sampling must not use Math.random()
+- [ ] All 6 gate thresholds re-validated after OWC integration
