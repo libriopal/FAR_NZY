@@ -52,8 +52,8 @@ serve(async (req) => {
   }
 
   // ── Generate via LLM ──
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!anthropicKey) {
+  const cohereKey = Deno.env.get('COHERE_API_KEY');
+  if (!cohereKey) {
     return new Response(JSON.stringify({ quests: _getTemplateQuests() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -62,22 +62,21 @@ serve(async (req) => {
   const prompt = _buildPrompt(levelReached);
 
   try {
-    const llmRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const cohereRes = await fetch('https://api.cohere.com/v1/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${cohereKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: Deno.env.get('COHERE_QUEST_MODEL') ?? 'command-r7b-12-2024',
+        prompt,
         max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
       }),
     });
-
-    const llmData = await llmRes.json();
-    const rawText: string = llmData.content?.[0]?.text ?? '';
+    const cohereData = await cohereRes.json();
+    const rawText: string = cohereData.generations?.[0]?.text ?? '';
     let quests: unknown[] = [];
 
     try {

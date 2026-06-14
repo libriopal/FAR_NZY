@@ -3,6 +3,9 @@
 // Visual/presentational layer. Safe to modify appearance.
 // Do not add game logic here. Do not remove imports from CORE files.
 // ─────────────────────────────────────────────────────
+// ORPHANED — confirmed no imports across apps/web/src (UI audit 2026-05-31).
+// GameHUD reads useGameStore (match-3 model), not useFarkleStore (dice model).
+// Pending deletion in a dedicated cleanup PR — do not extend.
 
 import React, { useCallback } from 'react';
 import { useGameStore } from '../store/gameStore.js';

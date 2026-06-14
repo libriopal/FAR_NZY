@@ -115,6 +115,8 @@ export interface FarkleGameState {
   setRallyDecision: (active: boolean, expiresAt?: number | null) => void;
   setRallyVotes: (votes: Record<string, string>) => void;
   clearRallyVotes: () => void;
+  // P2.6: server authority reconciliation — all fields synced; server applies bonuses
+  syncFromServer: (multiplierStep: number, banked?: number, unbanked?: number, vaultPts?: number, orbBonus?: number, doublerBonus?: number, archivistBonus?: number) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -359,6 +361,14 @@ export const useFarkleStore = create<FarkleGameState>()(
 
     setRallyVotes: (votes) => set({ rallyVotes: votes }),
     clearRallyVotes: () => set({ rallyVotes: {} }),
+
+    syncFromServer: (multiplierStep, banked, unbanked, vaultPts, _orbBonus, _doublerBonus, _archivistBonus) =>
+      set(() => ({
+        multiplierStep,
+        ...(banked !== undefined ? { banked } : {}),
+        ...(unbanked !== undefined ? { unbanked } : {}),
+        ...(vaultPts !== undefined ? { vaultPts } : {}),
+      })),
 
     tickTimer: (deltaMs) =>
       set(s => {

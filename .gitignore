@@ -11,3 +11,9 @@ android/app/release/
 *.jks
 pnpm-lock.yaml
 UPDATEMAY5.zip
+
+# Cohere AI spend log — machine-local, never commit
+COHERE_SPEND_LOG.json
+
+# Governance audit run artifacts — gitignored; only .gitkeep tracked
+runs/governance/*.json

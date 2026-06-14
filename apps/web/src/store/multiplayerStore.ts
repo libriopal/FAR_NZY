@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import type { DisruptionEvent, RallyRole } from '@match3d/farkle-shared';
+import type { DisruptionEvent, RallyRole, DieFace } from '@match3d/farkle-shared';
+import { useFarkleStore } from './farkleStore.js';
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:3001';
 
@@ -46,16 +47,43 @@ export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...I
 
 let _ws: WebSocket | null = null;
 
+// ── Reconnect state ───────────────────────────────────────────────────────────
+// Stores credentials needed to attempt JOIN_ROOM on unexpected disconnect.
+// Cleared on intentional leaveRoom(). Never resets farkleStore on reconnect.
+let _reconnectCreds: { roomCode: string; playerId: string; playerName: string } | null = null;
+let _pendingPlayerName = '';   // captured at createRoom/joinRoom before WS opens
+let _reconnectAttempts = 0;
+let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let _isReconnecting = false;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY_MS = 2000;
+
 function _applyMessage(msg: { type: string; [k: string]: unknown }) {
   const myId = useMultiplayerStore.getState().playerId;
   useMultiplayerStore.setState(prev => {
     const next = { ...prev, lastMessage: msg };
     switch (msg.type) {
       case 'ROOM_CREATED':
-      case 'ROOM_JOINED':
-        return { ...next, status: 'lobby' as const, roomCode: msg.roomCode as string, playerId: msg.playerId as string };
+      case 'ROOM_JOINED': {
+        const roomCode = msg.roomCode as string;
+        const playerId = msg.playerId as string;
+        _reconnectCreds = { roomCode, playerId, playerName: _pendingPlayerName };
+        if (_isReconnecting) {
+          // Reconnect acknowledged — preserve 'playing'; ROOM_STATE will sync scores
+          return { ...next, roomCode, playerId };
+        }
+        return { ...next, status: 'lobby' as const, roomCode, playerId };
+      }
       case 'ROOM_STATE': {
         const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number };
+        if (_isReconnecting) {
+          _isReconnecting = false;
+          _reconnectAttempts = 0;
+          if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+          const curStep = useFarkleStore.getState().multiplierStep;
+          useFarkleStore.getState().syncFromServer(curStep, rs.banked, rs.unbanked);
+          return { ...next, status: 'playing' as const, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked };
+        }
         return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked };
       }
       case 'GAME_STARTED': {
@@ -63,13 +91,42 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         const myRole = myId ? (roleMap[myId] ?? null) : null;
         return { ...next, status: 'playing' as const, myRole };
       }
-      case 'CHAIN_RESULT':
-        return { ...next, banked: (msg.banked as number) ?? prev.banked, unbanked: (msg.unbanked as number) ?? prev.unbanked };
+      case 'CHAIN_RESULT': {
+        const multiplierStep = (msg.multiplierStep as number | undefined) ?? 0;
+        const banked = (msg.banked as number) ?? prev.banked;
+        const unbanked = (msg.unbanked as number | undefined) ?? prev.unbanked;
+        const vaultPts = msg.vaultPts as number | undefined;
+        const orbBonus = msg.orbBonus as number | undefined;
+        const doublerBonus = msg.doublerBonus as number | undefined;
+        const archivistBonus = msg.archivistBonus as number | undefined;
+        // P2.6: server applies all bonuses (orb, doubler, ARCHIVIST, heist vault).
+        // Always sync banked/unbanked — server total is now authoritative including bonuses.
+        useFarkleStore.getState().syncFromServer(multiplierStep, banked, unbanked, vaultPts, orbBonus, doublerBonus, archivistBonus);
+        return { ...next, banked, unbanked };
+      }
+      case 'DOUBLER_SPAWNED': {
+        const col = msg.column as number;
+        const expiresAt = msg.expiresAt as number;
+        const duration = Math.max(0, expiresAt - Date.now());
+        useFarkleStore.getState().spawnDoublerCell(col, duration);
+        return next;
+      }
+      case 'ORB_COLLECTED':
+        // Server confirmed orb collection — lastMessage set; no additional state change needed.
+        return next;
       case 'TURN_CHANGE':
         return { ...next, activePlayerId: msg.activePlayerId as string };
       case 'DISRUPTION_INCOMING':
         return { ...next, lastDisruption: msg.disruption as DisruptionEvent };
+      case 'BOARD_UPDATE':
+        // Server recovered a dead board. lastMessage is set via the spread above;
+        // GameScreen reacts via the mpState.lastMessage effect.
+        return next;
       case 'ERROR':
+        if (_isReconnecting) {
+          _isReconnecting = false;
+          _reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // stop retrying
+        }
         return { ...next, error: msg.message as string };
       default:
         return next;
@@ -93,15 +150,36 @@ function _connect(onOpen: () => void) {
   };
   ws.onerror = () => useMultiplayerStore.setState({ error: 'Connection error', status: 'disconnected' });
   ws.onclose = () => {
-    useMultiplayerStore.setState(s => s.status !== 'idle' ? { ...s, status: 'disconnected' } : s);
+    const status = useMultiplayerStore.getState().status;
+    if (status === 'playing' && _reconnectCreds && _reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      _reconnectAttempts++;
+      _isReconnecting = true;
+      useMultiplayerStore.setState(s => ({ ...s, status: 'connecting' }));
+      const creds = _reconnectCreds;
+      _reconnectTimer = setTimeout(() => {
+        _connect(() => _send({ type: 'JOIN_ROOM', roomCode: creds!.roomCode, playerId: creds!.playerId, playerName: creds!.playerName }));
+      }, RECONNECT_DELAY_MS);
+    } else {
+      _reconnectAttempts = 0;
+      _isReconnecting = false;
+      _reconnectCreds = null;
+      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+      useMultiplayerStore.setState(s => s.status !== 'idle' ? { ...s, status: 'disconnected' } : s);
+    }
   };
 }
 
 export const mpActions = {
   createRoom(playerName: string, gameMode?: string) {
+    _pendingPlayerName = playerName;
+    _reconnectCreds = null;
+    _reconnectAttempts = 0;
     _connect(() => _send({ type: 'CREATE_ROOM', playerName, gameMode }));
   },
   joinRoom(roomCode: string, playerName: string) {
+    _pendingPlayerName = playerName;
+    _reconnectCreds = null;
+    _reconnectAttempts = 0;
     _connect(() => _send({ type: 'JOIN_ROOM', roomCode: roomCode.toUpperCase(), playerName }));
   },
   startGame() { _send({ type: 'START_GAME' }); },
@@ -110,7 +188,20 @@ export const mpActions = {
   sendDisruption(disruptType: string, targetColumns: number[]) {
     _send({ type: 'DISRUPT', disruptType, targetColumns });
   },
+  submitChainFaces(faces: DieFace[], chainLength: number, chainColumns: number[]) {
+    _send({ type: 'SUBMIT_CHAIN_FACES', faces, chainLength, chainColumns });
+  },
+  collectOrb(bodyId: string) {
+    _send({ type: 'COLLECT_ORB', bodyId });
+  },
+  claimVault() {
+    _send({ type: 'CLAIM_VAULT' });
+  },
   leaveRoom() {
+    _reconnectCreds = null;
+    _reconnectAttempts = 0;
+    _isReconnecting = false;
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
     _send({ type: 'LEAVE_ROOM' });
     _ws?.close();
     _ws = null;

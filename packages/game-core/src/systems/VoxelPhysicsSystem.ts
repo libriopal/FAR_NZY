@@ -561,9 +561,10 @@ export class VoxelPhysicsSystem {
   }
 
   isDeadBoard(): boolean {
-    // Wilds, bombs, mirrors, and catalysts always provide a move
+    // wild, mirror, catalyst are CHAINABLE — their presence means a move exists.
+    // bomb, rainbow_bomb, multiplier_orb are TAPPABLE only — not chainable.
     for (const [, data] of this.bodies) {
-      if (['wild','bomb','rainbow_bomb','mirror','catalyst','multiplier_orb'].includes(data.entityType)) return false;
+      if (['wild', 'mirror', 'catalyst'].includes(data.entityType)) return false;
     }
     const faceCounts: Record<number, number> = {};
     for (const [, data] of this.bodies) {
@@ -576,11 +577,28 @@ export class VoxelPhysicsSystem {
   }
 
   reshuffleBoard(): void {
-    for (const [, data] of this.bodies) {
-      if (['die','ice','lock','mirror','ghost','catalyst'].includes(data.entityType)) {
-        data.face = Math.ceil(this.faceRng() * 6);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      for (const [, data] of this.bodies) {
+        // ice and lock retain their faces — thaw/unlock are separate mechanics
+        if (['die', 'mirror', 'ghost', 'catalyst'].includes(data.entityType)) {
+          data.face = Math.ceil(this.faceRng() * 6);
+        }
       }
+      if (!this.isDeadBoard()) return;
     }
+    // Exhausted — caller falls through to injectScoringDie()
+  }
+
+  injectScoringDie(): void {
+    const heights = this._columnHeights();
+    let lowestCol = 0;
+    let lowestH = Infinity;
+    for (let i = 0; i < 7; i++) {
+      if ((heights[i] ?? 0) < lowestH) { lowestH = heights[i] ?? 0; lowestCol = i; }
+    }
+    // Seeded face selection — never hardcoded
+    const face = this.faceRng() < 0.5 ? 1 : 5;
+    this.spawnBody(lowestCol, 'die', face);
   }
 
   getColumnHeights(): number[] { return this._columnHeights(); }

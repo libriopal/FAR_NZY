@@ -11,8 +11,8 @@
 
 import type { WebSocket } from 'ws';
 import type { Cell, Player, GamePhase, LobbySettings } from '@match3d/farkle-shared';
-import { GAME_CONSTANTS, RALLY_MILESTONES } from '@match3d/farkle-shared';
-import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision } from '@match3d/farkle-engine';
+import { GAME_CONSTANTS, RALLY_MILESTONES, HEIST_CONSTANTS } from '@match3d/farkle-shared';
+import { CSPRNG, createGrid, SixPoolManager, scoreFarkle, hashServerSeed, estimateFarkleRisk, isOptimalDecision, hasValidChain } from '@match3d/farkle-engine';
 import { insertChainDecision, insertSession } from './analytics.js';
 import { nanoid } from 'nanoid';
 
@@ -33,6 +33,9 @@ interface GameRoomState {
   banked: number;
   multiplierStep: number;
   farklePool: number;
+  orbActive: boolean;
+  doublerColumns: { column: number; expiresAt: number }[];
+  vaultPts: number;
 }
 
 // ── DB ────────────────────────────────────────────────────────────────────────
@@ -88,6 +91,7 @@ export class GameRoom {
   private banksTaken = 0;
   private lastActionAt: Map<string, number> = new Map();
   private readonly INPUT_LOCK_MS = 100;
+  private explicitBanksTaken = 0;
 
   constructor(settings: LobbySettings) {
     this.id = nanoid(8).toUpperCase();
@@ -104,6 +108,9 @@ export class GameRoom {
       banked: 0,
       multiplierStep: 0,
       farklePool: 0,
+      orbActive: false,
+      doublerColumns: [],
+      vaultPts: 0,
     };
     this.committedHash = hashServerSeed(this.csprng.getSeed());
     this.startEnergyTick();
@@ -118,6 +125,13 @@ export class GameRoom {
 
   private send(ws: WebSocket, msg: object) {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg));
+  }
+
+  private creditPlayerBanked(playerId: string, amount: number) {
+    if (amount <= 0) return;
+    const player = this.players.get(playerId);
+    if (!player) return;
+    player.profile.banked += amount;
   }
 
   private startTurnTimer() {
@@ -195,7 +209,78 @@ export class GameRoom {
           this.send(player.ws, { type: 'ERROR', message: 'Chain too short' });
           return;
         }
+        if (chain.length > 6) {
+          this.send(player.ws, { type: 'ERROR', message: 'Chain too long' });
+          return;
+        }
+        // Validate 4-way adjacency: each consecutive pair must share exactly one edge;
+        // no duplicate cells. Guards against non-adjacent face injection attacks.
+        const seenCells = new Set<string>();
+        let adjacencyOk = true;
+        for (let i = 0; i < chain.length; i++) {
+          const cell = chain[i]!;
+          const key = `${cell.row},${cell.col}`;
+          if (seenCells.has(key)) { adjacencyOk = false; break; }
+          seenCells.add(key);
+          if (i > 0) {
+            const prev = chain[i - 1]!;
+            const dist = Math.abs(prev.row - cell.row) + Math.abs(prev.col - cell.col);
+            if (dist !== 1) { adjacencyOk = false; break; }
+          }
+        }
+        if (!adjacencyOk) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid chain: non-adjacent tiles' });
+          return;
+        }
         this.processChain(playerId, chain);
+        break;
+      }
+      case 'SUBMIT_CHAIN_FACES': {
+        if (playerId !== this.activePlayerId) {
+          this.send(player.ws, { type: 'ERROR', message: 'Not your turn' });
+          return;
+        }
+        const lastAt2 = this.lastActionAt.get(playerId) ?? 0;
+        if (Date.now() - lastAt2 < this.INPUT_LOCK_MS) {
+          this.send(player.ws, { type: 'ERROR', message: 'Too fast' });
+          return;
+        }
+        this.lastActionAt.set(playerId, Date.now());
+        const faces = msg.faces as number[];
+        const chainLength = msg.chainLength as number;
+        if (!Array.isArray(faces) || faces.length < 1 || faces.length > 6) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid chain' });
+          return;
+        }
+        if (!faces.every((f: unknown) => Number.isInteger(f) && (f as number) >= 1 && (f as number) <= 6)) {
+          this.send(player.ws, { type: 'ERROR', message: 'Invalid face values' });
+          return;
+        }
+        const chainColumns = Array.isArray(msg.chainColumns)
+          ? (msg.chainColumns as number[]).filter((c: unknown) => Number.isInteger(c) && (c as number) >= 0 && (c as number) <= 6)
+          : [];
+        // Column adjacency: consecutive tiles must be in the same or adjacent column.
+        // Best validation available without full grid state (BUG-01 pending).
+        if (chainColumns.length === faces.length && chainColumns.length > 1) {
+          let colsOk = true;
+          for (let i = 1; i < chainColumns.length; i++) {
+            if (Math.abs(chainColumns[i]! - chainColumns[i - 1]!) > 1) { colsOk = false; break; }
+          }
+          if (!colsOk) {
+            this.send(player.ws, { type: 'ERROR', message: 'Invalid chain: non-adjacent columns' });
+            return;
+          }
+        }
+        // Clamp chainLength to the valid face range to prevent banking-bypass exploits.
+        const validatedChainLength = typeof chainLength === 'number' && chainLength >= 1 && chainLength <= 6
+          ? chainLength
+          : faces.length;
+        this.processChainFaces(
+          playerId,
+          faces as import('@match3d/farkle-shared').DieFace[],
+          validatedChainLength,
+          chainColumns,
+        );
         break;
       }
       case 'BANK':
@@ -227,6 +312,27 @@ export class GameRoom {
         this.rallyVotes.clear();
         this.broadcast({ type: 'RALLY_DECISION_START', expiresAt });
         this.rallyDecisionTimeout = setTimeout(() => this._resolveRallyVotes(), 3000);
+        break;
+      }
+      case 'COLLECT_ORB': {
+        this.state = { ...this.state, orbActive: true };
+        this.broadcast({ type: 'ORB_COLLECTED', playerId });
+        break;
+      }
+      case 'CLAIM_VAULT': {
+        if (this.state.vaultPts > 0) {
+          this.creditPlayerBanked(playerId, this.state.vaultPts);
+          this.state = {
+            ...this.state,
+            banked: this.state.banked + this.state.vaultPts,
+            vaultPts: 0,
+          };
+          if (this.state.banked >= WIN_SCORE) {
+            void this.endSession(playerId);
+            return;
+          }
+          this.broadcast({ type: 'CHAIN_RESULT', isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep, vaultPts: 0 });
+        }
         break;
       }
     }
@@ -267,7 +373,7 @@ export class GameRoom {
     if (result.isFarkle) {
       const lost = this.state.unbanked;
       this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' };
-      this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: 0, phase: 'FARKLE_ANIM' });
+      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, phase: 'FARKLE_ANIM' });
       // Analytics: log farkle decision (fire-and-forget)
       insertChainDecision({
         id: nanoid(), session_id: this.sessionId, player_id: playerId,
@@ -277,6 +383,7 @@ export class GameRoom {
         timestamp: new Date().toISOString(),
       });
       setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
+      this._checkAndRecoverDeadBoard();
       return;
     }
     this.scoringChains++;
@@ -316,7 +423,127 @@ export class GameRoom {
       }
     }
 
-    this.broadcast({ type: 'CHAIN_RESULT', result, unbanked: this.state.unbanked, banked: this.state.banked });
+    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep });
+    this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
+    this.startTurnTimer();
+  }
+
+  private processChainFaces(
+    playerId: string,
+    faces: import('@match3d/farkle-shared').DieFace[],
+    chainLength: number,
+    chainColumns: number[] = [],
+  ): void {
+    const result = scoreFarkle(faces);
+    this.totalChains++;
+
+    if (result.isFarkle) {
+      const lost = this.state.unbanked;
+      this.state = { ...this.state, farklePool: this.state.farklePool + lost, unbanked: 0, multiplierStep: 0, orbActive: false, phase: 'FARKLE_ANIM' };
+      this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: true, banked: this.state.banked, unbanked: 0, multiplierStep: 0, vaultPts: this.state.vaultPts, phase: 'FARKLE_ANIM', orbBonus: 0, doublerBonus: 0, archivistBonus: 0 });
+      insertChainDecision({
+        id: nanoid(), session_id: this.sessionId, player_id: playerId,
+        chain_number: this.totalChains, faces_played: faces as number[],
+        score_result: 0, multiplier_at: 1,
+        unbanked_before: lost, decision: 'FARKLE', was_optimal: false,
+        timestamp: new Date().toISOString(),
+      });
+      setTimeout(() => { this.state.phase = 'IDLE'; this.nextTurn(); }, 800);
+      this._checkAndRecoverDeadBoard();
+      return;
+    }
+
+    this.scoringChains++;
+    const scaled = Math.round(result.score * [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)]);
+    const newMultiplierStep = chainLength === 6 ? Math.min(this.state.multiplierStep + 1, 5) : 0;
+
+    // ── Heist vault split (before banking — applies to scaled score) ──────────
+    const isHeist = this.gameMode === 'HEIST_FREE' || this.gameMode === 'HEIST_CASINO';
+    let toVault = 0;
+    let scoreToUnbanked = scaled;
+    if (isHeist && scaled > 0) {
+      toVault = Math.round(scaled * HEIST_CONSTANTS.VAULT_SPLIT);
+      scoreToUnbanked = scaled - toVault;
+    }
+
+    this.state = {
+      ...this.state,
+      unbanked: this.state.unbanked + scoreToUnbanked,
+      vaultPts: this.state.vaultPts + toVault,
+      multiplierStep: newMultiplierStep,
+    };
+
+    // ── Banking for chain < 6 ─────────────────────────────────────────────────
+    if (chainLength < 6) {
+      this.creditPlayerBanked(playerId, this.state.unbanked);
+      this.state.banked += this.state.unbanked;
+      this.state.unbanked = 0;
+      this.banksTaken++;
+      this.checkMilestones(playerId, this.state.banked);
+      if (this.state.banked >= WIN_SCORE) {
+        void this.endSession(playerId);
+        return;
+      }
+    }
+
+    // ── Multiplier orb ×1.5 (applied after banking; 0 for chain<6 since unbanked=0) ──
+    let orbBonus = 0;
+    if (this.state.orbActive && this.state.unbanked > 0) {
+      orbBonus = Math.round(this.state.unbanked * 0.5);
+      this.creditPlayerBanked(playerId, orbBonus);
+      this.state = { ...this.state, banked: this.state.banked + orbBonus, orbActive: false };
+    } else {
+      this.state = { ...this.state, orbActive: false };
+    }
+
+    // ── Doubler cell ×2 (doubles net banked+unbanked delta vs pre-chain snapshot) ──
+    let doublerBonus = 0;
+    const now = Date.now();
+    this.state = { ...this.state, doublerColumns: this.state.doublerColumns.filter(d => d.expiresAt > now) };
+    const colSet = new Set(chainColumns);
+    const activeDoubler = this.state.doublerColumns.find(d => colSet.has(d.column));
+    if (activeDoubler) {
+      // Double the base score contribution (scaled) — same semantics as client delta doubling
+      doublerBonus = scaled + orbBonus;
+      if (chainLength < 6) {
+        this.creditPlayerBanked(playerId, doublerBonus);
+      }
+      this.state = {
+        ...this.state,
+        banked: this.state.banked + (chainLength < 6 ? doublerBonus : 0),
+        unbanked: this.state.unbanked + (chainLength === 6 ? doublerBonus : 0),
+        doublerColumns: this.state.doublerColumns.filter(d => d.column !== activeDoubler.column),
+      };
+    }
+
+    // ── ARCHIVIST: recover 15% of farkle pool ────────────────────────────────
+    let archivistBonus = 0;
+    if (this.roleMap.get(playerId) === 'ARCHIVIST' && this.state.farklePool > 0) {
+      archivistBonus = Math.round(this.state.farklePool * GAME_CONSTANTS.ARCHIVIST_PCT);
+      this.state = {
+        ...this.state,
+        farklePool: this.state.farklePool - archivistBonus,
+        unbanked: this.state.unbanked + archivistBonus,
+      };
+    }
+
+    const farkleRisk = estimateFarkleRisk(
+      faces.filter(f => f === 1).length,
+      faces.filter(f => f === 5).length,
+      faces.length,
+    );
+    const decision = chainLength < 6 ? 'BANK' : 'CONTINUE';
+    insertChainDecision({
+      id: nanoid(), session_id: this.sessionId, player_id: playerId,
+      chain_number: this.totalChains, faces_played: faces as number[],
+      score_result: result.score,
+      multiplier_at: [1, 1.25, 1.5, 2, 3, 4][Math.min(this.state.multiplierStep, 5)] ?? 1,
+      unbanked_before: this.state.unbanked, decision,
+      was_optimal: isOptimalDecision(decision, this.state.unbanked, this.state.multiplierStep, farkleRisk),
+      timestamp: new Date().toISOString(),
+    });
+
+    this.broadcast({ type: 'CHAIN_RESULT', result, isFarkle: false, banked: this.state.banked, unbanked: this.state.unbanked, multiplierStep: this.state.multiplierStep, vaultPts: this.state.vaultPts, orbBonus, doublerBonus, archivistBonus });
     this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid });
     this.startTurnTimer();
   }
@@ -368,11 +595,20 @@ export class GameRoom {
 
   private handleBank(playerId: string) {
     if (this.state.unbanked > 0) {
+      this.creditPlayerBanked(playerId, this.state.unbanked);
       this.state.banked += this.state.unbanked;
       this.state.unbanked = 0;
       this.checkMilestones(playerId, this.state.banked);
     }
-    this.broadcast({ type: 'CHAIN_RESULT', banked: this.state.banked, unbanked: 0 });
+    // Every 3rd explicit bank: server spawns a CSPRNG-seeded doubler cell
+    this.explicitBanksTaken++;
+    if (this.explicitBanksTaken % 3 === 0) {
+      const col = (this.pool.drawDie() + this.explicitBanksTaken * 2) % 7;
+      const expiresAt = Date.now() + 30_000;
+      this.state = { ...this.state, doublerColumns: [...this.state.doublerColumns, { column: col, expiresAt }] };
+      this.broadcast({ type: 'DOUBLER_SPAWNED', column: col, expiresAt });
+    }
+    this.broadcast({ type: 'CHAIN_RESULT', isFarkle: false, banked: this.state.banked, unbanked: 0, multiplierStep: 0, vaultPts: this.state.vaultPts });
     if (this.state.banked >= WIN_SCORE) {
       void this.endSession(playerId);
       return;
@@ -427,7 +663,7 @@ export class GameRoom {
     } else if (this.gameMode === 'SOLO_CASINO') {
       // C6: payout = (banked / WIN_SCORE) × stakeAmount × targetRTP(0.92)
       const player = this.players.get(triggeringPlayerId);
-      const banked = player?.profile.banked ?? 0;
+      const banked = player?.profile.banked ?? this.state.banked;
       payout = Math.round((banked / WIN_SCORE) * this.settings.stakeAmount * 0.92);
       winnerId = triggeringPlayerId;
     }
@@ -441,7 +677,7 @@ export class GameRoom {
     });
 
     // Analytics: insert session record (fire-and-forget)
-    const finalBanked = this.state.banked;
+    const finalBanked = this.players.get(triggeringPlayerId)?.profile.banked ?? this.state.banked;
     void insertSession({
       id: this.sessionId,
       player_id: triggeringPlayerId,
@@ -471,6 +707,37 @@ export class GameRoom {
       activePlayerId: this.activePlayerId,
       players: [...this.players.values()].map(p => ({ ...p.profile, energy: p.energy })),
     };
+  }
+
+  private _checkAndRecoverDeadBoard(attempt = 0): void {
+    if (hasValidChain(this.state.grid)) return;
+    if (attempt >= 3) {
+      this.broadcast({ type: 'BOARD_DEAD_RECOVERY_FAILED' });
+      void this.endSession(this.activePlayerId ?? '');
+      return;
+    }
+    this.pool.reshuffle();
+    this.state.grid = this._reshuffleGridFaces(this.state.grid);
+    this.broadcast({ type: 'BOARD_UPDATE', grid: this.state.grid, recoveryAttempt: attempt + 1 });
+    this._checkAndRecoverDeadBoard(attempt + 1);
+  }
+
+  private _reshuffleGridFaces(grid: import('@match3d/farkle-shared').Cell[][]): import('@match3d/farkle-shared').Cell[][] {
+    const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+    for (let r = 0; r < newGrid.length; r++) {
+      for (let c = 0; c < (newGrid[0]?.length ?? 0); c++) {
+        const cell = newGrid[r]?.[c];
+        if (!cell) continue;
+        // Preserve blockers and structural states unchanged
+        if (cell.type === 'STONE' || cell.state === 'EMPTY') continue;
+        if (cell.state === 'FROZEN' || cell.state === 'LOCKED') continue;
+        // Redraw face from pool for normal die/wild cells
+        const d = this.pool.drawDie();
+        const face = (d >= 1 && d <= 6 ? d : 1) as import('@match3d/farkle-shared').DieFace;
+        newGrid[r]![c] = { ...cell, face };
+      }
+    }
+    return newGrid;
   }
 
   isEmpty(): boolean {

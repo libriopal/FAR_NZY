@@ -24,5 +24,12 @@ export function useMultiplayer() {
     leaveRoom: () => mpActions.leaveRoom(),
     sendRallyVote: (choice: 'bank' | 'pass' | 'continue') => mpActions.sendRallyVote(choice),
     sendRallyDecisionStart: (expiresAt: number) => mpActions.sendRallyDecisionStart(expiresAt),
+    submitChainFaces: (
+      faces: import('@match3d/farkle-shared').DieFace[],
+      chainLength: number,
+      chainColumns: number[],
+    ) => mpActions.submitChainFaces(faces, chainLength, chainColumns),
+    collectOrb: (bodyId: string) => mpActions.collectOrb(bodyId),
+    claimVault: () => mpActions.claimVault(),
   };
 }

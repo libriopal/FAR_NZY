@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getAnalyserNode } from '../audio/gameAudio.js';
 import { useFarkleStore, MULTIPLIER_LADDER, MAX_ENERGY, FRENZY_THRESHOLD, FRENZY_INSTABILITY_THRESHOLD } from '../store/farkleStore.js';
 import { WIN_SCORE } from '../hooks/useFarkleGame.js';
+import { useMultiplayerStore } from '../store/multiplayerStore.js';
 import type { DisruptionType, GameMode } from '@match3d/farkle-shared';
 import { HEIST_CONSTANTS } from '@match3d/farkle-shared';
 
@@ -271,6 +272,59 @@ function ModePulse() {
           0%   { opacity: 0; transform: scale(0.6) translateY(10px); }
           35%  { opacity: 1; transform: scale(1.12) translateY(0); }
           100% { opacity: 0; transform: scale(1.3) translateY(-8px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Bonus Flash (P2.6 — multiplayer server bonus audit display) ───────────────
+
+function BonusFlash() {
+  const [flashes, setFlashes] = useState<{ id: number; label: string; color: string }[]>([]);
+  const counterRef = useRef(0);
+  const lastMessage = useMultiplayerStore(s => s.lastMessage);
+  const prevMsgRef = useRef<typeof lastMessage>(null);
+
+  useEffect(() => {
+    if (!lastMessage || lastMessage.type !== 'CHAIN_RESULT' || lastMessage === prevMsgRef.current) return;
+    prevMsgRef.current = lastMessage;
+    const orb = (lastMessage.orbBonus as number | undefined) ?? 0;
+    const doubler = (lastMessage.doublerBonus as number | undefined) ?? 0;
+    const archivist = (lastMessage.archivistBonus as number | undefined) ?? 0;
+    const entries: { label: string; color: string }[] = [];
+    if (orb > 0) entries.push({ label: `✦ ORB +${orb.toLocaleString()}`, color: GH.magenta });
+    if (doubler > 0) entries.push({ label: `⬡ DOUBLER +${doubler.toLocaleString()}`, color: GH.cyan });
+    if (archivist > 0) entries.push({ label: `◈ ARCHIVIST +${archivist.toLocaleString()}`, color: GH.gold });
+    if (entries.length === 0) return;
+    const id = ++counterRef.current;
+    setFlashes(f => [...f, ...entries.map((e, i) => ({ ...e, id: id * 10 + i }))]);
+    setTimeout(() => setFlashes(f => f.filter(x => Math.floor(x.id / 10) !== id)), 1500);
+  }, [lastMessage]);
+
+  if (flashes.length === 0) return null;
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {flashes.map((f, i) => (
+        <div key={f.id} style={{
+          position: 'absolute',
+          top: `${32 + i * 8}%`, left: '50%',
+          transform: 'translateX(-50%)',
+          color: f.color,
+          fontSize: 18, fontWeight: 700, fontFamily: 'monospace',
+          textShadow: `0 0 10px ${f.color}, 0 0 20px ${f.color}`,
+          animation: 'bonusFlash 1.5s ease-out forwards',
+          whiteSpace: 'nowrap', letterSpacing: 2,
+        }}>
+          {f.label}
+        </div>
+      ))}
+      <style>{`
+        @keyframes bonusFlash {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.9); }
+          20%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.05); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(1); }
         }
       `}</style>
     </div>
@@ -1533,6 +1587,7 @@ export function FarkleHUD({
       <FrenzyInstabilityWarning />
       <FarkleFlash />
       <ModePulse />
+      <BonusFlash />
       <ScorePopupLayer />
     </div>
   );

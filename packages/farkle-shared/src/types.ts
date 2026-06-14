@@ -255,6 +255,14 @@ export interface RTPConfig {
   targetRTP: number;
   platformFee: number;
   poolSize: number;
+  bonusSpawnRates?: {
+    multiplierOrb?: number;
+    bomb?: number;
+    rainbowBomb?: number;
+  };
+  roleEffects?: Partial<Record<RallyRole, boolean>>;
+  varianceTarget?: 'LOW' | 'MEDIUM' | 'HIGH';
+  milestoneConfig?: ReadonlyArray<{ tier: number; points: number; multiplier: number }>;
 }
 
 export type TransactionType =

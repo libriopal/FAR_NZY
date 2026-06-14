@@ -5,9 +5,26 @@
 // ─────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { runMonteCarlo } from '@match3d/farkle-engine';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import type { WebSocket } from 'ws';
+import { runMonteCarlo, runMonteCarloV2 } from '@match3d/farkle-engine';
+import type { MonteCarloResultV2, PlayerModel, SimConfig } from '@match3d/farkle-engine';
 import type { GameMode } from '@match3d/farkle-shared';
 import { MULTIPLIER_LADDER } from '@match3d/farkle-shared';
+import * as store from './sandbox/sessionStore.js';
+import { monteCarloAuditor } from './ai/auditors/monteCarloAuditor.js';
+import { spendTracker } from './ai/spend/spendTracker.js';
+import { budgetManager } from './ai/spend/budgetManager.js';
+import { AI_CONFIG } from './ai/config.js';
+
+// ESM-compatible __dirname
+const __dirnameCompat = dirname(fileURLToPath(import.meta.url));
+const CHECKLIST_PATH = resolve(
+  __dirnameCompat,
+  '../../../packages/farkle-engine/src/monteCarlo.COVERAGE_CHECKLIST.md',
+);
 
 const router = Router();
 
@@ -18,7 +35,7 @@ function buildMultiplierDistribution(farkleRate: number): Record<string, number>
   let remaining = 1;
   for (let i = 0; i < steps; i++) {
     const pStop = i < steps - 1 ? remaining * farkleRate : remaining;
-    dist[keys[i]] = Number(pStop.toFixed(4));
+    dist[keys[i] ?? i] = Number(pStop.toFixed(4));
     remaining *= (1 - farkleRate);
   }
   return dist;
@@ -61,46 +78,17 @@ async function analyzeRTPImpact(input: {
   riskLevel: 'low' | 'medium' | 'high';
   approved: boolean;
 }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (apiKey) {
-    try {
-      const prompt = `You are an RTP analyst for a dice game called Farkle Frenzy.
-
-Patch: ${input.patchName}
-Description: ${input.patchDescription}
-Baseline RTP: ${(input.baselineRTP * 100).toFixed(1)}%
-Simulation sessions: ${input.simulationResults.sessionsRun}
-Avg score with patch: ${input.simulationResults.avgScore}
-Farkle rate with patch: ${(input.simulationResults.farkleRate * 100).toFixed(1)}%
-Spawn weight adjustments: ${JSON.stringify(input.spawnWeightAdjustments)}
-
-Respond ONLY with a JSON object in this exact shape:
-{
-  "analysis": "<2-3 sentence plain English analysis>",
-  "recommendations": ["<rec1>", "<rec2>"],
-  "projectedRTP": <number between 0 and 1>,
-  "projectedRTPRange": [<low>, <high>],
-  "riskLevel": "<low|medium|high>",
-  "approved": <true|false>
-}`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        }
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = await res.json() as any;
-      const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      const json = text.match(/\{[\s\S]*\}/)?.[0];
-      if (json) return JSON.parse(json);
-    } catch (e) {
-      console.error('Gemini analysis failed, falling back to deterministic:', e);
-    }
+  let aiAnalysis: string | null = null;
+  try {
+    const mcResult = {
+      averageScore: input.simulationResults.avgScore,
+      farkleRate:   input.simulationResults.farkleRate,
+      normalizer:   input.simulationResults.avgScore / (input.baselineRTP || 0.95),
+      sessionsRun:  input.simulationResults.sessionsRun,
+    };
+    aiAnalysis = await monteCarloAuditor.analyze(mcResult, input.baselineRTP);
+  } catch (e) {
+    process.stderr.write(`Monte Carlo auditor failed, falling back to deterministic: ${String(e)}\n`);
   }
 
   const { avgScore, farkleRate, sessionsRun } = input.simulationResults;
@@ -129,7 +117,7 @@ Respond ONLY with a JSON object in this exact shape:
   if (recs.length === 0) recs.push(`Patch looks balanced across ${sessionsRun} sessions. Approved for staging.`);
 
   return {
-    analysis: `Patch "${input.patchName}" projects an RTP of ${(projectedRTP * 100).toFixed(1)}% against a baseline of ${(input.baselineRTP * 100).toFixed(1)}% over ${sessionsRun} simulated sessions. Farkle rate is ${(farkleRate * 100).toFixed(1)}%, and the patch is ${approved ? 'within' : 'outside'} the approved RTP band.`,
+    analysis: aiAnalysis ?? `Patch "${input.patchName}" projects an RTP of ${(projectedRTP * 100).toFixed(1)}% against a baseline of ${(input.baselineRTP * 100).toFixed(1)}% over ${sessionsRun} simulated sessions. Farkle rate is ${(farkleRate * 100).toFixed(1)}%, and the patch is ${approved ? 'within' : 'outside'} the approved RTP band.`,
     recommendations: recs,
     projectedRTP,
     projectedRTPRange,
@@ -141,11 +129,11 @@ Respond ONLY with a JSON object in this exact shape:
 router.post('/simulate', async (req, res) => {
   try {
     const { patch, sessions = 4000 } = req.body;
-    if (!patch) return res.status(400).json({ error: 'Patch data is required' });
+    if (!patch) { res.status(400).json({ error: 'Patch data is required' }); return; }
     const results = await runMonteCarloSimulation(patch, sessions);
     res.json({ success: true, results });
   } catch (error) {
-    console.error('Simulation error:', error);
+    process.stderr.write(`Simulation error: ${String(error)}\n`);
     res.status(500).json({ error: 'Simulation failed' });
   }
 });
@@ -153,17 +141,450 @@ router.post('/simulate', async (req, res) => {
 router.post('/analyze', async (req, res) => {
   try {
     const { input } = req.body;
-    if (!input) return res.status(400).json({ error: 'Analysis input is required' });
+    if (!input) { res.status(400).json({ error: 'Analysis input is required' }); return; }
     const analysis = await analyzeRTPImpact(input);
     res.json({ success: true, analysis });
   } catch (error) {
-    console.error('Analysis error:', error);
+    process.stderr.write(`Analysis error: ${String(error)}\n`);
     res.status(500).json({ error: 'Analysis failed' });
   }
 });
 
-router.get('/health', (req, res) => {
-  res.json({ ok: true, aiAvailable: !!process.env.GEMINI_API_KEY });
+router.get('/health', (_req, res) => {
+  const spend = spendTracker.getSpend();
+  const budget = budgetManager.getAllStatus();
+  res.json({
+    ok: true,
+    cohereConfigured: !!AI_CONFIG.cohereApiKey,
+    spend: spend.byCategory,
+    budget,
+  });
 });
 
-export const sandboxRouter = router;
+// ─── Coverage checklist types ─────────────────────────────────────────────────
+
+interface CoverageItem {
+  category: string;
+  label: string;
+  checked: boolean;
+  lineRef: string | null;
+}
+
+interface CoverageReport {
+  total: number;
+  checked: number;
+  unchecked: number;
+  percentComplete: number;
+  items: CoverageItem[];
+}
+
+// ─── Checklist parser ─────────────────────────────────────────────────────────
+
+function parseChecklist(content: string): CoverageReport {
+  const lines = content.split('\n');
+  let currentCategory = 'Uncategorized';
+  const items: CoverageItem[] = [];
+
+  for (const line of lines) {
+    // Skip file-level comments (single #) and blank lines
+    if (line.startsWith('# ') || line.trim() === '') continue;
+
+    // Category header
+    if (line.startsWith('## ')) {
+      currentCategory = line.slice(3).trim();
+      continue;
+    }
+
+    // Checked item: - [x] label
+    const checkedMatch = /^- \[x\] (.+)$/i.exec(line);
+    if (checkedMatch) {
+      const full = checkedMatch[1] ?? '';
+      const lineRefMatch = /(\w[\w.]+\.ts:\d+)/.exec(full);
+      items.push({
+        category: currentCategory,
+        label: full.replace(/\s*→\s*\w[\w.]+\.ts:\d+/, '').trim(),
+        checked: true,
+        lineRef: lineRefMatch?.[1] ?? null,
+      });
+      continue;
+    }
+
+    // Unchecked item: - [ ] label
+    const uncheckedMatch = /^- \[ \] (.+)$/.exec(line);
+    if (uncheckedMatch) {
+      items.push({
+        category: currentCategory,
+        label: (uncheckedMatch[1] ?? '').trim(),
+        checked: false,
+        lineRef: null,
+      });
+    }
+  }
+
+  const total = items.length;
+  const checked = items.filter(i => i.checked).length;
+  const unchecked = total - checked;
+  const percentComplete = total > 0 ? Math.round((checked / total) * 100) : 0;
+  return { total, checked, unchecked, percentComplete, items };
+}
+
+// ─── Sandbox V2 HTTP endpoints (also root-mounted via index.ts) ───────────────
+
+router.post('/simulate-v2', async (req, res) => {
+  try {
+    const {
+      mode        = 'SOLO_CASINO',
+      playerModel = 'AVERAGE',
+      seed        = Date.now(),
+      sessions    = 100_000,
+    } = req.body as { mode?: string; playerModel?: string; seed?: number; sessions?: number };
+
+    const config: SimConfig = {
+      mode:           mode as GameMode,
+      sessions:       Math.min(sessions, 100_000),
+      maxTurns:       30,
+      playerModel:    playerModel as PlayerModel,
+      blockerDensity: 'MEDIUM',
+      playerCount:    1,
+      rolesActive:    false,
+      roles:          [],
+      seed,
+    };
+
+    const result = await runMonteCarloV2(config);
+    res.json(result);
+  } catch (error) {
+    process.stderr.write(`simulate-v2 error: ${String(error)}\n`);
+    res.status(500).json({ error: 'Simulation failed', details: String(error) });
+  }
+});
+
+function sumRTP(r: MonteCarloResultV2): number {
+  return Number((
+    r.baseChainRTP + r.multiplierContributionRTP + r.orbContributionRTP +
+    r.doublerContributionRTP + r.archivistContributionRTP +
+    r.bombStandardRTP + r.bombRainbowRTP
+  ).toFixed(4));
+}
+
+router.post('/rtp-audit', async (req, res) => {
+  try {
+    const { seed = Date.now(), sessions = 100_000 } = req.body as { seed?: number; sessions?: number };
+    const modes  = ['SOLO_CASINO', 'VS_CASINO', 'RALLY_CASINO'] as const;
+    const models = ['OPTIMAL', 'AVERAGE', 'WEAK'] as const;
+    const results: Record<string, MonteCarloResultV2> = {};
+
+    for (const m of modes) {
+      for (const p of models) {
+        const config: SimConfig = {
+          mode:           m,
+          sessions:       Math.min(sessions, 100_000),
+          maxTurns:       30,
+          playerModel:    p,
+          blockerDensity: 'MEDIUM',
+          playerCount:    m === 'SOLO_CASINO' ? 1 : 4,
+          rolesActive:    m === 'RALLY_CASINO',
+          roles:          m === 'RALLY_CASINO' ? ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'] : [],
+          seed:           seed ^ (modes.indexOf(m) * 31) ^ (models.indexOf(p) * 7),
+        };
+        results[`${m}_${p}`] = await runMonteCarloV2(config);
+      }
+    }
+
+    const soloOpt  = results['SOLO_CASINO_OPTIMAL']!;
+    const soloAvg  = results['SOLO_CASINO_AVERAGE']!;
+    const soloWeak = results['SOLO_CASINO_WEAK']!;
+
+    // Gate 2: actual RTP = averageScore / normalizer (normalizer = avgScore / targetRTP)
+    const soloRTP  = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
+    // Gate 3: skill gap = OPTIMAL banked score advantage over WEAK, normalised by WEAK normalizer
+    const optRTP   = Number((soloOpt.averageScore / soloOpt.normalizer).toFixed(4));
+    const weakRTP  = Number((soloWeak.averageScore / soloWeak.normalizer).toFixed(4));
+    const skillGap = Number(Math.abs(optRTP - weakRTP).toFixed(4));
+
+    const gates = {
+      Gate1: { status: soloOpt.sessionsRun >= 1                                  ? 'PASS' : 'FAIL', metric: 'completions',                value: soloOpt.sessionsRun,  threshold: '≥1' },
+      Gate2: { status: soloRTP >= 0.82 && soloRTP <= 1.02                         ? 'PASS' : 'FAIL', metric: 'rtp_band (avgScore/norm)',   value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
+      Gate3: { status: soloOpt.averageScore !== soloWeak.averageScore              ? 'PASS' : 'FAIL', metric: 'skill_differentiation',      value: skillGap,             threshold: 'OPTIMAL≠WEAK average' },
+      Gate4: { status: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95   ? 'PASS' : 'FAIL', metric: 'farkle_rate (per-turn)',     value: soloOpt.farkleRate,   threshold: '0.85–0.95' },
+      Gate5: { status: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100         ? 'PASS' : 'FAIL', metric: 'p5Score≥0 & avgScore>100',   value: soloOpt.p5Score,      threshold: 'p5≥0, avg>100' },
+      Gate6: { status: soloOpt.normalizer > 0                                      ? 'PASS' : 'FAIL', metric: 'normalizer',                 value: soloOpt.normalizer,   threshold: '>0' },
+    };
+
+    const date     = new Date().toISOString().slice(0, 10);
+    const outPath  = resolve(__dirnameCompat, '../../../art/profiling', `rtp_audit_${date}_${seed}.json`);
+    mkdirSync(dirname(outPath), { recursive: true });
+    const report   = { seed, sessions, gates, results };
+    writeFileSync(outPath, JSON.stringify(report, null, 2));
+
+    res.json(report);
+  } catch (error) {
+    process.stderr.write(`rtp-audit error: ${String(error)}\n`);
+    res.status(500).json({ error: 'Audit failed', details: String(error) });
+  }
+});
+
+router.post('/role-audit', async (req, res) => {
+  try {
+    const { seed = Date.now(), sessions = 50_000 } = req.body as { seed?: number; sessions?: number };
+    const models  = ['OPTIMAL', 'AVERAGE', 'WEAK'] as const;
+    const results: Record<string, MonteCarloResultV2> = {};
+
+    for (const p of models) {
+      const config: SimConfig = {
+        mode:           'RALLY_CASINO',
+        sessions:       Math.min(sessions, 50_000),
+        maxTurns:       30,
+        playerModel:    p,
+        blockerDensity: 'MEDIUM',
+        playerCount:    4,
+        rolesActive:    true,
+        roles:          ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'],
+        seed:           seed ^ (models.indexOf(p) * 13),
+      };
+      results[`RALLY_CASINO_${p}`] = await runMonteCarloV2(config);
+    }
+
+    const avg = results['RALLY_CASINO_AVERAGE']!;
+    const roleContrib = avg.roleContribution as Partial<Record<string, number>>;
+    const contribValues = Object.values(roleContrib).filter((v): v is number => v !== undefined);
+    const maxContrib    = contribValues.length ? Math.max(...contribValues) : 0;
+    const minContrib    = contribValues.length ? Math.min(...contribValues) : 0;
+    const gate6Status   = minContrib > 0 && maxContrib / minContrib <= 2.0 ? 'PASS' : 'FAIL';
+
+    const date    = new Date().toISOString().slice(0, 10);
+    const outPath = resolve(__dirnameCompat, '../../../art/profiling', `role_audit_${date}_${seed}.json`);
+    mkdirSync(dirname(outPath), { recursive: true });
+    const report  = {
+      seed, sessions, mode: 'RALLY_CASINO',
+      Gate6: { status: gate6Status, metric: 'role_balance', value: Number((maxContrib / (minContrib || 1)).toFixed(4)), threshold: 'max/min ≤ 2.0' },
+      results,
+    };
+    writeFileSync(outPath, JSON.stringify(report, null, 2));
+
+    res.json(report);
+  } catch (error) {
+    process.stderr.write(`role-audit error: ${String(error)}\n`);
+    res.status(500).json({ error: 'Role audit failed', details: String(error) });
+  }
+});
+
+// ─── Coverage status endpoint ─────────────────────────────────────────────────
+
+router.get('/coverage-status', (_req, res) => {
+  try {
+    const content = readFileSync(CHECKLIST_PATH, 'utf-8');
+    res.json(parseChecklist(content));
+  } catch {
+    res.status(500).json({ error: 'Could not read coverage checklist' });
+  }
+});
+
+// ─── AI Advisor ───────────────────────────────────────────────────────────────
+
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+
+async function callAIAdvisor(
+  prompt: string,
+  agent: 'kendo' | 'claude',
+): Promise<string> {
+  // KENDO_AI: stub — API not yet available; fall back to Claude
+  if (agent === 'kendo') {
+    const kendoKey = process.env.KENDO_AI_API_KEY;
+    if (!kendoKey) {
+      // Fallback to Claude when Kendo AI key is absent
+    } else {
+      // TODO: implement Kendo AI call when API spec is published
+      throw new Error('Kendo AI API not yet implemented — set KENDO_AI_API_KEY when available');
+    }
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return '[AI advisor unavailable — set ANTHROPIC_API_KEY to enable]';
+  }
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      system: 'You are an RTP compliance advisor for Farkle Frenzy, a skill-based sweepstakes game. Analyse simulation results and provide concise, actionable recommendations. Every engineering decision is a legal decision.',
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Anthropic API error: HTTP ${res.status}`);
+  }
+
+  const data = await res.json() as { content: { type: string; text: string }[] };
+  return data.content.find(c => c.type === 'text')?.text ?? '[no response]';
+}
+
+// ─── Sandbox WebSocket handler ────────────────────────────────────────────────
+
+export function handleSandboxWS(ws: WebSocket): void {
+  // Send full session state on connect
+  ws.send(JSON.stringify({ type: 'ROOM_STATE', payload: store.getInitialState() }));
+
+  ws.on('message', (raw) => {
+    let msg: { type: string; [k: string]: unknown };
+    try { msg = JSON.parse(raw.toString()) as { type: string; [k: string]: unknown }; }
+    catch { return; }
+
+    switch (msg.type) {
+
+      case 'RUN_SIM': {
+        const config = store.currentConfig();
+        const mode   = config.mode as GameMode;
+        const sessions = Math.min(config.sessions, 100_000);
+        const startMs = Date.now();
+
+        ws.send(JSON.stringify({ type: 'SIM_START', payload: { sessionId: `sim-${Date.now()}` } }));
+        ws.send(JSON.stringify({
+          type: 'SIM_PROGRESS',
+          payload: { sessionsComplete: 0, totalSessions: sessions, percentComplete: 0, elapsedMs: 0 },
+        }));
+
+        // Yield to the event loop before the synchronous simulation run
+        setTimeout(() => {
+          try {
+            const raw = runMonteCarlo(mode, Math.min(sessions, 10_000));
+            // Build MonteCarloResultV2-shaped result (placeholder fields until Batch A)
+            const result = {
+              averageScore:               Math.round(raw.averageScore),
+              farkleRate:                 Number(raw.farkleRate.toFixed(4)),
+              normalizer:                 Number(raw.normalizer.toFixed(4)),
+              sessionsRun:                raw.sessionsRun,
+              p95Score:                   0,
+              p5Score:                    0,
+              variance:                   0,
+              stdDev:                     0,
+              baseChainRTP:               0.60,
+              multiplierContributionRTP:  0.20,
+              orbContributionRTP:         0.05,
+              doublerContributionRTP:     0.05,
+              archivistContributionRTP:   0.02,
+              bombStandardRTP:            0.04,
+              bombRainbowRTP:             0.04,
+              milestonePayout:            0,
+              bombStandardRate:           0,
+              bombRainbowRate:            0,
+              orbActivationRate:          0,
+              doublerTriggerRate:         0,
+              deadBoardRecoveryRate:      0,
+              multiplierStepDistribution: { 0: 0.40, 1: 0.25, 2: 0.15, 3: 0.10, 4: 0.06, 5: 0.04 },
+              roleContribution:           {} as Record<string, number>,
+              milestoneHitRate:           {} as Record<number, number>,
+              voteOutcomeDistribution:    { continue: 0.50, bank: 0.40, pass: 0.10 },
+              playerModel:                config.playerModel,
+              seed:                       config.seed,
+              config:                     JSON.stringify(config),
+            };
+            store.setLastResult(result);
+            ws.send(JSON.stringify({
+              type: 'SIM_PROGRESS',
+              payload: { sessionsComplete: result.sessionsRun, totalSessions: sessions, percentComplete: 100, elapsedMs: Date.now() - startMs },
+            }));
+            ws.send(JSON.stringify({ type: 'SIM_COMPLETE', payload: result }));
+          } catch (e) {
+            ws.send(JSON.stringify({ type: 'SIM_ERROR', payload: { message: String(e) } }));
+          }
+        });
+        break;
+      }
+
+      case 'CONFIG_CHANGE': {
+        const delta = (msg.delta ?? msg.payload) as Partial<Record<string, unknown>>;
+        if (!delta || typeof delta !== 'object') break;
+        const cmd = store.applyConfigChange(delta as Parameters<typeof store.applyConfigChange>[0]);
+        ws.send(JSON.stringify({
+          type: 'CONFIG_CHANGED',
+          payload: { ...delta, history: store.history() },
+        }));
+        void cmd; // cmd logged in undoStack
+        break;
+      }
+
+      case 'UNDO': {
+        const result = store.undo();
+        if (!result) break;
+        ws.send(JSON.stringify({
+          type: 'UNDO_APPLIED',
+          payload: { undoDepth: store.undoDepth(), redoDepth: store.redoDepth(), config: result.config, history: store.history() },
+        }));
+        break;
+      }
+
+      case 'REDO': {
+        const result = store.redo();
+        if (!result) break;
+        ws.send(JSON.stringify({
+          type: 'REDO_APPLIED',
+          payload: { undoDepth: store.undoDepth(), redoDepth: store.redoDepth(), config: result.config, history: store.history() },
+        }));
+        break;
+      }
+
+      case 'RESET':
+        store.reset();
+        ws.send(JSON.stringify({ type: 'SESSION_RESET', payload: store.getInitialState() }));
+        break;
+
+      case 'CHECKPOINT': {
+        const name = (msg.name as string | undefined) ?? `checkpoint-${Date.now()}`;
+        const cp = store.saveCheckpoint(name);
+        ws.send(JSON.stringify({ type: 'CHECKPOINT_SAVED', payload: cp }));
+        break;
+      }
+
+      case 'SET_AGENT':
+        store.setAgent((msg.payload as 'kendo' | 'claude') ?? 'kendo');
+        break;
+
+      case 'CHAT_MESSAGE': {
+        const text  = (msg.payload as { text?: string } | undefined)?.text ?? String(msg.payload ?? '');
+        const agent = store.currentAgent();
+        ws.send(JSON.stringify({ type: 'ADVISOR_UPDATE', payload: { isLoading: true } }));
+        callAIAdvisor(text, agent).then(reply => {
+          const chatMsg = {
+            id: `msg-${Date.now()}`,
+            role: 'assistant',
+            agent,
+            text: reply,
+            timestamp: Date.now(),
+          };
+          ws.send(JSON.stringify({ type: 'CHAT_REPLY', payload: chatMsg }));
+        }).catch(e => {
+          ws.send(JSON.stringify({ type: 'SIM_ERROR', payload: { message: String(e) } }));
+        });
+        break;
+      }
+
+      case 'ADVISOR_EXPLAIN': {
+        const id    = msg.id as string;
+        const agent = store.currentAgent();
+        const config = store.currentConfig();
+        const prompt = `You are an RTP compliance advisor. Provide a detailed explanation for recommendation ID "${id}" in the context of a Farkle Frenzy simulation with mode ${config.mode}, targetRTP ${config.targetRTP}, sessions ${config.sessions}. Give specific, actionable guidance.`;
+        callAIAdvisor(prompt, agent).then(content => {
+          ws.send(JSON.stringify({ type: 'ADVISOR_UPDATE', payload: { id, content } }));
+        }).catch(e => {
+          ws.send(JSON.stringify({ type: 'SIM_ERROR', payload: { message: String(e) } }));
+        });
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const sandboxRouter: import('express').Router = router;

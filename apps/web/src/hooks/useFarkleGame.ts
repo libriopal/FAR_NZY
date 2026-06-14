@@ -15,6 +15,7 @@ import type { DieFace, LevelDef, GameMode } from '@match3d/farkle-shared';
 import { SPAWN_WEIGHTS, CATALYST_WILD_BOOST, CATALYST_MAX_BOOST, GAME_CONSTANTS, HEIST_CONSTANTS } from '@match3d/farkle-shared';
 import type { VoxelPhysicsSystem } from '@match3d/game-core';
 import { useFarkleStore, MAX_CHAIN, WILD_PRIME_ENERGY, WILD_FRENZY_ENERGY } from '../store/farkleStore.js';
+import { mpActions } from '../store/multiplayerStore.js';
 import { useExplosionStore } from '../store/explosionStore.js';
 import { useTrayStore } from '../store/trayStore.js';
 
@@ -41,6 +42,7 @@ export function useFarkleGame(
   physicsRef: MutableRefObject<VoxelPhysicsSystem | null>,
   levelDef?: LevelDef,
   gameMode?: GameMode,
+  isMultiplayer?: boolean,
 ) {
   const store = useFarkleStore;
   const explosionStore = useExplosionStore;
@@ -130,8 +132,10 @@ export function useFarkleGame(
       (mode, prev) => {
         if (mode === 'FRENZY' && prev !== 'FRENZY' && !frenzyDoublerSpawnedRef.current) {
           frenzyDoublerSpawnedRef.current = true;
-          const cols = _randomColumns(2);
-          for (const col of cols) store.getState().spawnDoublerCell(col, 12_000);
+          if (!isMultiplayer) {
+            const cols = _randomColumns(2);
+            for (const col of cols) store.getState().spawnDoublerCell(col, 12_000);
+          }
         }
       },
     );
@@ -272,6 +276,20 @@ export function useFarkleGame(
       // commitChain cleared it; restore nothing
     }
 
+    // In multiplayer, submit resolved faces + chain columns to server for authoritative
+    // scoring. Server applies base score, orb, doubler, ARCHIVIST, and heist vault.
+    // CHAIN_RESULT → syncFromServer overwrites all score fields. Solo path unchanged.
+    if (isMultiplayer && resolvedFaces.length > 0) {
+      const chainCols = chainBodies
+        .map(b => b?.column)
+        .filter((c): c is number => c !== undefined);
+      mpActions.submitChainFaces(
+        resolvedFaces as import('@match3d/farkle-shared').DieFace[],
+        chainIds.length,
+        chainCols,
+      );
+    }
+
     // Wild energy bonus: +WILD_PRIME_ENERGY per wild in PRIME, +WILD_FRENZY_ENERGY per wild in FRENZY (B17/B18)
     if (result === 'ok') {
       const wildCount = chainBodies.filter(b => b?.entityType === 'wild').length;
@@ -281,8 +299,8 @@ export function useFarkleGame(
       }
     }
 
-    // Apply multiplier orb ×1.5 bonus
-    if (s.multiplierOrbActive && result === 'ok') {
+    // Apply multiplier orb ×1.5 bonus (solo only — server applies in multiplayer)
+    if (!isMultiplayer && s.multiplierOrbActive && result === 'ok') {
       store.setState(prev => {
         const bonus = Math.round((prev.unbanked - 0) * 0.5); // 50% on top of committed
         return {
@@ -292,8 +310,8 @@ export function useFarkleGame(
       });
     }
 
-    // Apply doubler cell ×2 bonus — if any chain body touches an active doubler column
-    if (result === 'ok') {
+    // Apply doubler cell ×2 bonus — solo only; server applies in multiplayer
+    if (!isMultiplayer && result === 'ok') {
       const now = Date.now();
       const doublerCells = store.getState().doublerCells.filter(d => d.active && d.expiresAt > now);
       const chainColumns = new Set(chainBodies.map(b => b?.column).filter((c): c is number => c !== undefined));
@@ -312,13 +330,13 @@ export function useFarkleGame(
       }
     }
 
-    // ARCHIVIST: recover 15% of farkle pool per successful chain (B5)
-    if (result === 'ok' && s.rallyRole === 'ARCHIVIST') {
+    // ARCHIVIST: recover 15% of farkle pool per successful chain (B5) — solo only
+    if (!isMultiplayer && result === 'ok' && s.rallyRole === 'ARCHIVIST') {
       store.getState().drainFarklePool(GAME_CONSTANTS.ARCHIVIST_PCT);
     }
 
-    // C1: Heist — redirect 70% of chain pts to vault, keep 30% in unbanked
-    if (result === 'ok' && (gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO')) {
+    // C1: Heist — redirect 70% of chain pts to vault, keep 30% in unbanked (solo only)
+    if (!isMultiplayer && result === 'ok' && (gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO')) {
       store.setState(prev => {
         const earned = prev.unbanked - s.unbanked; // pts added this chain
         if (earned <= 0) return prev;
@@ -449,9 +467,11 @@ export function useFarkleGame(
         physics?.removeBody(bodyId);
         store.setState(prev => ({
           bodies: prev.bodies.filter(b => b.id !== bodyId),
-          multiplierOrbActive: true,
+          // Solo: set flag locally. Multiplayer: server applies bonus via CHAIN_RESULT.
+          ...(isMultiplayer ? {} : { multiplierOrbActive: true }),
         }));
         store.getState().addEnergy(5);
+        if (isMultiplayer) mpActions.collectOrb(bodyId);
         break;
       }
 
@@ -554,11 +574,13 @@ export function useFarkleGame(
     const s = store.getState();
     if (s.gamePhase !== 'playing' || s.unbanked === 0) return;
     store.getState().bankScore();
-    // Every 3rd bank: spawn 1 doubler cell in a random column
-    bankCountRef.current += 1;
-    if (bankCountRef.current % 3 === 0) {
-      const cols = _randomColumns(1);
-      for (const col of cols) store.getState().spawnDoublerCell(col, 30_000);
+    // Every 3rd explicit bank: spawn doubler cell (solo only; server spawns in multiplayer)
+    if (!isMultiplayer) {
+      bankCountRef.current += 1;
+      if (bankCountRef.current % 3 === 0) {
+        const cols = _randomColumns(1);
+        for (const col of cols) store.getState().spawnDoublerCell(col, 30_000);
+      }
     }
     const { banked } = store.getState();
     if (banked >= effectiveWinScore) store.setState({ gamePhase: 'win' });
@@ -571,10 +593,9 @@ export function useFarkleGame(
     if (deadBoardAttemptsRef.current <= 3) {
       physics.reshuffleBoard();
     } else {
-      const bodies = store.getState().bodies;
-      for (const b of bodies) {
-        if (b.entityType === 'die') physics.setDieFace(b.id, 1);
-      }
+      // reshuffleBoard() exhausted 5 attempts and still dead.
+      // Inject one seeded scoring die via faceRng — never hardcode face=1.
+      physics.injectScoringDie();
       deadBoardAttemptsRef.current = 0;
     }
   }
@@ -732,6 +753,11 @@ function _doCasinoChain(physicsRef: MutableRefObject<VoxelPhysicsSystem | null>)
       for (const id of ids) physics?.removeBody(id);
       physics?.thawAdjacentIce(ids);
       physics?.damageLockInColumns(ids);
+      // Casino auto-chain removes bodies without player input — recover dead boards directly.
+      if (physics?.isDeadBoard()) {
+        physics.reshuffleBoard();
+        if (physics.isDeadBoard()) physics.injectScoringDie();
+      }
     }, 500);
     return; // one chain per interval tick
   }
