@@ -400,20 +400,21 @@ router.post('/rtp-audit', async (req, res) => {
     const soloAvg  = results['SOLO_CASINO_AVERAGE']!;
     const soloWeak = results['SOLO_CASINO_WEAK']!;
 
-    // Gate 2: actual RTP = averageScore / normalizer (normalizer = avgScore / targetRTP)
-    const soloRTP  = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
-    // Gate 3: skill gap = OPTIMAL banked score advantage over WEAK, normalised by WEAK normalizer
-    const optRTP   = Number((soloOpt.averageScore / soloOpt.normalizer).toFixed(4));
-    const weakRTP  = Number((soloWeak.averageScore / soloWeak.normalizer).toFixed(4));
-    const skillGap = Number(Math.abs(optRTP - weakRTP).toFixed(4));
+    // Gate 2: actual RTP = averageScore / normalizer
+    const soloRTP       = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
+    // Gate 3: strict skill ordering — OPTIMAL > AVERAGE > WEAK (ADR-022, aligned with validate-gates.ts)
+    const properOrdering = soloOpt.averageScore > soloAvg.averageScore &&
+                           soloAvg.averageScore > soloWeak.averageScore;
+    const skillGapRaw   = Math.round(soloOpt.averageScore - soloWeak.averageScore);
+    const skillGapNorm  = Number((Math.abs(skillGapRaw) / soloWeak.averageScore).toFixed(4));
 
     const gates = {
-      Gate1: { status: soloOpt.sessionsRun >= 1                                  ? 'PASS' : 'FAIL', metric: 'completions',                value: soloOpt.sessionsRun,  threshold: '≥1' },
-      Gate2: { status: soloRTP >= 0.82 && soloRTP <= 1.02                         ? 'PASS' : 'FAIL', metric: 'rtp_band (avgScore/norm)',   value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
-      Gate3: { status: soloOpt.averageScore !== soloWeak.averageScore              ? 'PASS' : 'FAIL', metric: 'skill_differentiation',      value: skillGap,             threshold: 'OPTIMAL≠WEAK average' },
-      Gate4: { status: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95   ? 'PASS' : 'FAIL', metric: 'farkle_rate (per-turn)',     value: soloOpt.farkleRate,   threshold: '0.85–0.95' },
-      Gate5: { status: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100         ? 'PASS' : 'FAIL', metric: 'p5Score≥0 & avgScore>100',   value: soloOpt.p5Score,      threshold: 'p5≥0, avg>100' },
-      Gate6: { status: soloOpt.normalizer > 0                                      ? 'PASS' : 'FAIL', metric: 'normalizer',                 value: soloOpt.normalizer,   threshold: '>0' },
+      Gate1: { status: soloOpt.sessionsRun >= 1                                  ? 'PASS' : 'FAIL', metric: 'completions',                     value: soloOpt.sessionsRun,  threshold: '≥1' },
+      Gate2: { status: soloRTP >= 0.82 && soloRTP <= 1.02                         ? 'PASS' : 'FAIL', metric: 'rtp_band (avgScore/norm)',        value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
+      Gate3: { status: properOrdering                                              ? 'PASS' : 'FAIL', metric: 'skill_ordering (OPTIMAL>AVG>WEAK)', value: `${soloOpt.averageScore}>${soloAvg.averageScore}>${soloWeak.averageScore} (gap_norm:${skillGapNorm})`, threshold: 'strict ordering required' },
+      Gate4: { status: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95   ? 'PASS' : 'FAIL', metric: 'farkle_rate (per-turn)',          value: soloOpt.farkleRate,   threshold: '0.85–0.95' },
+      Gate5: { status: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100         ? 'PASS' : 'FAIL', metric: 'p5Score≥0 & avgScore>100',        value: soloOpt.p5Score,      threshold: 'p5≥0, avg>100' },
+      Gate6: { status: soloOpt.normalizer > 0                                      ? 'PASS' : 'FAIL', metric: 'normalizer',                      value: soloOpt.normalizer,   threshold: '>0' },
     };
 
     const date     = new Date().toISOString().slice(0, 10);

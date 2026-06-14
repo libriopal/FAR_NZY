@@ -49,16 +49,17 @@ async function main() {
   // P7-RTP-CALIBRATION will replace with true monetary RTP measurement.
   const soloRTP = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
 
-  // Gate 3: null-bot baseline — raw score delta anchored to WEAK (the weakest non-sacred player model).
-  // This replaces the circular |optRTP - weakRTP| metric which always produced ~0.0004 regardless of models.
-  // skillGapRaw: absolute point difference. skillGapNorm: fraction of WEAK's average (external reference).
-  const skillGapRaw  = Math.round(Math.abs(soloOpt.averageScore - soloWeak.averageScore));
-  const skillGapNorm = Number((skillGapRaw / soloWeak.averageScore).toFixed(4));
+  // Gate 3: strict skill ordering — OPTIMAL > AVERAGE > WEAK (ADR-022).
+  // skillGapRaw: signed point delta (positive = OPTIMAL beats WEAK; negative = inverted ordering bug). skillGapNorm: fraction of WEAK's average.
+  const skillGapRaw    = Math.round(soloOpt.averageScore - soloWeak.averageScore);
+  const properOrdering = soloOpt.averageScore > soloAvg.averageScore &&
+                         soloAvg.averageScore > soloWeak.averageScore;
+  const skillGapNorm   = Number((Math.abs(skillGapRaw) / soloWeak.averageScore).toFixed(4));
 
   const gates = {
-    Gate1: { pass: soloOpt.sessionsRun >= 1,                                  metric: 'completions',                  value: soloOpt.sessionsRun,   threshold: '≥1' },
-    Gate2: { pass: soloRTP >= 0.82 && soloRTP <= 1.02,                        metric: 'rtp_band (avgScore/normalizer)', value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
-    Gate3: { pass: soloOpt.averageScore !== soloWeak.averageScore,             metric: 'skill_gap_raw (OPTIMAL-WEAK)',  value: skillGapRaw,           threshold: 'OPTIMAL≠WEAK (normalized: ' + skillGapNorm + ')' },
+    Gate1: { pass: soloOpt.sessionsRun >= 1,                                  metric: 'completions',                        value: soloOpt.sessionsRun,   threshold: '≥1' },
+    Gate2: { pass: soloRTP >= 0.82 && soloRTP <= 1.02,                        metric: 'rtp_band (avgScore/normalizer)',      value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
+    Gate3: { pass: properOrdering,                                             metric: 'skill_ordering (OPTIMAL>AVG>WEAK)',  value: `${soloOpt.averageScore}>${soloAvg.averageScore}>${soloWeak.averageScore} (gap_norm:${skillGapNorm})`, threshold: 'strict ordering required' },
     Gate4: { pass: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95,  metric: 'farkle_rate (per-turn)',        value: soloOpt.farkleRate,    threshold: '0.85–0.95' },
     Gate5: { pass: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100,        metric: 'p5Score≥0 & avgScore>100',      value: soloOpt.p5Score,       threshold: 'p5≥0, avg>100' },
     Gate6: { pass: soloOpt.normalizer > 0,                                     metric: 'normalizer',                    value: soloOpt.normalizer,    threshold: '>0' },

@@ -17,3 +17,6 @@ COHERE_SPEND_LOG.json
 
 # Governance audit run artifacts — gitignored; only .gitkeep tracked
 runs/governance/*.json
+
+# TypeScript incremental build cache — machine-generated, never commit
+*.tsbuildinfo

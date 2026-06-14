@@ -64,23 +64,17 @@ export function computeSkillScore(session: Omit<SessionAnalytics, 'skill_score'>
   ));
 }
 
-// CONTINUE is optimal when expectedContinueValue > bankValue.
-// expectedContinueValue = unbanked * (1 - farkleRisk) * nextMultiplierRatio
+// Aligned with monteCarlo.ts playerContinue (ADR-022).
+// Empirical farkleRate=0.9156 makes continuing EV-positive only at low unbanked
+// and early multiplier steps. Uses same threshold as simulation for consistency.
 export function isOptimalDecision(
   decision: 'BANK' | 'CONTINUE',
   unbanked: number,
   multiplierStep: number,
-  estimatedFarkleRisk: number,
+  _estimatedFarkleRisk: number,  // deprecated — kept for API compatibility
 ): boolean {
-  const bankValue = unbanked;
-  const currentMult = MULTIPLIER_STEPS[Math.min(multiplierStep, 5)] ?? 4.0;
-  const nextMult    = MULTIPLIER_STEPS[Math.min(multiplierStep + 1, 5)] ?? 4.0;
-  const multiplierGain = nextMult / currentMult;
-  const expectedContinueValue = unbanked * (1 - estimatedFarkleRisk) * multiplierGain;
-
-  return decision === 'CONTINUE'
-    ? expectedContinueValue > bankValue
-    : bankValue >= expectedContinueValue;
+  const shouldContinue = multiplierStep < 3 && unbanked < 300;
+  return decision === 'CONTINUE' ? shouldContinue : !shouldContinue;
 }
 
 // Baseline random risk ~0.37. Fewer scoring tiles (1s/5s) = higher risk.
