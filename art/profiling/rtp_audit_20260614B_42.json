@@ -1,0 +1,489 @@
+{
+  "auditId": "rtp_audit_20260614B_42",
+  "date": "2026-06-14",
+  "sprint": "P5-GOVERNANCE",
+  "seed": 42,
+  "sessions": 100000,
+  "stakeAmount": 1,
+  "owcEnabled": false,
+  "gateRevision": "v2 — null-bot baseline Gate3, stakeAmount=1",
+  "gates": {
+    "Gate1": {
+      "pass": true,
+      "value": 100000,
+      "threshold": "≥1"
+    },
+    "Gate2": {
+      "pass": true,
+      "value": 0.9203,
+      "threshold": "0.82–1.02"
+    },
+    "Gate3": {
+      "pass": true,
+      "value": 1564,
+      "normalized": 0.8519,
+      "threshold": "OPTIMAL≠WEAK"
+    },
+    "Gate4": {
+      "pass": true,
+      "value": 0.9156,
+      "threshold": "0.85–0.95"
+    },
+    "Gate5": {
+      "pass": true,
+      "value": 0,
+      "threshold": "p5≥0, avg>100"
+    },
+    "Gate6": {
+      "pass": true,
+      "value": 295.2091,
+      "threshold": ">0"
+    }
+  },
+  "allPass": true,
+  "results": {
+    "SOLO_CASINO_OPTIMAL": {
+      "averageScore": 272,
+      "farkleRate": 0.9156,
+      "normalizer": 295.2091,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 1500,
+      "variance": 363229,
+      "stdDev": 603,
+      "baseChainRTP": 3712.5945,
+      "multiplierContributionRTP": 82.8008,
+      "orbContributionRTP": 92.3753,
+      "doublerContributionRTP": 0,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 37.9574,
+      "bombRainbowRTP": 90.4779,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1188,
+      "bombRainbowRate": 0.4733,
+      "orbActivationRate": 0.1137,
+      "doublerTriggerRate": 0,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9931,
+        "1": 0.0063,
+        "2": 0.0005,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "OPTIMAL",
+      "seed": 42,
+      "config": "{\"mode\":\"SOLO_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"OPTIMAL\",\"seed\":42}"
+    },
+    "SOLO_CASINO_AVERAGE": {
+      "averageScore": 844,
+      "farkleRate": 0.9155,
+      "normalizer": 917.0795,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 3313,
+      "variance": 1469003,
+      "stdDev": 1212,
+      "baseChainRTP": 3719.402,
+      "multiplierContributionRTP": 70.1662,
+      "orbContributionRTP": 59.978,
+      "doublerContributionRTP": 0.7385,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 36.1039,
+      "bombRainbowRTP": 82.9774,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1178,
+      "bombRainbowRate": 0.4745,
+      "orbActivationRate": 0.0754,
+      "doublerTriggerRate": 0.0005,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9941,
+        "1": 0.0055,
+        "2": 0.0004,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "AVERAGE",
+      "seed": 45,
+      "config": "{\"mode\":\"SOLO_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"AVERAGE\",\"seed\":45}"
+    },
+    "SOLO_CASINO_WEAK": {
+      "averageScore": 1836,
+      "farkleRate": 0.9157,
+      "normalizer": 1995.3047,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 5300,
+      "variance": 3220789,
+      "stdDev": 1795,
+      "baseChainRTP": 3705.9255,
+      "multiplierContributionRTP": 46.3985,
+      "orbContributionRTP": 20.6735,
+      "doublerContributionRTP": 3.563,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 34.6979,
+      "bombRainbowRTP": 71.9792,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1191,
+      "bombRainbowRate": 0.4729,
+      "orbActivationRate": 0.0268,
+      "doublerTriggerRate": 0.0023,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.996,
+        "1": 0.0038,
+        "2": 0.0002,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "WEAK",
+      "seed": 36,
+      "config": "{\"mode\":\"SOLO_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"WEAK\",\"seed\":36}"
+    },
+    "VS_CASINO_OPTIMAL": {
+      "averageScore": 268,
+      "farkleRate": 0.9158,
+      "normalizer": 268.1415,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 1500,
+      "variance": 355920,
+      "stdDev": 597,
+      "baseChainRTP": 3704.155,
+      "multiplierContributionRTP": 82.1025,
+      "orbContributionRTP": 93.9382,
+      "doublerContributionRTP": 0,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 38.4112,
+      "bombRainbowRTP": 88.9906,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1205,
+      "bombRainbowRate": 0.47,
+      "orbActivationRate": 0.1146,
+      "doublerTriggerRate": 0,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9932,
+        "1": 0.0063,
+        "2": 0.0005,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "OPTIMAL",
+      "seed": 53,
+      "config": "{\"mode\":\"VS_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"OPTIMAL\",\"seed\":53}"
+    },
+    "VS_CASINO_AVERAGE": {
+      "averageScore": 841,
+      "farkleRate": 0.9159,
+      "normalizer": 840.5501,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 3313,
+      "variance": 1462812,
+      "stdDev": 1209,
+      "baseChainRTP": 3700.0805,
+      "multiplierContributionRTP": 68.9085,
+      "orbContributionRTP": 61.0263,
+      "doublerContributionRTP": 0.8193,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 35.9671,
+      "bombRainbowRTP": 82.4769,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1174,
+      "bombRainbowRate": 0.4755,
+      "orbActivationRate": 0.0755,
+      "doublerTriggerRate": 0.0005,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9942,
+        "1": 0.0054,
+        "2": 0.0004,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "AVERAGE",
+      "seed": 50,
+      "config": "{\"mode\":\"VS_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"AVERAGE\",\"seed\":50}"
+    },
+    "VS_CASINO_WEAK": {
+      "averageScore": 1856,
+      "farkleRate": 0.9153,
+      "normalizer": 1855.962,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 5350,
+      "variance": 3246089,
+      "stdDev": 1802,
+      "baseChainRTP": 3730.721,
+      "multiplierContributionRTP": 46.0397,
+      "orbContributionRTP": 20.9077,
+      "doublerContributionRTP": 3.8545,
+      "archivistContributionRTP": 0,
+      "bombStandardRTP": 34.7178,
+      "bombRainbowRTP": 72.9354,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1192,
+      "bombRainbowRate": 0.4771,
+      "orbActivationRate": 0.027,
+      "doublerTriggerRate": 0.0026,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.996,
+        "1": 0.0038,
+        "2": 0.0002,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {},
+      "milestoneHitRate": {
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0,
+        "bank": 0,
+        "pass": 0
+      },
+      "playerModel": "WEAK",
+      "seed": 59,
+      "config": "{\"mode\":\"VS_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"WEAK\",\"seed\":59}"
+    },
+    "RALLY_CASINO_OPTIMAL": {
+      "averageScore": 295,
+      "farkleRate": 0.9156,
+      "normalizer": 320.9618,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 1500,
+      "variance": 490952,
+      "stdDev": 701,
+      "baseChainRTP": 3711.486,
+      "multiplierContributionRTP": 83.1356,
+      "orbContributionRTP": 91.4857,
+      "doublerContributionRTP": 0,
+      "archivistContributionRTP": 186.836,
+      "bombStandardRTP": 47.9389,
+      "bombRainbowRTP": 89.0865,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1181,
+      "bombRainbowRate": 0.4728,
+      "orbActivationRate": 0.1118,
+      "doublerTriggerRate": 0,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9931,
+        "1": 0.0063,
+        "2": 0.0005,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {
+        "ARCHIVIST": 186.836,
+        "HEADHUNTER": 0.2695
+      },
+      "milestoneHitRate": {
+        "1": 0.0006,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0.9998,
+        "bank": 0.0002,
+        "pass": 0
+      },
+      "playerModel": "OPTIMAL",
+      "seed": 20,
+      "config": "{\"mode\":\"RALLY_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"OPTIMAL\",\"seed\":20}"
+    },
+    "RALLY_CASINO_AVERAGE": {
+      "averageScore": 2021,
+      "farkleRate": 0.9156,
+      "normalizer": 2196.7474,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 5625,
+      "variance": 3635114,
+      "stdDev": 1907,
+      "baseChainRTP": 3715.7765,
+      "multiplierContributionRTP": 45.2195,
+      "orbContributionRTP": 61.9792,
+      "doublerContributionRTP": 4.3318,
+      "archivistContributionRTP": 77.8351,
+      "bombStandardRTP": 39.392,
+      "bombRainbowRTP": 79.1634,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1192,
+      "bombRainbowRate": 0.4746,
+      "orbActivationRate": 0.0797,
+      "doublerTriggerRate": 0.0029,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9963,
+        "1": 0.0034,
+        "2": 0.0003,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {
+        "CONDUCTOR": 21.555,
+        "ARCHIVIST": 77.8351,
+        "HEADHUNTER": 0.247
+      },
+      "milestoneHitRate": {
+        "1": 0.0018,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0.5488,
+        "bank": 0.3511,
+        "pass": 0.1001
+      },
+      "playerModel": "AVERAGE",
+      "seed": 19,
+      "config": "{\"mode\":\"RALLY_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"AVERAGE\",\"seed\":19}"
+    },
+    "RALLY_CASINO_WEAK": {
+      "averageScore": 3076,
+      "farkleRate": 0.9158,
+      "normalizer": 3343.4001,
+      "sessionsRun": 100000,
+      "p5Score": 0,
+      "p95Score": 7250,
+      "variance": 5109390,
+      "stdDev": 2260,
+      "baseChainRTP": 3706.1285,
+      "multiplierContributionRTP": 19.4931,
+      "orbContributionRTP": 20.8231,
+      "doublerContributionRTP": 7.0777,
+      "archivistContributionRTP": 20.0839,
+      "bombStandardRTP": 31.8455,
+      "bombRainbowRTP": 67.1539,
+      "milestonePayout": 0,
+      "bombStandardRate": 0.1169,
+      "bombRainbowRate": 0.4744,
+      "orbActivationRate": 0.028,
+      "doublerTriggerRate": 0.0048,
+      "deadBoardRecoveryRate": 0,
+      "owcContributionRTP": 0,
+      "owcErrorCount": 0,
+      "multiplierStepDistribution": {
+        "0": 0.9984,
+        "1": 0.0015,
+        "2": 0.0001,
+        "3": 0,
+        "4": 0,
+        "5": 0
+      },
+      "roleContribution": {
+        "CONDUCTOR": 14.4225,
+        "ARCHIVIST": 20.0839,
+        "HEADHUNTER": 0.2592
+      },
+      "milestoneHitRate": {
+        "1": 0.0071,
+        "2": 0,
+        "3": 0,
+        "4": 0
+      },
+      "voteOutcomeDistribution": {
+        "continue": 0.3017,
+        "bank": 0.5983,
+        "pass": 0.1
+      },
+      "playerModel": "WEAK",
+      "seed": 26,
+      "config": "{\"mode\":\"RALLY_CASINO\",\"sessions\":100000,\"maxTurns\":30,\"playerModel\":\"WEAK\",\"seed\":26}"
+    }
+  }
+}
