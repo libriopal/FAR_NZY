@@ -547,7 +547,6 @@ export function handleSandboxWS(ws: WebSocket): void {
 
       case 'RUN_SIM': {
         const config = store.currentConfig();
-        const mode   = config.mode as GameMode;
         const sessions = Math.min(config.sessions, 100_000);
         const startMs = Date.now();
 
@@ -557,42 +556,23 @@ export function handleSandboxWS(ws: WebSocket): void {
           payload: { sessionsComplete: 0, totalSessions: sessions, percentComplete: 0, elapsedMs: 0 },
         }));
 
-        // Yield to the event loop before the synchronous simulation run
-        setTimeout(() => {
+        // runMonteCarloV2 is synchronous — yield first so the WS messages flush
+        setTimeout(async () => {
           try {
-            const raw = runMonteCarlo(mode, Math.min(sessions, 10_000));
-            // Build MonteCarloResultV2-shaped result (placeholder fields until Batch A)
-            const result = {
-              averageScore:               Math.round(raw.averageScore),
-              farkleRate:                 Number(raw.farkleRate.toFixed(4)),
-              normalizer:                 Number(raw.normalizer.toFixed(4)),
-              sessionsRun:                raw.sessionsRun,
-              p95Score:                   0,
-              p5Score:                    0,
-              variance:                   0,
-              stdDev:                     0,
-              baseChainRTP:               0.60,
-              multiplierContributionRTP:  0.20,
-              orbContributionRTP:         0.05,
-              doublerContributionRTP:     0.05,
-              archivistContributionRTP:   0.02,
-              bombStandardRTP:            0.04,
-              bombRainbowRTP:             0.04,
-              milestonePayout:            0,
-              bombStandardRate:           0,
-              bombRainbowRate:            0,
-              orbActivationRate:          0,
-              doublerTriggerRate:         0,
-              deadBoardRecoveryRate:      0,
-              multiplierStepDistribution: { 0: 0.40, 1: 0.25, 2: 0.15, 3: 0.10, 4: 0.06, 5: 0.04 },
-              roleContribution:           {} as Record<string, number>,
-              milestoneHitRate:           {} as Record<number, number>,
-              voteOutcomeDistribution:    { continue: 0.50, bank: 0.40, pass: 0.10 },
-              playerModel:                config.playerModel,
-              seed:                       config.seed,
-              config:                     JSON.stringify(config),
+            const v2Config = {
+              mode:           config.mode as GameMode,
+              sessions:       Math.min(sessions, 100_000),
+              maxTurns:       config.maxTurns,
+              playerModel:    config.playerModel as import('@match3d/farkle-engine').PlayerModel,
+              blockerDensity: config.blockerDensity,
+              playerCount:    config.playerCount,
+              rolesActive:    config.rolesActive,
+              roles:          [] as import('@match3d/farkle-shared').RallyRole[],
+              seed:           config.seed,
+              ...(config.owcParams?.enabled ? { owcParams: config.owcParams as import('@match3d/farkle-shared').OWCConfig } : {}),
             };
-            store.setLastResult(result);
+            const result = await runMonteCarloV2(v2Config);
+            store.setLastResult(result as unknown as Record<string, unknown>);
             ws.send(JSON.stringify({
               type: 'SIM_PROGRESS',
               payload: { sessionsComplete: result.sessionsRun, totalSessions: sessions, percentComplete: 100, elapsedMs: Date.now() - startMs },

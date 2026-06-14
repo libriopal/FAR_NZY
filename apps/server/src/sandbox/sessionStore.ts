@@ -16,6 +16,14 @@ type GameMode =
 type PlayerModel = 'OPTIMAL' | 'AVERAGE' | 'WEAK';
 type AIAgent = 'kendo' | 'claude';
 
+interface OWCParamsConfig {
+  enabled: boolean;
+  playerRank?: number;
+  playerCount?: number;
+  turnsElapsed?: number;
+  targetRTP?: number;
+}
+
 interface SimConfig {
   mode: GameMode;
   sessions: number;
@@ -29,6 +37,7 @@ interface SimConfig {
   bombSpawnRate: number;
   orbSpawnProbability: number;
   doublerSpawnEvery: number;
+  owcParams?: OWCParamsConfig;
 }
 
 // MonteCarloResultV2 is opaque at the session-store level
@@ -60,6 +69,7 @@ const BASE_CONFIG: SimConfig = {
   bombSpawnRate: 0.022,
   orbSpawnProbability: 0.15,
   doublerSpawnEvery: 3,
+  owcParams: { enabled: false },
 };
 
 const MAX_UNDO = 50;
