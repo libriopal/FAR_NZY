@@ -1,8 +1,8 @@
 // Direct gate validation — runs runMonteCarloV2 with seed=42, 50k sessions.
 // Mirrors the /rtp-audit endpoint gate logic exactly. No server required.
 
-import { runMonteCarloV2 } from '../packages/farkle-engine/src/monteCarlo.js';
-import type { SimConfig } from '../packages/farkle-engine/src/monteCarlo.js';
+import { runMonteCarloV2 } from '@match3d/farkle-engine/monteCarlo';
+import type { SimConfig } from '@match3d/farkle-engine/monteCarlo';
 
 const SEED     = 42;
 const SESSIONS = 50_000;

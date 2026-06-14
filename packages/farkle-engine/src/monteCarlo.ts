@@ -79,6 +79,7 @@ export interface MonteCarloResultV2 {
   doublerTriggerRate:         number;
   deadBoardRecoveryRate:      number;
   owcContributionRtp:         number;
+  owcErrorCount:              number;
   multiplierStepDistribution: Record<0|1|2|3|4|5, number>;
   roleContribution:           Partial<Record<RallyRole, number>>;
   milestoneHitRate:           Partial<Record<1|2|3|4, number>>;
@@ -248,8 +249,9 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
 
   // ── OWC setup (pre-loop) ──────────────────────────────────────────────────
   const owcEnabled     = owcParams?.enabled === true;
-  const owcPlayerRank  = owcParams?.playerRank  ?? 1;
-  const owcPlayerCount = owcParams?.playerCount ?? config.playerCount;
+  // Clamp to valid semantic ranges — computeWeights() validates finiteness only.
+  const owcPlayerCount = Math.max(1, Math.min(4, Math.trunc(owcParams?.playerCount ?? config.playerCount)));
+  const owcPlayerRank  = Math.max(1, Math.min(owcPlayerCount, Math.trunc(owcParams?.playerRank ?? 1)));
   const owcTargetRTP   = owcParams?.targetRTP   ?? RTP_CONFIGS[mode]?.targetRTP ?? 0.92;
   // Pre-calibrate normalizer for per-turn running-RTP estimation (500 sessions, fast)
   const owcNormalizer  = owcEnabled ? calibrateNormalizer(mode, 500).normalizer : 0;
@@ -274,7 +276,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
   let totalBombStdScore     = 0;
   let totalBombRainbowScore = 0;
   let totalMilestonePayout  = 0;
-  let totalOwcContrib       = 0;
+  let totalOwcContribRtp    = 0;  // already in RTP units — do NOT feed into toRTP()
+  let totalOwcErrors        = 0;
 
   // Multiplier step distribution (one slot per step 0-5)
   const stepCounts: [number,number,number,number,number,number] = [0,0,0,0,0,0];
@@ -382,6 +385,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
             sessOwcContrib += owcOut.owcContributionRtp;
           } catch {
             owcAdj.face_1 = owcAdj.face_2 = owcAdj.face_3 = owcAdj.face_4 = owcAdj.face_5 = owcAdj.face_6 = 0;
+            totalOwcErrors++;
           }
         }
 
@@ -569,7 +573,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
       totalBombStdScore     += sessBombStd;
       totalBombRainbowScore += sessBombRbw;
       totalMilestonePayout  += sessMilestone;
-      totalOwcContrib       += sessOwcContrib;
+      totalOwcContribRtp    += sessOwcContrib;
     }
 
     // Yield event loop between chunks (non-blocking)
@@ -648,7 +652,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
     orbActivationRate:          Number((totalOrbActivations  / sessions).toFixed(4)),
     doublerTriggerRate:         Number((totalDoublerTriggers / sessions).toFixed(4)),
     deadBoardRecoveryRate:      Number((totalDeadBoardRecov  / sessions).toFixed(4)),
-    owcContributionRtp:         toRTP(totalOwcContrib),
+    owcContributionRtp:         Number((totalOwcContribRtp / sessions).toFixed(4)),
+    owcErrorCount:              totalOwcErrors,
     multiplierStepDistribution,
     roleContribution,
     milestoneHitRate,
