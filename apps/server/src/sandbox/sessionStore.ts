@@ -66,6 +66,7 @@ const BASE_CONFIG: SimConfig = {
   rolesActive: false,
   seed: Date.now() & 0x7fffffff,
   targetRTP: 0.92,
+  stakeAmount: 1,
   bombSpawnRate: 0.022,
   orbSpawnProbability: 0.15,
   doublerSpawnEvery: 3,

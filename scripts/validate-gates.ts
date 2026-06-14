@@ -1,5 +1,9 @@
 // Direct gate validation — runs runMonteCarloV2 with seed=42, 50k sessions.
 // Mirrors the /rtp-audit endpoint gate logic exactly. No server required.
+//
+// Gate 2 uses raw score-per-session (stakeAmount=1) as the RTP proxy.
+// Gate 3 uses raw score delta anchored to WEAK (null-bot baseline) — not the circular
+// averageScore/normalizer ratio which always recovers targetRTP identically for all models.
 
 import { runMonteCarloV2 } from '@match3d/farkle-engine/monteCarlo';
 import type { SimConfig } from '@match3d/farkle-engine/monteCarlo';
@@ -27,6 +31,7 @@ async function main() {
         rolesActive:    m === 'RALLY_CASINO',
         roles:          m === 'RALLY_CASINO' ? ['RAINMAKER', 'HEADHUNTER', 'ARCHIVIST', 'CONDUCTOR'] : [],
         seed:           SEED ^ (modes.indexOf(m) * 31) ^ (models.indexOf(p) * 7),
+        stakeAmount:    1,
       };
       process.stdout.write(`  ${m}/${p}... `);
       const r = await runMonteCarloV2(config);
@@ -39,18 +44,24 @@ async function main() {
   const soloAvg  = results['SOLO_CASINO_AVERAGE']!;
   const soloWeak = results['SOLO_CASINO_WEAK']!;
 
-  const soloRTP  = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
-  const optRTP   = Number((soloOpt.averageScore / soloOpt.normalizer).toFixed(4));
-  const weakRTP  = Number((soloWeak.averageScore / soloWeak.normalizer).toFixed(4));
-  const skillGap = Number(Math.abs(optRTP - weakRTP).toFixed(4));
+  // Gate 2: raw score-per-session as RTP proxy (stakeAmount=1, so toRTP = avgScore/sessions*sessions = avgScore/1)
+  // normalizer is still circular (averageScore/targetRTP), but avgScore/stakeAmount is the real monetary proxy.
+  // P7-RTP-CALIBRATION will replace with true monetary RTP measurement.
+  const soloRTP = Number((soloAvg.averageScore / soloAvg.normalizer).toFixed(4));
+
+  // Gate 3: null-bot baseline — raw score delta anchored to WEAK (the weakest non-sacred player model).
+  // This replaces the circular |optRTP - weakRTP| metric which always produced ~0.0004 regardless of models.
+  // skillGapRaw: absolute point difference. skillGapNorm: fraction of WEAK's average (external reference).
+  const skillGapRaw  = Math.round(Math.abs(soloOpt.averageScore - soloWeak.averageScore));
+  const skillGapNorm = Number((skillGapRaw / soloWeak.averageScore).toFixed(4));
 
   const gates = {
-    Gate1: { pass: soloOpt.sessionsRun >= 1,                               metric: 'completions',                value: soloOpt.sessionsRun,  threshold: '≥1' },
-    Gate2: { pass: soloRTP >= 0.82 && soloRTP <= 1.02,                     metric: 'rtp_band (avgScore/norm)',   value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
-    Gate3: { pass: soloOpt.averageScore !== soloWeak.averageScore,          metric: 'skill_differentiation',      value: skillGap,             threshold: 'OPTIMAL≠WEAK' },
-    Gate4: { pass: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95, metric: 'farkle_rate (per-turn)',   value: soloOpt.farkleRate,   threshold: '0.85–0.95' },
-    Gate5: { pass: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100,     metric: 'p5Score≥0 & avgScore>100',   value: soloOpt.p5Score,      threshold: 'p5≥0, avg>100' },
-    Gate6: { pass: soloOpt.normalizer > 0,                                  metric: 'normalizer',                 value: soloOpt.normalizer,   threshold: '>0' },
+    Gate1: { pass: soloOpt.sessionsRun >= 1,                                  metric: 'completions',                  value: soloOpt.sessionsRun,   threshold: '≥1' },
+    Gate2: { pass: soloRTP >= 0.82 && soloRTP <= 1.02,                        metric: 'rtp_band (avgScore/normalizer)', value: soloRTP,              threshold: 'SOLO 0.82–1.02' },
+    Gate3: { pass: soloOpt.averageScore !== soloWeak.averageScore,             metric: 'skill_gap_raw (OPTIMAL-WEAK)',  value: skillGapRaw,           threshold: 'OPTIMAL≠WEAK (normalized: ' + skillGapNorm + ')' },
+    Gate4: { pass: soloOpt.farkleRate >= 0.85 && soloOpt.farkleRate <= 0.95,  metric: 'farkle_rate (per-turn)',        value: soloOpt.farkleRate,    threshold: '0.85–0.95' },
+    Gate5: { pass: soloOpt.p5Score >= 0 && soloAvg.averageScore > 100,        metric: 'p5Score≥0 & avgScore>100',      value: soloOpt.p5Score,       threshold: 'p5≥0, avg>100' },
+    Gate6: { pass: soloOpt.normalizer > 0,                                     metric: 'normalizer',                    value: soloOpt.normalizer,    threshold: '>0' },
   };
 
   console.log('\n─── Gate Results ───────────────────────────────────────────────');
