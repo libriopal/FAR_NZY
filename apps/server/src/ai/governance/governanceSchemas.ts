@@ -1,45 +1,31 @@
-// Governance schemas for audit inputs/outputs.
-// NOTE: zod is absent from package.json at generation time (added in Phase 5).
-// These are plain TypeScript interfaces matching the intended zod schema shapes exactly.
-// After Phase 5 pnpm install, migrate to z.object() — shapes must not change.
+import { z } from 'zod';
 
 // Input: RTP proposal from Sandbox
-export interface SimulationResults {
-  avgScore: number;
-  farkleRate: number;
-  sessionsRun: number;
-}
-
-export interface SpawnWeightAdjustments {
-  [face: string]: number;
-}
-
-export interface RTPProposal {
-  patchName: string;
-  patchDescription: string;
-  baselineRTP: number;              // 0–2
-  simulationResults: SimulationResults;
-  spawnWeightAdjustments: SpawnWeightAdjustments;
-}
+export const RTPProposalSchema = z.object({
+  patchName:              z.string(),
+  patchDescription:       z.string(),
+  baselineRTP:            z.number().min(0).max(2),
+  simulationResults: z.object({
+    avgScore:    z.number(),
+    farkleRate:  z.number().min(0).max(1),
+    sessionsRun: z.number().int(),
+  }),
+  spawnWeightAdjustments: z.record(z.string(), z.number()),
+});
 
 // Output: Governance audit finding
-export interface GovernanceAuditResult {
-  analysis: string;
-  recommendations: string[];
-  projectedRTP: number;
-  projectedRTPRange: [number, number];
-  riskLevel: 'low' | 'medium' | 'high';
-  approved: boolean;
-}
+export const GovernanceAuditResultSchema = z.object({
+  analysis:            z.string(),
+  recommendations:     z.array(z.string()),
+  projectedRTP:        z.number(),
+  projectedRTPRange:   z.tuple([z.number(), z.number()]),
+  riskLevel:           z.enum(['low', 'medium', 'high']),
+  approved:            z.boolean(),
+});
+
+export type RTPProposal = z.infer<typeof RTPProposalSchema>;
+export type GovernanceAuditResult = z.infer<typeof GovernanceAuditResultSchema>;
 
 export function validateRTPProposal(input: unknown): RTPProposal {
-  const p = input as Record<string, unknown>;
-  if (typeof p['patchName'] !== 'string') throw new Error('patchName must be a string');
-  if (typeof p['patchDescription'] !== 'string') throw new Error('patchDescription must be a string');
-  if (typeof p['baselineRTP'] !== 'number') throw new Error('baselineRTP must be a number');
-  const sim = p['simulationResults'] as Record<string, unknown>;
-  if (!sim || typeof sim['avgScore'] !== 'number') throw new Error('simulationResults.avgScore must be a number');
-  if (typeof sim['farkleRate'] !== 'number') throw new Error('simulationResults.farkleRate must be a number');
-  if (typeof sim['sessionsRun'] !== 'number') throw new Error('simulationResults.sessionsRun must be a number');
-  return p as unknown as RTPProposal;
+  return RTPProposalSchema.parse(input);
 }

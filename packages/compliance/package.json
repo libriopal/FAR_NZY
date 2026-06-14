@@ -1,6 +1,9 @@
 {
   "name": "@match3d/compliance",
   "version": "1.0.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
