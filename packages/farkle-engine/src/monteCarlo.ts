@@ -9,7 +9,7 @@
 // See .ff-core-lock for full classification manifest.
 // ═══════════════════════════════════════════════════════
 
-import type { GameMode, DieFace, RallyRole } from '@match3d/farkle-shared';
+import type { GameMode, DieFace, RallyRole, OWCConfig } from '@match3d/farkle-shared';
 import {
   MULTIPLIER_LADDER,
   SPAWN_WEIGHTS,
@@ -18,6 +18,7 @@ import {
   BOMB_CONSTANTS,
   ENERGY_CONSTANTS,
 } from '@match3d/farkle-shared';
+import { computeWeights, type OWCInput } from '@match3d/owc';
 import { seededRng } from './csprng.js';
 import { RTP_CONFIGS } from './rtpConfig.js';
 import { lookupScore, buildScoreTable } from './chainIndex.js';
@@ -52,6 +53,7 @@ export interface SimConfig {
   roles: RallyRole[];
   seed: number;
   stakeAmount?: number;
+  owcParams?: OWCConfig;
 }
 
 export interface MonteCarloResultV2 {
@@ -76,6 +78,8 @@ export interface MonteCarloResultV2 {
   orbActivationRate:          number;
   doublerTriggerRate:         number;
   deadBoardRecoveryRate:      number;
+  owcContributionRtp:         number;
+  owcErrorCount:              number;
   multiplierStepDistribution: Record<0|1|2|3|4|5, number>;
   roleContribution:           Partial<Record<RallyRole, number>>;
   milestoneHitRate:           Partial<Record<1|2|3|4, number>>;
@@ -199,6 +203,31 @@ function checkMilestones(
   }
 }
 
+// ─── OWC biased die draw ─────────────────────────────────────────────────────
+// Applies additive face-probability deltas from OWC. One diceRng() call per die
+// (same count as uniform draw) — CSPRNG lineage preserved.
+function biasedFaceDraw(
+  adj: { face_1: number; face_2: number; face_3: number; face_4: number; face_5: number; face_6: number },
+  rng: () => number,
+): DieFace {
+  const BASE = 1 / 6;
+  const w0 = Math.max(0, BASE + adj.face_1);
+  const w1 = Math.max(0, BASE + adj.face_2);
+  const w2 = Math.max(0, BASE + adj.face_3);
+  const w3 = Math.max(0, BASE + adj.face_4);
+  const w4 = Math.max(0, BASE + adj.face_5);
+  const w5 = Math.max(0, BASE + adj.face_6);
+  const total = w0 + w1 + w2 + w3 + w4 + w5;
+  if (total === 0) return (Math.floor(rng() * 6) + 1) as DieFace;
+  let r = rng() * total;
+  if ((r -= w0) <= 0) return 1;
+  if ((r -= w1) <= 0) return 2;
+  if ((r -= w2) <= 0) return 3;
+  if ((r -= w3) <= 0) return 4;
+  if ((r -= w4) <= 0) return 5;
+  return 6;
+}
+
 // ─── V2 Monte Carlo simulation ────────────────────────────────────────────────
 
 export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResultV2> {
@@ -211,11 +240,21 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
     roles       = [],
     seed,
     stakeAmount = 0,
+    owcParams,
   } = config;
 
   const table         = getMcTable();
   const isRally       = mode.includes('RALLY');
   const isRallyCasino = mode === 'RALLY_CASINO';
+
+  // ── OWC setup (pre-loop) ──────────────────────────────────────────────────
+  const owcEnabled     = owcParams?.enabled === true;
+  // Clamp to valid semantic ranges — computeWeights() validates finiteness only.
+  const owcPlayerCount = Math.max(1, Math.min(4, Math.trunc(owcParams?.playerCount ?? config.playerCount)));
+  const owcPlayerRank  = Math.max(1, Math.min(owcPlayerCount, Math.trunc(owcParams?.playerRank ?? 1)));
+  const owcTargetRTP   = owcParams?.targetRTP   ?? RTP_CONFIGS[mode]?.targetRTP ?? 0.92;
+  // Pre-calibrate normalizer for per-turn running-RTP estimation (500 sessions, fast)
+  const owcNormalizer  = owcEnabled ? calibrateNormalizer(mode, 500).normalizer : 0;
 
   // Session score array (for p5/p95 — sorted once at end)
   const sessionScores = new Array<number>(sessions).fill(0);
@@ -237,6 +276,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
   let totalBombStdScore     = 0;
   let totalBombRainbowScore = 0;
   let totalMilestonePayout  = 0;
+  let totalOwcContribRtp    = 0;  // already in RTP units — do NOT feed into toRTP()
+  let totalOwcErrors        = 0;
 
   // Multiplier step distribution (one slot per step 0-5)
   const stepCounts: [number,number,number,number,number,number] = [0,0,0,0,0,0];
@@ -293,6 +334,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
       let sessBombStd   = 0;
       let sessBombRbw   = 0;
       let sessMilestone = 0;
+      let sessOwcContrib = 0;
+      const owcAdj = { face_1: 0, face_2: 0, face_3: 0, face_4: 0, face_5: 0, face_6: 0 };
 
       let sFarkles  = 0;
       let sBombStd  = 0;
@@ -322,15 +365,34 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
         // Doubler expiry check
         if (doublerActive && turn >= doublerExpiresTurn) doublerActive = false;
 
-        // Roll 6d6 via diceRng stream
-        const roll: DieFace[] = [
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-          (Math.floor(diceRng() * 6) + 1) as DieFace,
-        ];
+        // ── OWC per-turn face bias ───────────────────────────────────────────
+        if (owcEnabled) {
+          const currentRTP = owcNormalizer > 0 ? (banked + unbanked) / owcNormalizer : owcTargetRTP;
+          const sFarkleRate = turn > 0 ? sFarkles / turn : 0;
+          try {
+            const owcInput: OWCInput = {
+              mode, playerRank: owcPlayerRank, playerCount: owcPlayerCount,
+              turnsElapsed: turn, currentRTP, targetRTP: owcTargetRTP,
+              sessionFarkleRate: sFarkleRate,
+            };
+            const owcOut = computeWeights(owcInput);
+            owcAdj.face_1 = owcOut.spawnWeightAdjustments.face_1;
+            owcAdj.face_2 = owcOut.spawnWeightAdjustments.face_2;
+            owcAdj.face_3 = owcOut.spawnWeightAdjustments.face_3;
+            owcAdj.face_4 = owcOut.spawnWeightAdjustments.face_4;
+            owcAdj.face_5 = owcOut.spawnWeightAdjustments.face_5;
+            owcAdj.face_6 = owcOut.spawnWeightAdjustments.face_6;
+            sessOwcContrib += owcOut.owcContributionRtp;
+          } catch {
+            owcAdj.face_1 = owcAdj.face_2 = owcAdj.face_3 = owcAdj.face_4 = owcAdj.face_5 = owcAdj.face_6 = 0;
+            totalOwcErrors++;
+          }
+        }
+
+        // Roll 6d6 via diceRng stream (OWC-biased when enabled)
+        const roll: DieFace[] = owcEnabled
+          ? [biasedFaceDraw(owcAdj, diceRng), biasedFaceDraw(owcAdj, diceRng), biasedFaceDraw(owcAdj, diceRng), biasedFaceDraw(owcAdj, diceRng), biasedFaceDraw(owcAdj, diceRng), biasedFaceDraw(owcAdj, diceRng)]
+          : [(Math.floor(diceRng() * 6) + 1) as DieFace, (Math.floor(diceRng() * 6) + 1) as DieFace, (Math.floor(diceRng() * 6) + 1) as DieFace, (Math.floor(diceRng() * 6) + 1) as DieFace, (Math.floor(diceRng() * 6) + 1) as DieFace, (Math.floor(diceRng() * 6) + 1) as DieFace];
 
         const rawScore = lookupScore(roll, table);
 
@@ -511,6 +573,7 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
       totalBombStdScore     += sessBombStd;
       totalBombRainbowScore += sessBombRbw;
       totalMilestonePayout  += sessMilestone;
+      totalOwcContribRtp    += sessOwcContrib;
     }
 
     // Yield event loop between chunks (non-blocking)
@@ -589,6 +652,8 @@ export async function runMonteCarloV2(config: SimConfig): Promise<MonteCarloResu
     orbActivationRate:          Number((totalOrbActivations  / sessions).toFixed(4)),
     doublerTriggerRate:         Number((totalDoublerTriggers / sessions).toFixed(4)),
     deadBoardRecoveryRate:      Number((totalDeadBoardRecov  / sessions).toFixed(4)),
+    owcContributionRtp:         Number((totalOwcContribRtp / sessions).toFixed(4)),
+    owcErrorCount:              totalOwcErrors,
     multiplierStepDistribution,
     roleContribution,
     milestoneHitRate,

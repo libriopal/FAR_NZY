@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": "..",
+    "paths": {
+      "@match3d/farkle-engine":    ["packages/farkle-engine/src/index.ts"],
+      "@match3d/farkle-engine/*":  ["packages/farkle-engine/src/*"],
+      "@match3d/farkle-shared":    ["packages/farkle-shared/src/index.ts"],
+      "@match3d/owc":              ["packages/owc/src/index.ts"]
+    },
+    "typeRoots": ["../apps/server/node_modules/@types"]
+  },
+  "include": ["./**/*"]
+}
