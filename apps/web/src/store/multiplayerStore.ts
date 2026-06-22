@@ -30,6 +30,7 @@ export interface MultiplayerStoreState {
   lastMessage: { type: string; [k: string]: unknown } | null;
   lastDisruption: DisruptionEvent | null;
   myRole: RallyRole | null;
+  boardSeed: number | null;
   error: string | null;
 }
 
@@ -38,7 +39,7 @@ const INITIAL: MultiplayerStoreState = {
   players: [], activePlayerId: null,
   banked: 0, unbanked: 0,
   lastMessage: null, lastDisruption: null,
-  myRole: null, error: null,
+  myRole: null, boardSeed: null, error: null,
 };
 
 export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...INITIAL }));
@@ -75,21 +76,23 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, status: 'lobby' as const, roomCode, playerId };
       }
       case 'ROOM_STATE': {
-        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number };
+        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number; boardSeed?: number };
+        const boardSeed = rs.boardSeed ?? prev.boardSeed;
         if (_isReconnecting) {
           _isReconnecting = false;
           _reconnectAttempts = 0;
           if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
           const curStep = useFarkleStore.getState().multiplierStep;
           useFarkleStore.getState().syncFromServer(curStep, rs.banked, rs.unbanked);
-          return { ...next, status: 'playing' as const, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked };
+          return { ...next, status: 'playing' as const, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed };
         }
-        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked };
+        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed };
       }
       case 'GAME_STARTED': {
         const roleMap = ((msg.roles ?? {}) as Record<string, RallyRole>);
         const myRole = myId ? (roleMap[myId] ?? null) : null;
-        return { ...next, status: 'playing' as const, myRole };
+        const boardSeed = (msg.boardSeed as number | undefined) ?? prev.boardSeed;
+        return { ...next, status: 'playing' as const, myRole, boardSeed };
       }
       case 'CHAIN_RESULT': {
         const multiplierStep = (msg.multiplierStep as number | undefined) ?? 0;

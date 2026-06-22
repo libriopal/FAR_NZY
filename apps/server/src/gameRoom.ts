@@ -92,12 +92,17 @@ export class GameRoom {
   private lastActionAt: Map<string, number> = new Map();
   private readonly INPUT_LOCK_MS = 100;
   private explicitBanksTaken = 0;
+  private readonly boardSeed: number;
 
   constructor(settings: LobbySettings) {
     this.id = nanoid(8).toUpperCase();
     this.settings = settings;
     this.csprng = new CSPRNG(nanoid(32));
     this.pool = new SixPoolManager(settings.playerCount, this.csprng);
+    // Cosmetic-only seed for client physics rendering — independent of
+    // this.csprng's fairness-committed gameplay stream. Safe to reveal
+    // at game start since it never feeds scoring.
+    this.boardSeed = Math.floor(Math.random() * 2 ** 31);
     const gridDim = settings.playerCount === 1 ? 7
       : settings.playerCount === 2 ? 8
       : settings.playerCount === 3 ? 9 : 10;
@@ -558,7 +563,7 @@ export class GameRoom {
     for (const [pid] of this.players) {
       roles[pid] = this.roleMap.get(pid) ?? null;
     }
-    this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles });
+    this.broadcast({ type: 'GAME_STARTED', gameMode: this.gameMode, roles, boardSeed: this.boardSeed });
   }
 
   private assignRoles(): Map<string, string> {
@@ -706,6 +711,7 @@ export class GameRoom {
       multiplierStep: this.state.multiplierStep,
       activePlayerId: this.activePlayerId,
       players: [...this.players.values()].map(p => ({ ...p.profile, energy: p.energy })),
+      boardSeed: this.boardSeed,
     };
   }
 
