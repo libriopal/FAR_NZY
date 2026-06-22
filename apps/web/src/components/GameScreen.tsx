@@ -114,7 +114,12 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     let cancelled = false;
     setInitError(null);
 
-    VoxelPhysicsSystem.create(Date.now()).then(sys => {
+    // Multiplayer: seed cosmetic physics from the server's boardSeed (when available)
+    // instead of Date.now(), so client renders stop ignoring server entropy entirely.
+    // Falls back to Date.now() if the seed hasn't arrived yet — not a hard block.
+    const physicsSeed = isMultiplayer && mpState.boardSeed != null ? mpState.boardSeed : Date.now();
+
+    VoxelPhysicsSystem.create(physicsSeed).then(sys => {
       if (cancelled) { sys.destroy(); return; }
       physicsRef.current = sys;
       sys.startSimulation(
