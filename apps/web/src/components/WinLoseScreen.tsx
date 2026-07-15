@@ -14,6 +14,7 @@ function navigateWithAd(nav: () => void) {
 }
 import { analytics } from '@match3d/analytics';
 import { savePlayerData, submitScore } from '@match3d/backend-client';
+import { SessionRetrospectivePrompt } from './SessionRetrospectivePrompt.js';
 
 export function WinScreen() {
   const { score, resources, economyBalance, userId, purchasedUpgradeIds } = useGameStore(s => ({
@@ -144,6 +145,7 @@ export function WinScreen() {
           Play Again
         </button>
       </div>
+      <SessionRetrospectivePrompt />
     </div>
   );
 }
@@ -212,6 +214,7 @@ export function LoseScreen() {
           Home
         </button>
       </div>
+      <SessionRetrospectivePrompt />
     </div>
   );
 }

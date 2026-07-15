@@ -47,25 +47,7 @@
 
 import { computeSkillScore } from './skillMetrics.js';
 import type { SessionAnalytics, ChainDecision } from './skillMetrics.js';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _client: any = null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getClient(): any {
-  if (_client) return _client;
-  const url = process.env['SUPABASE_URL'];
-  const key = process.env['SUPABASE_SERVICE_KEY'];
-  if (!url || !key) return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createClient } = require('@supabase/supabase-js');
-    _client = createClient(url, key);
-  } catch {
-    _client = null;
-  }
-  return _client;
-}
+import { getSupabaseClient as getClient } from './evidence/supabaseClient.js';
 
 export async function insertSession(session: Omit<SessionAnalytics, 'skill_score'>): Promise<void> {
   try {

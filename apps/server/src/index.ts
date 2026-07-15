@@ -13,6 +13,7 @@ import { DEFAULT_SETTINGS } from '@match3d/farkle-shared';
 import { nanoid } from 'nanoid';
 import { governanceRouter } from './ai/routes/governanceRouter.js';
 import { questRouter } from './ai/routes/questRouter.js';
+import { evidenceRouter } from './evidence/evidenceRouter.js';
 // Initialize AI provider registry at startup
 import './ai/index.js';
 
@@ -26,6 +27,7 @@ app.use('/', sandboxRouter);
 app.use('/api/sandbox', sandboxRouter);
 app.use('/api/governance', governanceRouter);
 app.use('/api/quests', questRouter);
+app.use('/api/evidence', evidenceRouter);
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
