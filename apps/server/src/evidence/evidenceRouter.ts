@@ -37,7 +37,10 @@ router.post('/discovery', (req, res) => {
     ? (event_type as DiscoveryEventType)
     : 'discovery_claim';
 
-  recordDiscoveryEvent({ session_id, player_id, epoch_id, event_type: type, text, context });
+  // §36: epoch is a human-set, server-side concept — default from env rather
+  // than requiring every client call site to know and pass it.
+  const resolvedEpochId = epoch_id ?? process.env['EVIDENCE_EPOCH_ID'] ?? undefined;
+  recordDiscoveryEvent({ session_id, player_id, epoch_id: resolvedEpochId, event_type: type, text, context });
   return res.status(202).json({ accepted: true });
 });
 
@@ -55,7 +58,8 @@ router.post('/retrospective', (req, res) => {
     return res.status(400).json({ error: 'player_id and text are required' });
   }
 
-  recordDiscoveryEvent({ session_id, player_id, epoch_id, event_type: 'session_retrospective', text });
+  const resolvedEpochId = epoch_id ?? process.env['EVIDENCE_EPOCH_ID'] ?? undefined;
+  recordDiscoveryEvent({ session_id, player_id, epoch_id: resolvedEpochId, event_type: 'session_retrospective', text });
   return res.status(202).json({ accepted: true });
 });
 

@@ -11,6 +11,7 @@ import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
 import { VoxelPileScene } from '../game/VoxelPileScene.js';
 import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
+import { DiscoveryNotePrompt } from './DiscoveryNotePrompt.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
 import type { AudioSettings } from './SettingsModal.js';
@@ -389,6 +390,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
           {...((gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') ? { onInitiateHeist: initiateHeist, onBlockHeist: blockHeist } : {})}
         />
+
+        <DiscoveryNotePrompt />
       </div>
 
       {/* Beat Window — Gothic rhythm bar */}

@@ -12,6 +12,7 @@
     "@match3d/farkle-engine": "workspace:*",
     "@match3d/compliance": "workspace:*",
     "@match3d/owc": "workspace:*",
+    "@supabase/supabase-js": "^2.39.0",
     "express": "^5.2.1",
     "ws": "^8.19.0",
     "nanoid": "^5.0.0",
