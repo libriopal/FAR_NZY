@@ -24,12 +24,12 @@ export function useMultiplayer() {
     leaveRoom: () => mpActions.leaveRoom(),
     sendRallyVote: (choice: 'bank' | 'pass' | 'continue') => mpActions.sendRallyVote(choice),
     sendRallyDecisionStart: (expiresAt: number) => mpActions.sendRallyDecisionStart(expiresAt),
-    submitChainFaces: (
-      faces: import('@match3d/farkle-shared').DieFace[],
-      chainLength: number,
-      chainColumns: number[],
-    ) => mpActions.submitChainFaces(faces, chainLength, chainColumns),
-    collectOrb: (bodyId: string) => mpActions.collectOrb(bodyId),
+    // submitChainFaces removed (GAP-1b/ADR-024/ADR-025) — use submitChain above.
+    collectOrb: (row: number, col: number) => mpActions.collectOrb(row, col),
+    anchorGhost: (row: number, col: number) => mpActions.anchorGhost(row, col),
+    tapSphere: (row: number, col: number) => mpActions.tapSphere(row, col),
+    detonateBomb: (row: number, col: number, targetFace?: number) => mpActions.detonateBomb(row, col, targetFace),
+    detonateRainbowBomb: (row: number, col: number, targetFace?: number) => mpActions.detonateRainbowBomb(row, col, targetFace),
     claimVault: () => mpActions.claimVault(),
   };
 }

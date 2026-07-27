@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import type { DisruptionEvent, RallyRole, DieFace } from '@match3d/farkle-shared';
+import type { Cell, DisruptionEvent, RallyRole } from '@match3d/farkle-shared';
 import { useFarkleStore } from './farkleStore.js';
 
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:3001';
@@ -31,6 +31,10 @@ export interface MultiplayerStoreState {
   lastDisruption: DisruptionEvent | null;
   myRole: RallyRole | null;
   boardSeed: number | null;
+  // ADR-024/ADR-025: the server's authoritative grid, from BOARD_UPDATE /
+  // ROOM_STATE — previously received but discarded. The 2D renderer and
+  // grid-native chain-drag both read this directly.
+  grid: Cell[][] | null;
   error: string | null;
 }
 
@@ -39,7 +43,7 @@ const INITIAL: MultiplayerStoreState = {
   players: [], activePlayerId: null,
   banked: 0, unbanked: 0,
   lastMessage: null, lastDisruption: null,
-  myRole: null, boardSeed: null, error: null,
+  myRole: null, boardSeed: null, grid: null, error: null,
 };
 
 export const useMultiplayerStore = create<MultiplayerStoreState>()(() => ({ ...INITIAL }));
@@ -76,17 +80,18 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
         return { ...next, status: 'lobby' as const, roomCode, playerId };
       }
       case 'ROOM_STATE': {
-        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number; boardSeed?: number };
+        const rs = msg.state as { players: MultiplayerPlayer[]; activePlayerId: string; banked: number; unbanked: number; boardSeed?: number; grid?: Cell[][] };
         const boardSeed = rs.boardSeed ?? prev.boardSeed;
+        const grid = rs.grid ?? prev.grid;
         if (_isReconnecting) {
           _isReconnecting = false;
           _reconnectAttempts = 0;
           if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
           const curStep = useFarkleStore.getState().multiplierStep;
           useFarkleStore.getState().syncFromServer(curStep, rs.banked, rs.unbanked);
-          return { ...next, status: 'playing' as const, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed };
+          return { ...next, status: 'playing' as const, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed, grid };
         }
-        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed };
+        return { ...next, players: rs.players ?? prev.players, activePlayerId: rs.activePlayerId, banked: rs.banked, unbanked: rs.unbanked, boardSeed, grid };
       }
       case 'GAME_STARTED': {
         const roleMap = ((msg.roles ?? {}) as Record<string, RallyRole>);
@@ -122,9 +127,10 @@ function _applyMessage(msg: { type: string; [k: string]: unknown }) {
       case 'DISRUPTION_INCOMING':
         return { ...next, lastDisruption: msg.disruption as DisruptionEvent };
       case 'BOARD_UPDATE':
-        // Server recovered a dead board. lastMessage is set via the spread above;
-        // GameScreen reacts via the mpState.lastMessage effect.
-        return next;
+        // ADR-024/ADR-025: now the regular vehicle for streaming grid state
+        // (chain consumption + refill, dead-board recovery, entity taps) —
+        // previously discarded except as a dead-board recovery signal.
+        return { ...next, grid: (msg.grid as Cell[][] | undefined) ?? prev.grid };
       case 'ERROR':
         if (_isReconnecting) {
           _isReconnecting = false;
@@ -191,11 +197,22 @@ export const mpActions = {
   sendDisruption(disruptType: string, targetColumns: number[]) {
     _send({ type: 'DISRUPT', disruptType, targetColumns });
   },
-  submitChainFaces(faces: DieFace[], chainLength: number, chainColumns: number[]) {
-    _send({ type: 'SUBMIT_CHAIN_FACES', faces, chainLength, chainColumns });
+  // submitChainFaces removed (GAP-1b/ADR-024/ADR-025) — the server no longer
+  // accepts client-asserted face values. Use submitChain (row/col) above.
+  collectOrb(row: number, col: number) {
+    _send({ type: 'COLLECT_ORB', row, col });
   },
-  collectOrb(bodyId: string) {
-    _send({ type: 'COLLECT_ORB', bodyId });
+  anchorGhost(row: number, col: number) {
+    _send({ type: 'ANCHOR_GHOST', row, col });
+  },
+  tapSphere(row: number, col: number) {
+    _send({ type: 'TAP_SPHERE', row, col });
+  },
+  detonateBomb(row: number, col: number, targetFace?: number) {
+    _send({ type: 'DETONATE_BOMB', row, col, targetFace });
+  },
+  detonateRainbowBomb(row: number, col: number, targetFace?: number) {
+    _send({ type: 'DETONATE_RAINBOW_BOMB', row, col, targetFace });
   },
   claimVault() {
     _send({ type: 'CLAIM_VAULT' });
