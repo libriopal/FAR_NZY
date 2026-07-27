@@ -10,7 +10,7 @@
 // ═══════════════════════════════════════════════════════
 
 import type { Cell, DieFace, GridPos, LobbySettings } from '@match3d/farkle-shared';
-import { FACE_TO_COLOR, GAME_CONSTANTS } from '@match3d/farkle-shared';
+import { FACE_TO_COLOR, GAME_CONSTANTS, MIRROR_OPPOSITES } from '@match3d/farkle-shared';
 import { CSPRNG, seededRng } from './csprng.js';
 import { lookupScore, buildScoreTable } from './chainIndex.js';
 import { nanoid } from 'nanoid';
@@ -132,7 +132,12 @@ export class SixPoolManager {
     return val;
   }
 
-  drawWild(): number {
+  // boostPct (ADR-025, CATALYST_WILD_BOOST accumulation, 0-CATALYST_MAX_BOOST):
+  // a non-wild draw gets a boostPct% second chance to upgrade to a fresh
+  // wild-tier roll, using the same relative tier weighting as pool
+  // construction (0.60/0.75/0.90 → 1/2/3, line ~108-111 above). Deterministic
+  // — draws from the same seeded `this.rng`, no new randomness source.
+  drawWild(boostPct = 0): number {
     if (this.wildIdx >= this.wildLive.length) {
       if (this.wildDead.length > 0) {
         this.wildLive = shuffle([...this.wildDead], this.rng);
@@ -144,6 +149,12 @@ export class SixPoolManager {
     }
     const val = this.wildLive[this.wildIdx++];
     this.wildDead.push(val);
+    if (val === 0 && boostPct > 0 && this.rng() * 100 < boostPct) {
+      const r = this.rng();
+      if (r < 0.5) return 1;
+      if (r < 0.8) return 2;
+      return 3;
+    }
     return val;
   }
 
@@ -301,7 +312,7 @@ export function stepGravity(grid: Cell[][]): { grid: Cell[][], changed: boolean 
   for (let r = rows - 2; r >= 0; r--) {
     for (let c = 0; c < cols; c++) {
       const cell = newGrid[r][c];
-      const canFall = cell.state === 'WILD' || cell.type === 'ICE' || (
+      const canFall = cell.state === 'WILD' || cell.state === 'MIRROR' || cell.type === 'ICE' || (
         cell.state === 'NORMAL' &&
         (isDieTile(cell) || cell.type === 'BOMB_STANDARD' || cell.type === 'BOMB_RAINBOW')
       );
@@ -323,7 +334,7 @@ export function hasEmptyBelow(grid: Cell[][]): boolean {
   for (let r = 0; r < rows - 1; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = grid[r][c];
-      const canFall = cell.state === 'WILD' || cell.type === 'ICE' || (
+      const canFall = cell.state === 'WILD' || cell.state === 'MIRROR' || cell.type === 'ICE' || (
         cell.state === 'NORMAL' && isDieTile(cell)
       );
       if (canFall && grid[r + 1][c].state === 'EMPTY') return true;
@@ -334,7 +345,8 @@ export function hasEmptyBelow(grid: Cell[][]): boolean {
 
 export function spawnTiles(
   grid: Cell[][],
-  pool: SixPoolManager
+  pool: SixPoolManager,
+  catalystBoostPct = 0
 ): { grid: Cell[][], changed: boolean } {
   const newGrid = cloneGrid(grid);
   let changed = false;
@@ -345,7 +357,7 @@ export function spawnTiles(
       if (newGrid[0][c].type === 'BOMB_STANDARD' || newGrid[0][c].type === 'BOMB_RAINBOW') {
         continue;
       }
-      const w = pool.drawWild();
+      const w = pool.drawWild(catalystBoostPct);
       if (w === 3) {
         const wd = pool.drawDie();
         const wface = (wd >= 1 && wd <= 6 ? wd : 1) as DieFace;
@@ -483,7 +495,7 @@ export function damageAdjacentBlockers(
 // ── Chain validation ──────────────────────────────────────────────────────────
 
 function _isChainableTile(cell: Cell): boolean {
-  return isDieTile(cell) || cell.state === 'WILD';
+  return isDieTile(cell) || cell.state === 'WILD' || cell.state === 'MIRROR';
 }
 
 function _rawFace(cell: Cell): number {
@@ -510,6 +522,51 @@ function _resolveWilds(faces: number[]): DieFace[] {
     if (score > bestScore) { bestScore = score; bestFaces = candidate.slice(); }
   }
   return bestFaces;
+}
+
+// ── Live chain scoring resolution (ADR-025) ───────────────────────────────────
+//
+// NOT the same algorithm as _resolveWilds/hasValidChain above — those maximize
+// score to answer "does ANY valid chain exist" (dead-board detection). This
+// resolves what a SUBMITTED chain actually scores, and must match
+// VoxelPhysicsSystem.resolveMirrorFace / useFarkleGame.ts's
+// _resolveChainFacesForChain exactly (plurality for wild, raw-neighbor lookup
+// for mirror) to avoid drifting from calibrated RTP/Monte Carlo behavior.
+
+function _plurality(faces: number[]): number | undefined {
+  if (faces.length === 0) return undefined;
+  const counts: Record<number, number> = {};
+  for (const f of faces) counts[f] = (counts[f] ?? 0) + 1;
+  let best: number | undefined; let bestC = 0;
+  for (const [f, c] of Object.entries(counts)) {
+    if (c > bestC) { bestC = c; best = Number(f); }
+  }
+  return best;
+}
+
+export function resolveChainFaces(grid: Cell[][], chain: GridPos[]): DieFace[] {
+  const cells = chain
+    .map(pos => grid[pos.row]?.[pos.col])
+    .filter((c): c is Cell => c !== undefined);
+
+  // Raw per-position value: real face for normal/mirror cells, 0 sentinel for
+  // wild — mirror resolution reads this RAW array (pre-resolution), matching
+  // the client's exact semantics including the mirror-next-to-wild edge case
+  // (MIRROR_OPPOSITES[0] is undefined, falls back to the raw 0 itself).
+  const raw: number[] = cells.map(cell => (cell.state === 'WILD' ? 0 : (cell.face ?? 1)));
+  const nonSpecial = raw.filter((f, i) => f !== 0 && cells[i]!.state !== 'MIRROR');
+
+  return raw.map((f, i) => {
+    const cell = cells[i]!;
+    if (cell.state === 'WILD' || f === 0) {
+      return (_plurality(nonSpecial) ?? 1) as DieFace;
+    }
+    if (cell.state === 'MIRROR') {
+      const neighborFace = raw[i - 1] ?? raw[i + 1] ?? 1;
+      return (MIRROR_OPPOSITES[neighborFace] ?? neighborFace) as DieFace;
+    }
+    return f as DieFace;
+  });
 }
 
 export function hasValidChain(grid: Cell[][]): boolean {

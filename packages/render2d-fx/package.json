@@ -1,0 +1,15 @@
+{
+  "name": "@match3d/render2d-fx",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Deterministic visual-polish toolkit for the PixiJS 2D board (ADR-024/025): seeded RNG, fixed-point math, and cosmetic 2D physics. Vendored from jurerotar/ts-seedrandom, ShaiSrc/fixed-point, and kevglass/propel-js (all MIT) — see LICENSES/.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2"
+  }
+}

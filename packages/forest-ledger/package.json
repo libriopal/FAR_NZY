@@ -1,0 +1,16 @@
+{
+  "name": "@match3d/forest-ledger",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Decision ledger + Bito review runner, adapted from ~/devos (libriopal-devos). Not this repo's forest/ (a genetic-algorithm fitness simulator, unrelated concept) — see src/decisionLedger.ts's header note.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "~5.8.2"
+  }
+}

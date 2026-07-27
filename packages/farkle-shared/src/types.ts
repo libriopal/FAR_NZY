@@ -96,7 +96,11 @@ export interface DoublerCell {
   expiresAt: number;
 }
 
-export type CellState = 'NORMAL' | 'EMPTY' | 'SPAWNING' | 'FROZEN' | 'LOCKED' | 'WILD';
+// MIRROR: chains normally, face resolves via neighbor lookup (see gridUtils.ts
+// resolveChainFaces), not stored face. GHOST_PENDING: placed at a real
+// (row,col) at spawn time but not yet chainable — ANCHOR_GHOST flips it to
+// NORMAL in place (ADR-025).
+export type CellState = 'NORMAL' | 'EMPTY' | 'SPAWNING' | 'FROZEN' | 'LOCKED' | 'WILD' | 'MIRROR' | 'GHOST_PENDING';
 
 export type GamePhase =
   | 'IDLE' | 'CHAINING' | 'RESOLVING' | 'REFILLING'
@@ -114,10 +118,14 @@ export type RallyRole = 'RAINMAKER' | 'HEADHUNTER' | 'ARCHIVIST' | 'CONDUCTOR';
 
 export type ReactionVote = 'UP' | 'DOWN' | null;
 
+// SPHERE/MULTIPLIER_ORB/CATALYST added for ADR-025 grid-native entity model
+// (docs/adr/ADR-025-grid-native-entity-model.md) — the remaining 3 of the 12
+// voxel entity types (EntityType, above) that previously had no server-side
+// grid representation. MIRROR and GHOST_PENDING (CellState) cover the other 2.
 export interface Cell {
   id: string;
   face: DieFace | null;
-  type: DieColor | BlockerType | 'BOMB_STANDARD' | 'BOMB_RAINBOW' | 'NONE';
+  type: DieColor | BlockerType | 'BOMB_STANDARD' | 'BOMB_RAINBOW' | 'NONE' | 'SPHERE' | 'MULTIPLIER_ORB' | 'CATALYST';
   state: CellState;
   health?: number;
   fuseMs?: number;

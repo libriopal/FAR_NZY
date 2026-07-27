@@ -9,12 +9,12 @@ import { useGameStore } from '../store/gameStore.js';
 import { useFarkleStore } from '../store/farkleStore.js';
 import { useFarkleGame } from '../hooks/useFarkleGame.js';
 import { useMultiplayer } from '../hooks/useMultiplayer.js';
-import { VoxelPileScene } from '../game/VoxelPileScene.js';
+import { Board2DScene } from '../game/Board2DScene.js';
 import { FarkleHUD, BeatWindow } from './FarkleHUD.js';
+import { DiscoveryNotePrompt } from './DiscoveryNotePrompt.js';
 import { SettingsModal } from './SettingsModal.js';
 import { TransitionOverlay } from './TransitionOverlay.js';
 import type { AudioSettings } from './SettingsModal.js';
-import { VoxelPhysicsSystem } from '@match3d/game-core';
 import { adManager } from '@match3d/ads';
 import { useGameAudio } from '../hooks/useGameAudio.js';
 import { setMusicState, forceMusicState } from '../audio/gameAudio.js';
@@ -69,7 +69,6 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const setActiveScreen = useGameStore(s => s.setActiveScreen);
   const selectedLevelId = useGameStore(s => s.selectedLevelId);
   const gamePhase = useFarkleStore(s => s.gamePhase);
-  const physicsRef = useRef<VoxelPhysicsSystem | null>(null);
   const gameStartedRef = useRef(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -81,7 +80,7 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   const gameMode = useGameStore(s => s.gameMode);
   const { state: mpState, sendDisruption, sendRallyVote, sendRallyDecisionStart } = useMultiplayer();
   const isMultiplayer = !!mpState.roomCode;
-  const { startChain, extendChain, endChain, tapSphere, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(physicsRef, levelDef, gameMode ?? undefined, isMultiplayer);
+  const { grid, startChain, extendChain, endChain, tapEntity, bankScore, passScore, startGame, confirmRainmakerBomb, initiateHeist, blockHeist, rallyBank, rallyPass, rallyContinue } = useFarkleGame(levelDef, gameMode ?? undefined, isMultiplayer);
   useGameAudio(audioSettings);
   const isDisruptionMode = gameMode === 'VS_FREE' || gameMode === 'VS_CASINO'
     || gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO';
@@ -97,11 +96,6 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     forceMusicState(state);
   }, []);
 
-  const handleEmptyTap = useCallback((col: number) => {
-    if (!debugMode || !debugFace || !physicsRef.current) return;
-    physicsRef.current.spawnBody(col, 'die', debugFace);
-  }, [debugMode, debugFace, physicsRef]);
-
   // Must be above early returns — hooks must always be called in the same order
   const handleDisrupt = useCallback((type: DisruptionType) => {
     sendDisruption(type, [0, 1, 2, 3, 4, 5, 6]);
@@ -110,42 +104,15 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
   useEffect(() => {
     // Synchronously clear any stale win/lose phase so routing effect doesn't fire immediately
     useFarkleStore.getState().resetGame();
-
-    let cancelled = false;
     setInitError(null);
 
-    // Multiplayer: seed cosmetic physics from the server's boardSeed (when available)
-    // instead of Date.now(), so client renders stop ignoring server entropy entirely.
-    // Falls back to Date.now() if the seed hasn't arrived yet — not a hard block.
-    const physicsSeed = isMultiplayer && mpState.boardSeed != null ? mpState.boardSeed : Date.now();
-
-    VoxelPhysicsSystem.create(physicsSeed).then(sys => {
-      if (cancelled) { sys.destroy(); return; }
-      physicsRef.current = sys;
-      sys.startSimulation(
-        (transforms) => {
-          const chainSet = new Set(useFarkleStore.getState().chain);
-          useFarkleStore.getState().updateBodies(
-            transforms.map(t => ({ ...t, type: (t.entityType === 'sphere' ? 'sphere' : 'die') as 'die' | 'sphere', inChain: chainSet.has(t.id) }))
-          );
-        },
-        () => useFarkleStore.setState({ gamePhase: 'lose' }),
-      );
-      adManager.showInterstitial();
-      gameStartedRef.current = true;
-      startGame();
-    }).catch(err => {
-      if (!cancelled) {
-        console.error('[GameScreen] Physics init failed:', err);
-        setInitError(String(err));
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      physicsRef.current?.destroy();
-      physicsRef.current = null;
-    };
+    // ADR-024/025: no async physics init anymore — solo's SoloEngine and the
+    // multiplayer grid are both synchronous (solo instantiates its grid
+    // immediately in startGame(); multiplayer's grid arrives via ROOM_STATE/
+    // BOARD_UPDATE, already flowing through multiplayerStore).
+    adManager.showInterstitial();
+    gameStartedRef.current = true;
+    startGame();
   }, []);
 
   // Sync rally role from multiplayer state into farkle store
@@ -153,11 +120,15 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
     useFarkleStore.getState().setRallyRole(mpState.myRole);
   }, [mpState.myRole]);
 
-  // Apply incoming disruptions from multiplayer to local physics
+  // Apply incoming disruptions from multiplayer.
+  // TODO (deferred, ADR-024/025 follow-up): ice_send/lock_send/scramble had
+  // no server-side grid effect before this pivot either (the physics client
+  // applied them locally) — grid-native equivalents (spawn an ICE/LOCK cell,
+  // reroll a column's faces) aren't wired yet. Recorded in the disruption
+  // feed for UI purposes only; no board effect currently.
   useEffect(() => {
     const d = mpState.lastDisruption;
     if (!d) return;
-    physicsRef.current?.sendDisruption(d.targetColumns, d.type as 'ice_send' | 'lock_send' | 'scramble');
     useFarkleStore.getState().addDisruption(d);
   }, [mpState.lastDisruption]);
 
@@ -175,15 +146,10 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
       else if (outcome === 'pass') rallyPass();
       else if (outcome === 'continue') rallyContinue();
       useFarkleStore.getState().clearRallyVotes();
-    } else if (msg.type === 'BOARD_UPDATE') {
-      // Server recovered a dead board after P1 dead-state fix. Resync client physics
-      // so the player's board reflects the server's recovered state.
-      const p = physicsRef.current;
-      if (p) {
-        p.reshuffleBoard();
-        if (p.isDeadBoard()) p.injectScoringDie();
-      }
     }
+    // BOARD_UPDATE needs no handling here anymore — multiplayerStore already
+    // stores the grid directly (ADR-024/025), and Board2DScene re-renders
+    // from that store value. No client-side reconciliation needed.
   }, [mpState.lastMessage]);
 
   // C15: When active player triggers a rally decision, notify server so all players see the panel
@@ -304,12 +270,13 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
 
       {/* Game canvas — flex-1 */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-        <VoxelPileScene
+        <Board2DScene
+          grid={grid}
+          boardSeed={mpState.boardSeed}
           onChainStart={startChain}
           onChainExtend={extendChain}
           onChainEnd={endChain}
-          onEntityTap={tapSphere}
-          onEmptyTap={handleEmptyTap}
+          onEntityTap={tapEntity}
         />
 
         {/* Debug die picker — vertical strip on the left */}
@@ -389,6 +356,8 @@ function GameScreenInner({ onRetry }: { onRetry: () => void }) {
           {...(isRallyMode ? { onPass: passScore, onRallyBank: handleRallyBank, onRallyPass: handleRallyPass, onRallyContinue: handleRallyContinue } : {})}
           {...((gameMode === 'HEIST_FREE' || gameMode === 'HEIST_CASINO') ? { onInitiateHeist: initiateHeist, onBlockHeist: blockHeist } : {})}
         />
+
+        <DiscoveryNotePrompt />
       </div>
 
       {/* Beat Window — Gothic rhythm bar */}

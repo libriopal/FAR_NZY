@@ -54,7 +54,9 @@ export async function insertSession(session: Omit<SessionAnalytics, 'skill_score
     const client = getClient();
     if (!client) return;
     const skill_score = computeSkillScore(session);
-    await client.from('session_analytics').upsert({ ...session, skill_score });
+    // §36 Research Epoch — human-set label via env, never derived from gameplay.
+    const epoch_id = process.env['EVIDENCE_EPOCH_ID'] ?? null;
+    await client.from('session_analytics').upsert({ ...session, skill_score, epoch_id });
   } catch (e) {
     console.error('[analytics] insertSession failed:', e);
   }

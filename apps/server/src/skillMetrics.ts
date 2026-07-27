@@ -20,6 +20,7 @@ export interface SessionAnalytics {
   final_score: number;
   avg_chain_score: number;
   skill_score?: number;
+  epoch_id?: string | null;
 }
 
 export interface ChainDecision {

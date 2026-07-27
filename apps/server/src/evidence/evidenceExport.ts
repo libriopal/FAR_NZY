@@ -169,10 +169,12 @@ export async function buildEvidenceReturnPackage(epoch_id?: string): Promise<Evi
   const research_notes = discovery_log.filter((e) => e.event_type === 'session_retrospective');
 
   const participants = new Set(sessions.map((s) => s.player_id)).size;
+  const epoch_ids_present = [...new Set(sessions.map((s) => s.epoch_id).filter((e): e is string => e != null))];
 
   const evidence_manifest = {
     stage: 'stage1',
     epoch_id: epoch_id ?? null,
+    epoch_ids_present,
     build_version: process.env['npm_package_version'] ?? 'unknown',
     export_version: EXPORT_VERSION,
     generation_time: new Date().toISOString(),
